@@ -1,0 +1,1 @@
+ALTER TABLE "ProductPricing" ALTER COLUMN "BasePrice" DROP NOT NULL;

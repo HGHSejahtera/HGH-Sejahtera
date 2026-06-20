@@ -1,0 +1,85 @@
+import { Menu, Bell } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useSidebar } from './SidebarContext';
+import { useLocation } from 'react-router-dom';
+import { useTranslation } from '@/hooks/useTranslation';
+import 'flag-icons/css/flag-icons.min.css';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+export function Header() {
+    const { toggleSidebar } = useSidebar();
+    const location = useLocation();
+
+    const { t, language, setLanguage } = useTranslation();
+
+    // Generate dynamic title based on path
+    const getPageTitle = () => {
+        const path = location.pathname;
+        if (path.includes('/dashboard')) return t('header.dashboard');
+        if (path.includes('/pos')) return t('header.pos');
+        if (path.includes('/pick-queue')) return t('header.pickPack');
+        if (path.includes('/pack-order')) return t('header.packOrder');
+        if (path.includes('/orders/upload')) return t('header.orderUpload');
+        if (path.includes('/products/barcodes')) return t('header.barcodes');
+        if (path.includes('/products')) return t('header.products');
+        if (path.includes('/inventory')) return t('header.inventory');
+        if (path.includes('/agents')) return t('header.agents');
+        if (path.includes('/pricing')) return t('header.pricing');
+        if (path.includes('/settings')) return t('header.settings');
+        return t('header.workspace');
+    };
+
+    return (
+        <header className="h-16 bg-white/80 backdrop-blur-md border-b border-gray-200/50 flex items-center justify-between px-4 md:px-6 sticky top-0 z-10">
+            <div className="flex items-center">
+                <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="md:hidden mr-2 -ml-2"
+                    onClick={toggleSidebar}
+                >
+                    <Menu className="h-5 w-5 text-gray-700" />
+                </Button>
+                <h1 className="text-lg md:text-xl font-bold text-gray-900 tracking-tight">
+                    {getPageTitle()}
+                </h1>
+            </div>
+            
+            <div className="flex items-center space-x-2 md:space-x-4">
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="px-2 w-9 h-9 hover:bg-gray-100/80 transition-colors focus-visible:ring-0">
+                            <span className={`fi fi-${language === 'en' ? 'gb' : 'my'} text-lg rounded-sm overflow-hidden`}></span>
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-44 p-1.5 rounded-xl border border-gray-100 shadow-sm">
+                        <DropdownMenuItem 
+                            onClick={() => setLanguage('en')} 
+                            className={`flex items-center gap-3 cursor-pointer py-2.5 px-3 rounded-lg transition-colors outline-none ${language === 'en' ? 'bg-indigo-50/80 text-indigo-700 font-medium' : 'text-gray-600 hover:bg-gray-50 focus:bg-gray-50'}`}
+                        >
+                            <span className="fi fi-gb text-lg rounded-sm overflow-hidden shadow-sm shrink-0"></span> 
+                            <span>English</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                            onClick={() => setLanguage('my')} 
+                            className={`flex items-center gap-3 cursor-pointer py-2.5 px-3 rounded-lg transition-colors outline-none ${language === 'my' ? 'bg-indigo-50/80 text-indigo-700 font-medium' : 'text-gray-600 hover:bg-gray-50 focus:bg-gray-50'}`}
+                        >
+                            <span className="fi fi-my text-lg rounded-sm overflow-hidden shadow-sm shrink-0"></span> 
+                            <span>Bahasa Melayu</span>
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+
+                <Button variant="ghost" size="icon" className="relative">
+                    <Bell className="h-5 w-5 text-gray-500" />
+                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
+                </Button>
+            </div>
+        </header>
+    );
+}
