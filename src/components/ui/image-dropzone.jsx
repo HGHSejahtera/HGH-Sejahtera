@@ -1,6 +1,6 @@
-import React, { useCallback, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { supabase } from '@/lib/supabase';
+import imageCompression from 'browser-image-compression';
 import { UploadCloud, X, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -16,21 +16,52 @@ export function ImageDropzone({ value, onChange, className }) {
         setError('');
 
         try {
-            const fileExt = file.name.split('.').pop();
+            // 1. Compress the image client-side
+            const options = {
+                maxSizeMB: 1, // Compress to ~1MB or less
+                maxWidthOrHeight: 1080,
+                useWebWorker: true,
+                fileType: 'image/webp'
+            };
+            
+            let compressedFile = file;
+            try {
+                compressedFile = await imageCompression(file, options);
+            } catch (compressErr) {
+                console.warn("Compression failed, using original file", compressErr);
+            }
+
+            const fileExt = 'webp'; // Since we convert to webp
             const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
-            const filePath = `${fileName}`;
 
-            const { error: uploadError } = await supabase.storage
-                .from('product-images')
-                .upload(filePath, file);
+            // 2. Get Pre-signed URL from our Vercel Backend API
+            const res = await fetch('/api/generate-r2-url', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fileName, fileType: 'image/webp' })
+            });
 
-            if (uploadError) throw uploadError;
+            if (!res.ok) {
+                throw new Error('Gagal mendapatkan kebenaran upload (Pre-signed URL gagal)');
+            }
 
-            const { data } = supabase.storage
-                .from('product-images')
-                .getPublicUrl(filePath);
+            const { url: presignedUrl, publicUrl } = await res.json();
 
-            onChange(data.publicUrl);
+            // 3. Upload directly to Cloudflare R2
+            const uploadRes = await fetch(presignedUrl, {
+                method: 'PUT',
+                body: compressedFile,
+                headers: {
+                    'Content-Type': 'image/webp'
+                }
+            });
+
+            if (!uploadRes.ok) {
+                throw new Error('Gagal upload gambar ke Cloudflare R2');
+            }
+
+            // 4. Update UI with the final public URL
+            onChange(publicUrl);
         } catch (err) {
             console.error('Upload error:', err);
             setError(err.message || 'Failed to upload image.');
