@@ -7,6 +7,8 @@ import { ProductBulkImport } from './pages/Products/ProductBulkImport';
 import { BarcodeGenerator } from './pages/Products/Barcode';
 import { Login } from './pages/Auth/Login';
 import { Registration } from './pages/Auth/Registration';
+import { AccountActivation } from './pages/Auth/AccountActivation';
+import { PendingApproval } from './pages/Auth/PendingApproval';
 import { POS } from './pages/POS/POS';
 import { PickPack } from './pages/Orders/PickPack';
 import { PackOrder } from './pages/Orders/PackOrder';
@@ -22,6 +24,7 @@ import { InventoryDashboard } from './pages/Inventory/InventoryDashboard';
 import { StockIn } from './pages/Inventory/StockIn';
 
 import { Dashboard } from './pages/Dashboard/Dashboard';
+
 
 export default function App() {
     const { isAuthenticated, isLoading } = useAuthStore();
@@ -40,6 +43,8 @@ export default function App() {
                 {/* Public Routes */}
                 <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/dashboard" />} />
                 <Route path="/HGH/Registration" element={<Registration />} />
+                <Route path="/activation" element={<AccountActivation />} />
+                <Route path="/pending-approval" element={<PendingApproval />} />
                 
                 {/* Protected Routes inside Layout */}
                 {isAuthenticated ? (

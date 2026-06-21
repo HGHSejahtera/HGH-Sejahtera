@@ -322,11 +322,7 @@ export function Registration() {
             if (error) throw error;
             setIsSuccess(true);
             
-            // Trigger the send-approval-email edge function
-            await supabase.functions.invoke('send-approval-email', {
-                body: { email, name }
-            });
-            
+
         } catch (err) {
             console.error('Registration Error:', err);
             let msg = err?.message || err?.error_description || String(err);
@@ -716,7 +712,7 @@ export function Registration() {
                                 size="lg" 
                                 disabled={isLoading}
                             >
-                                {isLoading ? 'Processing...' : 'Register Now'}
+                                {isLoading ? 'Processing...' : 'Register'}
                             </Button>
                         </form>
                     ) : (

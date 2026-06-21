@@ -27,3 +27,5 @@ dist-ssr
 /MemoryCore/
 /Analysis/
 /Implementation Plan/
+
+.vercel

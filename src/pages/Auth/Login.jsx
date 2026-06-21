@@ -163,6 +163,12 @@ export function Login() {
   });
 
   useEffect(() => {
+      // Route Pending users to the dedicated pending-approval screen so they can check their status
+      if (user?.role === 'Pending') {
+          navigate('/pending-approval');
+          return;
+      }
+
       if (isAuthenticated && user) {
           if (user.role === 'Agent') {
               navigate('/agent');

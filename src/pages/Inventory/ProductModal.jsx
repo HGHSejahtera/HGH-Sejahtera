@@ -1,15 +1,21 @@
 import { useState } from 'react';
 import { useProducts } from '@/hooks/useProducts';
+import { useBrands } from '@/hooks/useBrands';
+import { useCategories } from '@/hooks/useCategories';
 import { useBulkUpdatePricing } from '@/hooks/usePricing';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { X, AlertTriangle } from 'lucide-react';
+import { CreatableCombobox } from '@/components/ui/creatable-combobox';
+import { ImageDropzone } from '@/components/ui/image-dropzone';
+import { X, AlertTriangle, Wand2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 export function ProductModal({ isOpen, onClose, product = null }) {
     const { addProduct, updateProduct } = useProducts();
+    const { data: brands = [] } = useBrands();
+    const { data: categories = [] } = useCategories();
     const updatePricing = useBulkUpdatePricing();
     const [isLoading, setIsLoading] = useState(false);
     const [errorMsg, setErrorMsg] = useState('');
@@ -19,7 +25,7 @@ export function ProductModal({ isOpen, onClose, product = null }) {
     const pricing = Array.isArray(pricingObj) ? (pricingObj[0] || {}) : (pricingObj || {});
     
     const [hasRRP, setHasRRP] = useState(
-        product ? (pricing.BasePrice !== null && pricing.BasePrice !== undefined) : true
+        product ? (pricing.BasePrice !== null && pricing.BasePrice !== undefined) : false
     );
     
     const [formData, setFormData] = useState({
@@ -79,6 +85,17 @@ export function ProductModal({ isOpen, onClose, product = null }) {
         const barcodeBase = prefix + randomDigits;
         const checkDigit = calculateCheckDigit(barcodeBase);
         return barcodeBase + checkDigit;
+    };
+
+    const handleGenerateBarcodeClick = () => {
+        const code = generateInternalBarcode();
+        setFormData(prev => ({
+            ...prev,
+            Barcode: code,
+            SellerSKU: code,
+            GTIN: code
+        }));
+        setFieldErrors({});
     };
 
     const handleSubmit = async (e) => {
@@ -166,7 +183,7 @@ export function ProductModal({ isOpen, onClose, product = null }) {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm overflow-y-auto p-4 sm:p-6 lg:p-10 animate-in fade-in duration-200">
-            <div className="w-full max-w-7xl bg-white rounded-xl shadow-2xl relative flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
+            <div className="w-full max-w-[1400px] bg-white rounded-xl shadow-2xl relative flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
                 <div className="flex items-center justify-between px-10 py-6 border-b border-gray-100 shrink-0">
                     <h2 className="text-2xl font-bold tracking-tight text-gray-900">
                         {product ? 'Edit Product Profile' : 'Add New Product'}
@@ -188,86 +205,112 @@ export function ProductModal({ isOpen, onClose, product = null }) {
                             </div>
                         )}
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-16">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                             
-                            {/* Left Column: Profile & Identifiers */}
-                            <div className="space-y-10">
-                                
+                            {/* Column 1: Product Profile */}
+                            <div className="space-y-8">
                                 <section>
-                                    <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-6 border-b border-gray-100 pb-2">Product Profile</h3>
-                                    <div className="grid grid-cols-2 gap-6">
-                                        <div className="space-y-2 col-span-2">
-                                            <Label htmlFor="ProductName" className="text-gray-700 font-medium">Product Name <span className="text-red-500">*</span></Label>
+                                    <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-5 border-b border-gray-100 pb-2">Product Profile</h3>
+                                    <div className="space-y-5">
+                                        <div className="space-y-2 z-50">
+                                            <Label htmlFor="Brand" className="text-gray-700 font-medium flex items-center">Brand</Label>
+                                            <CreatableCombobox 
+                                                id="Brand" 
+                                                options={brands} 
+                                                value={formData.Brand} 
+                                                onChange={(val) => setFormData(prev => ({ ...prev, Brand: val }))} 
+                                                emptyMessage="Tiada brand ditemui."
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="ProductName" className="text-gray-700 font-medium flex items-center">
+                                                Product Name <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500 ml-1.5 mb-0.5 shadow-sm shadow-blue-500/50"></span>
+                                            </Label>
                                             <Input id="ProductName" name="ProductName" required value={formData.ProductName} onChange={handleChange} className="bg-gray-50/50 focus:bg-white" />
                                         </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="Brand" className="text-gray-700 font-medium">Brand</Label>
-                                            <Input id="Brand" name="Brand" value={formData.Brand} onChange={handleChange} className="bg-gray-50/50 focus:bg-white" />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="Category" className="text-gray-700 font-medium">Category</Label>
-                                            <Input id="Category" name="Category" value={formData.Category} onChange={handleChange} className="bg-gray-50/50 focus:bg-white" />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="Variation" className="text-gray-700 font-medium">Variation</Label>
-                                            <Input id="Variation" name="Variation" value={formData.Variation} onChange={handleChange} className="bg-gray-50/50 focus:bg-white" placeholder="e.g. Lavender" />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="Size" className="text-gray-700 font-medium">Size</Label>
-                                            <Input id="Size" name="Size" value={formData.Size} onChange={handleChange} className="bg-gray-50/50 focus:bg-white" placeholder="e.g. 100 ml" />
-                                        </div>
-                                        <div className="space-y-2 col-span-2">
-                                            <Label htmlFor="ImageURL" className="text-gray-700 font-medium">Image URL</Label>
-                                            <Input id="ImageURL" name="ImageURL" value={formData.ImageURL} onChange={handleChange} className="bg-gray-50/50 focus:bg-white" />
-                                        </div>
-                                    </div>
-                                </section>
-
-                                <section>
-                                    <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-6 border-b border-gray-100 pb-2">Identifiers</h3>
-                                    <div className="grid grid-cols-2 gap-6">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="MasterSKU" className="text-gray-700 font-medium">Master SKU</Label>
-                                            <Input id="MasterSKU" name="MasterSKU" value={formData.MasterSKU} onChange={handleChange} className="bg-gray-50/50 focus:bg-white" />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="Barcode" className={`font-medium ${fieldErrors.Barcode ? 'text-red-600' : 'text-gray-700'}`}>Barcode</Label>
-                                            <Input 
-                                                id="Barcode" 
-                                                name="Barcode" 
-                                                value={formData.Barcode} 
-                                                onChange={(e) => {
-                                                    setFieldErrors({}); // Clear error when typing
-                                                    handleChange({target: {name: 'Barcode', value: e.target.value.replace(/\D/g, '')}});
-                                                }} 
-                                                maxLength="13" 
-                                                className={fieldErrors.Barcode ? 'border-red-500 focus-visible:ring-red-500 bg-red-50' : 'bg-gray-50/50 focus:bg-white'} 
+                                        <div className="space-y-2 z-40">
+                                            <Label htmlFor="Category" className="text-gray-700 font-medium flex items-center">Category</Label>
+                                            <CreatableCombobox 
+                                                id="Category" 
+                                                options={categories} 
+                                                value={formData.Category} 
+                                                onChange={(val) => setFormData(prev => ({ ...prev, Category: val }))} 
+                                                emptyMessage="Tiada kategori ditemui."
                                             />
-                                            {fieldErrors.Barcode && (
-                                                <p className="text-xs font-medium text-red-600 flex items-center gap-1 mt-1">
-                                                    <AlertTriangle className="h-3 w-3" /> {fieldErrors.Barcode}
-                                                </p>
-                                            )}
                                         </div>
-                                        <div className="space-y-1.5">
-                                            <Label className="text-xs text-gray-400 font-bold uppercase tracking-wide">Seller SKU</Label>
-                                            <div className="text-sm font-mono text-gray-600 bg-gray-50 px-3 py-2.5 rounded-lg border border-dashed border-gray-200 truncate">{formData.SellerSKU || '-'}</div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="Variation" className="text-gray-700 font-medium flex items-center">Variation</Label>
+                                            <Input id="Variation" name="Variation" value={formData.Variation} onChange={handleChange} className="bg-gray-50/50 focus:bg-white" />
                                         </div>
-                                        <div className="space-y-1.5">
-                                            <Label className="text-xs text-gray-400 font-bold uppercase tracking-wide">GTIN</Label>
-                                            <div className="text-sm font-mono text-gray-600 bg-gray-50 px-3 py-2.5 rounded-lg border border-dashed border-gray-200 truncate">{formData.GTIN || '-'}</div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="Size" className="text-gray-700 font-medium flex items-center">Size</Label>
+                                            <Input id="Size" name="Size" value={formData.Size} onChange={handleChange} className="bg-gray-50/50 focus:bg-white" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-gray-700 font-medium flex items-center">Product Image</Label>
+                                            <ImageDropzone 
+                                                value={formData.ImageURL} 
+                                                onChange={(url) => setFormData(prev => ({ ...prev, ImageURL: url }))} 
+                                                className="h-28 aspect-video w-full"
+                                            />
                                         </div>
                                     </div>
                                 </section>
                             </div>
 
-                            {/* Right Column: Inventory & Pricing */}
-                            <div className="space-y-10">
-                                
+                            {/* Column 2: Inventory Tracking */}
+                            <div className="space-y-8">
                                 <section>
-                                    <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-6 border-b border-gray-100 pb-2">Initial Setup</h3>
-                                    <div className="grid grid-cols-2 gap-6">
+                                    <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-5 border-b border-gray-100 pb-2">Inventory Tracking</h3>
+                                    <div className="space-y-5">
                                         <div className="space-y-2">
+                                            <Label htmlFor="MasterSKU" className="text-gray-700 font-medium flex items-center">Master SKU</Label>
+                                            <Input id="MasterSKU" name="MasterSKU" value={formData.MasterSKU} onChange={handleChange} className="bg-gray-50/50 focus:bg-white" />
+                                        </div>
+                                        
+                                        <div className="space-y-2">
+                                            <Label htmlFor="Barcode" className={`font-medium flex items-center ${fieldErrors.Barcode ? 'text-red-600' : 'text-gray-700'}`}>
+                                                Barcode <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500 ml-1.5 mb-0.5 shadow-sm shadow-blue-500/50"></span>
+                                            </Label>
+                                            <div className="relative">
+                                                <Input 
+                                                    id="Barcode" 
+                                                    name="Barcode" 
+                                                    value={formData.Barcode} 
+                                                    onChange={(e) => {
+                                                        setFieldErrors({});
+                                                        handleChange({target: {name: 'Barcode', value: e.target.value.replace(/\D/g, '')}});
+                                                    }} 
+                                                    maxLength="13" 
+                                                    className={`pr-12 ${fieldErrors.Barcode ? 'border-red-500 focus-visible:ring-red-500 bg-red-50' : 'bg-gray-50/50 focus:bg-white'}`} 
+                                                />
+                                                <button 
+                                                    type="button"
+                                                    onClick={handleGenerateBarcodeClick}
+                                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                                                    title="Auto-generate Barcode"
+                                                >
+                                                    <Wand2 className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                            {fieldErrors.Barcode && (
+                                                <p className="text-xs font-medium text-red-600 flex items-center gap-1 mt-1.5">
+                                                    <AlertTriangle className="h-3 w-3" /> {fieldErrors.Barcode}
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label className="text-gray-700 font-medium flex items-center">Seller SKU</Label>
+                                            <Input readOnly disabled value={formData.SellerSKU} placeholder="Auto-Generate" className="bg-gray-100 text-gray-500 cursor-not-allowed font-mono" />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label className="text-gray-700 font-medium flex items-center">GTIN</Label>
+                                            <Input readOnly disabled value={formData.GTIN} placeholder="Auto-Generate" className="bg-gray-100 text-gray-500 cursor-not-allowed font-mono" />
+                                        </div>
+
+                                        <div className="space-y-2 pt-2">
                                             <Label htmlFor="Stock" className="text-gray-700 font-medium">
                                                 {product ? 'Current Stock' : 'Initial Stock'}
                                             </Label>
@@ -282,55 +325,52 @@ export function ProductModal({ isOpen, onClose, product = null }) {
                                                 className={product ? "bg-gray-100 text-gray-500 cursor-not-allowed" : "bg-gray-50/50 focus:bg-white"} 
                                             />
                                         </div>
+                                    </div>
+                                </section>
+                            </div>
+
+                            {/* Column 3: Price */}
+                            <div className="space-y-8">
+                                <section>
+                                    <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-5 border-b border-gray-100 pb-2">Price</h3>
+                                    <div className="space-y-5">
                                         <div className="space-y-2">
-                                            <Label htmlFor="CostPrice" className="text-gray-700 font-medium">Cost Price (RM) <span className="text-red-500">*</span></Label>
+                                            <Label htmlFor="CostPrice" className="text-gray-700 font-medium flex items-center">
+                                                Cost Price <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500 ml-1.5 mb-0.5 shadow-sm shadow-blue-500/50"></span>
+                                            </Label>
                                             <Input id="CostPrice" name="CostPrice" type="number" step="0.01" required value={formData.CostPrice} onChange={handleChange} onBlur={handlePriceBlur} className="bg-gray-50/50 focus:bg-white" />
                                         </div>
-                                        <div className="space-y-3 col-span-2">
-                                            <div className="flex items-center justify-between p-3 bg-gray-50/50 border border-gray-100 rounded-lg">
-                                                <div className="flex items-center group relative">
-                                                    <Label className="text-gray-700 font-medium cursor-help flex items-center mb-0">
-                                                        Set Recommended Retail Price (RRP)
-                                                    </Label>
-                                                    <div className="absolute left-0 bottom-full mb-2 px-3 py-1.5 bg-gray-900 text-white text-xs font-medium rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
-                                                        Toggle to enable HQ recommended price
-                                                    </div>
-                                                </div>
+                                        
+                                        <div className="space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <Label className="text-gray-700 font-medium">Recommended Retail Price</Label>
                                                 <Switch checked={hasRRP} onCheckedChange={(checked) => setHasRRP(checked)} />
                                             </div>
-                                            
                                             {hasRRP && (
-                                                <div className="space-y-2 animate-in slide-in-from-top-2 duration-200">
-                                                    <Label htmlFor="BasePrice" className="text-gray-700 font-medium">RRP (RM) <span className="text-red-500">*</span></Label>
+                                                <div className="animate-in slide-in-from-top-2 duration-200">
                                                     <Input id="BasePrice" name="BasePrice" type="number" step="0.01" required={hasRRP} value={formData.BasePrice} onChange={handleChange} onBlur={handlePriceBlur} className="bg-gray-50/50 focus:bg-white" />
                                                 </div>
                                             )}
                                         </div>
-                                    </div>
-                                </section>
 
-                                <section>
-                                    <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-6 border-b border-gray-100 pb-2">Pricing Configuration</h3>
-                                    <div className="space-y-6">
-                                        <div className="grid grid-cols-2 gap-6">
-                                            <div className="space-y-2">
-                                                <Label className="text-gray-700 font-medium">Retail Price</Label>
-                                                <Input name="RetailRule" type="number" step="0.01" value={formData.RetailRule} onChange={handleChange} onBlur={handlePriceBlur} className="bg-gray-50/50 focus:bg-white" />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label className="text-gray-700 font-medium">Wholesale Price</Label>
-                                                <Input name="WholesaleRule" type="number" step="0.01" value={formData.WholesaleRule} onChange={handleChange} onBlur={handlePriceBlur} className="bg-gray-50/50 focus:bg-white" />
-                                            </div>
-                                        </div>
-                                        
                                         <div className="space-y-2">
-                                            <Label className="text-gray-700 font-medium">Agent Price</Label>
-                                            <Input name="AgentMarkup" type="number" step="0.01" value={formData.AgentMarkup} onChange={handleChange} onBlur={handlePriceBlur} className="bg-gray-50/50 focus:bg-white" />
+                                            <Label htmlFor="RetailRule" className="text-gray-700 font-medium flex items-center">Retail Price</Label>
+                                            <Input id="RetailRule" name="RetailRule" type="number" step="0.01" value={formData.RetailRule} onChange={handleChange} onBlur={handlePriceBlur} className="bg-gray-50/50 focus:bg-white" />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label htmlFor="WholesaleRule" className="text-gray-700 font-medium flex items-center">Wholesale Price</Label>
+                                            <Input id="WholesaleRule" name="WholesaleRule" type="number" step="0.01" value={formData.WholesaleRule} onChange={handleChange} onBlur={handlePriceBlur} className="bg-gray-50/50 focus:bg-white" />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label htmlFor="AgentMarkup" className="text-gray-700 font-medium flex items-center">Agent Price</Label>
+                                            <Input id="AgentMarkup" name="AgentMarkup" type="number" step="0.01" value={formData.AgentMarkup} onChange={handleChange} onBlur={handlePriceBlur} className="bg-gray-50/50 focus:bg-white" />
                                         </div>
                                     </div>
                                 </section>
-
                             </div>
+
                         </div>
                     </form>
                 </div>

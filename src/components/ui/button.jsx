@@ -1,3 +1,4 @@
+import * as React from "react"
 import { cva } from "class-variance-authority";
 import { Slot } from "radix-ui"
 
@@ -59,5 +60,4 @@ function Button({
   );
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
 export { Button, buttonVariants }
