@@ -11,8 +11,20 @@ import { CreatableCombobox } from '@/components/ui/creatable-combobox';
 import { ImageDropzone } from '@/components/ui/image-dropzone';
 import { X, AlertTriangle, Wand2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { useTranslation } from '@/hooks/useTranslation';
+
+const formatPlatformData = (PlatformData) => {
+    if (!PlatformData || Object.keys(PlatformData).length === 0) return '';
+
+    try {
+        return JSON.stringify(PlatformData, null, 2);
+    } catch {
+        return '';
+    }
+};
 
 export function ProductModal({ isOpen, onClose, product = null }) {
+    const { t } = useTranslation();
     const { addProduct, updateProduct } = useProducts();
     const { data: brands = [] } = useBrands();
     const { data: categories = [] } = useCategories();
@@ -23,11 +35,11 @@ export function ProductModal({ isOpen, onClose, product = null }) {
 
     const pricingObj = product?.ProductPricing;
     const pricing = Array.isArray(pricingObj) ? (pricingObj[0] || {}) : (pricingObj || {});
-    
+
     const [hasRRP, setHasRRP] = useState(
         product ? (pricing.BasePrice !== null && pricing.BasePrice !== undefined) : false
     );
-    
+
     const [formData, setFormData] = useState({
         ImageURL: product?.ImageURL || '',
         MasterSKU: product?.MasterSKU || '',
@@ -40,7 +52,12 @@ export function ProductModal({ isOpen, onClose, product = null }) {
         SellerSKU: product?.SellerSKU || '',
         GTIN: product?.GTIN || '',
         CostPrice: product?.CostPrice || '',
+        FakeCostPrice: product?.FakeCostPrice || '',
+        StockistPrice: product?.StockistPrice || '',
         Stock: product?.Stock || 0,
+        WeightG: product?.WeightG || '',
+        Dimensions: product?.Dimensions || '',
+        PlatformData: formatPlatformData(product?.PlatformData),
         PricingModel: pricing.PricingModel || 'HQ_DISCOUNT',
         BasePrice: pricing.BasePrice ?? product?.Price ?? '',
         RetailRule: pricing.RetailRule ?? '',
@@ -51,8 +68,8 @@ export function ProductModal({ isOpen, onClose, product = null }) {
     const handleChange = (e) => {
         const { name, value } = e.target;
         if (name === 'Barcode') {
-            setFormData(prev => ({ 
-                ...prev, 
+            setFormData(prev => ({
+                ...prev,
                 Barcode: value,
                 SellerSKU: value,
                 GTIN: value
@@ -98,6 +115,24 @@ export function ProductModal({ isOpen, onClose, product = null }) {
         setFieldErrors({});
     };
 
+    const parsePlatformData = () => {
+        const PlatformDataText = formData.PlatformData.trim();
+
+        if (!PlatformDataText) return {};
+
+        try {
+            const ParsedPlatformData = JSON.parse(PlatformDataText);
+
+            if (!ParsedPlatformData || typeof ParsedPlatformData !== 'object' || Array.isArray(ParsedPlatformData)) {
+                return { Error: 'Platform Data must be a valid JSON object.' };
+            }
+
+            return { Value: ParsedPlatformData };
+        } catch {
+            return { Error: 'Platform Data must be valid JSON.' };
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setIsLoading(true);
@@ -109,13 +144,22 @@ export function ProductModal({ isOpen, onClose, product = null }) {
             if (!finalBarcode || finalBarcode.trim() === '') {
                 finalBarcode = generateInternalBarcode();
             } else {
-                // Strict validation for EAN-13
                 if (!/^\d{13}$/.test(finalBarcode)) {
                     setFieldErrors({ Barcode: 'Barcode (EAN-13) must be exactly 13 digits.' });
                     setIsLoading(false);
                     return;
                 }
             }
+
+            const PlatformDataResult = parsePlatformData();
+            if (PlatformDataResult.Error) {
+                setFieldErrors({ PlatformData: PlatformDataResult.Error });
+                setIsLoading(false);
+                return;
+            }
+
+            const WeightG = formData.WeightG === '' ? null : parseInt(formData.WeightG, 10);
+            const ProductRRP = hasRRP ? (parseFloat(formData.BasePrice) || 0) : 0;
 
             const productData = {
                 ImageURL: formData.ImageURL || null,
@@ -129,6 +173,12 @@ export function ProductModal({ isOpen, onClose, product = null }) {
                 SellerSKU: finalBarcode || null,
                 GTIN: finalBarcode || null,
                 CostPrice: parseFloat(formData.CostPrice) || 0,
+                FakeCostPrice: parseFloat(formData.FakeCostPrice) || 0,
+                StockistPrice: parseFloat(formData.StockistPrice) || 0,
+                Price: ProductRRP,
+                WeightG: Number.isFinite(WeightG) ? WeightG : null,
+                Dimensions: formData.Dimensions || null,
+                PlatformData: PlatformDataResult.Value || {},
                 IsActive: true
             };
 
@@ -140,9 +190,8 @@ export function ProductModal({ isOpen, onClose, product = null }) {
             } else {
                 const newProd = await addProduct.mutateAsync(productData);
                 savedProductId = newProd.ProductID;
-                
-                // If there's initial stock, log it properly using the RPC
-                const initialStock = parseInt(formData.Stock) || 0;
+
+                const initialStock = parseInt(formData.Stock, 10) || 0;
                 if (initialStock > 0) {
                     await supabase.rpc('stock_in_product', {
                         product_id_input: savedProductId,
@@ -152,7 +201,6 @@ export function ProductModal({ isOpen, onClose, product = null }) {
                 }
             }
 
-            // Save Pricing
             if (savedProductId) {
                 const pricingData = {
                     ProductID: savedProductId,
@@ -168,7 +216,6 @@ export function ProductModal({ isOpen, onClose, product = null }) {
             onClose();
         } catch (error) {
             console.error('Failed to save product:', error);
-            // Catch PostgreSQL unique constraint violation (code 23505) or error string
             if (error.code === '23505' || error.message?.includes('duplicate key') || error.message?.includes('unique constraint')) {
                 setFieldErrors({ Barcode: 'This barcode is already registered to another product.' });
             } else {
@@ -206,20 +253,18 @@ export function ProductModal({ isOpen, onClose, product = null }) {
                         )}
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                            
-                            {/* Column 1: Product Profile */}
                             <div className="space-y-8">
                                 <section>
                                     <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-5 border-b border-gray-100 pb-2">Product Profile</h3>
                                     <div className="space-y-5">
                                         <div className="space-y-2 z-50">
                                             <Label htmlFor="Brand" className="text-gray-700 font-medium flex items-center">Brand</Label>
-                                            <CreatableCombobox 
-                                                id="Brand" 
-                                                options={brands} 
-                                                value={formData.Brand} 
-                                                onChange={(val) => setFormData(prev => ({ ...prev, Brand: val }))} 
-                                                emptyMessage="Tiada brand ditemui."
+                                            <CreatableCombobox
+                                                id="Brand"
+                                                options={brands}
+                                                value={formData.Brand}
+                                                onChange={(val) => setFormData(prev => ({ ...prev, Brand: val }))}
+                                                emptyMessage={t('productModal.noBrandFound')}
                                             />
                                         </div>
                                         <div className="space-y-2">
@@ -230,12 +275,12 @@ export function ProductModal({ isOpen, onClose, product = null }) {
                                         </div>
                                         <div className="space-y-2 z-40">
                                             <Label htmlFor="Category" className="text-gray-700 font-medium flex items-center">Category</Label>
-                                            <CreatableCombobox 
-                                                id="Category" 
-                                                options={categories} 
-                                                value={formData.Category} 
-                                                onChange={(val) => setFormData(prev => ({ ...prev, Category: val }))} 
-                                                emptyMessage="Tiada kategori ditemui."
+                                            <CreatableCombobox
+                                                id="Category"
+                                                options={categories}
+                                                value={formData.Category}
+                                                onChange={(val) => setFormData(prev => ({ ...prev, Category: val }))}
+                                                emptyMessage={t('productModal.noCategoryFound')}
                                             />
                                         </div>
                                         <div className="space-y-2">
@@ -248,9 +293,9 @@ export function ProductModal({ isOpen, onClose, product = null }) {
                                         </div>
                                         <div className="space-y-2">
                                             <Label className="text-gray-700 font-medium flex items-center">Product Image</Label>
-                                            <ImageDropzone 
-                                                value={formData.ImageURL} 
-                                                onChange={(url) => setFormData(prev => ({ ...prev, ImageURL: url }))} 
+                                            <ImageDropzone
+                                                value={formData.ImageURL}
+                                                onChange={(url) => setFormData(prev => ({ ...prev, ImageURL: url }))}
                                                 className="h-28 aspect-video w-full"
                                             />
                                         </div>
@@ -258,7 +303,6 @@ export function ProductModal({ isOpen, onClose, product = null }) {
                                 </section>
                             </div>
 
-                            {/* Column 2: Inventory Tracking */}
                             <div className="space-y-8">
                                 <section>
                                     <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-5 border-b border-gray-100 pb-2">Inventory Tracking</h3>
@@ -267,24 +311,24 @@ export function ProductModal({ isOpen, onClose, product = null }) {
                                             <Label htmlFor="MasterSKU" className="text-gray-700 font-medium flex items-center">Master SKU</Label>
                                             <Input id="MasterSKU" name="MasterSKU" value={formData.MasterSKU} onChange={handleChange} className="bg-gray-50/50 focus:bg-white" />
                                         </div>
-                                        
+
                                         <div className="space-y-2">
                                             <Label htmlFor="Barcode" className={`font-medium flex items-center ${fieldErrors.Barcode ? 'text-red-600' : 'text-gray-700'}`}>
                                                 Barcode <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500 ml-1.5 mb-0.5 shadow-sm shadow-blue-500/50"></span>
                                             </Label>
                                             <div className="relative">
-                                                <Input 
-                                                    id="Barcode" 
-                                                    name="Barcode" 
-                                                    value={formData.Barcode} 
+                                                <Input
+                                                    id="Barcode"
+                                                    name="Barcode"
+                                                    value={formData.Barcode}
                                                     onChange={(e) => {
                                                         setFieldErrors({});
-                                                        handleChange({target: {name: 'Barcode', value: e.target.value.replace(/\D/g, '')}});
-                                                    }} 
-                                                    maxLength="13" 
-                                                    className={`pr-12 ${fieldErrors.Barcode ? 'border-red-500 focus-visible:ring-red-500 bg-red-50' : 'bg-gray-50/50 focus:bg-white'}`} 
+                                                        handleChange({ target: { name: 'Barcode', value: e.target.value.replace(/\D/g, '') } });
+                                                    }}
+                                                    maxLength="13"
+                                                    className={`pr-12 ${fieldErrors.Barcode ? 'border-red-500 focus-visible:ring-red-500 bg-red-50' : 'bg-gray-50/50 focus:bg-white'}`}
                                                 />
-                                                <button 
+                                                <button
                                                     type="button"
                                                     onClick={handleGenerateBarcodeClick}
                                                     className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
@@ -314,36 +358,80 @@ export function ProductModal({ isOpen, onClose, product = null }) {
                                             <Label htmlFor="Stock" className="text-gray-700 font-medium">
                                                 {product ? 'Current Stock' : 'Initial Stock'}
                                             </Label>
-                                            <Input 
-                                                id="Stock" 
-                                                name="Stock" 
-                                                type="number" 
-                                                min="0" 
-                                                value={formData.Stock} 
-                                                onChange={handleChange} 
+                                            <Input
+                                                id="Stock"
+                                                name="Stock"
+                                                type="number"
+                                                min="0"
+                                                value={formData.Stock}
+                                                onChange={handleChange}
                                                 disabled={!!product}
-                                                className={product ? "bg-gray-100 text-gray-500 cursor-not-allowed" : "bg-gray-50/50 focus:bg-white"} 
+                                                className={product ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-gray-50/50 focus:bg-white'}
                                             />
+                                        </div>
+                                    </div>
+                                </section>
+
+                                <section>
+                                    <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-5 border-b border-gray-100 pb-2">Logistics & Platform</h3>
+                                    <div className="space-y-5">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="WeightG" className="text-gray-700 font-medium flex items-center">Weight (g)</Label>
+                                            <Input id="WeightG" name="WeightG" type="number" min="0" value={formData.WeightG} onChange={handleChange} className="bg-gray-50/50 focus:bg-white" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="Dimensions" className="text-gray-700 font-medium flex items-center">Dimensions</Label>
+                                            <Input id="Dimensions" name="Dimensions" value={formData.Dimensions} onChange={handleChange} placeholder="L x W x H cm" className="bg-gray-50/50 focus:bg-white" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="PlatformData" className={`font-medium flex items-center ${fieldErrors.PlatformData ? 'text-red-600' : 'text-gray-700'}`}>Platform Data (JSON)</Label>
+                                            <textarea
+                                                id="PlatformData"
+                                                name="PlatformData"
+                                                value={formData.PlatformData}
+                                                onChange={handleChange}
+                                                placeholder={'{\n  "tiktok": {},\n  "shopee": {}\n}'}
+                                                rows={5}
+                                                className={`w-full rounded-lg border px-3 py-2 text-sm font-mono outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 ${fieldErrors.PlatformData ? 'border-red-500 bg-red-50' : 'border-input bg-gray-50/50 focus:bg-white'}`}
+                                            />
+                                            {fieldErrors.PlatformData && (
+                                                <p className="text-xs font-medium text-red-600 flex items-center gap-1 mt-1.5">
+                                                    <AlertTriangle className="h-3 w-3" /> {fieldErrors.PlatformData}
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
                                 </section>
                             </div>
 
-                            {/* Column 3: Price */}
                             <div className="space-y-8">
                                 <section>
                                     <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-5 border-b border-gray-100 pb-2">Price</h3>
                                     <div className="space-y-5">
                                         <div className="space-y-2">
                                             <Label htmlFor="CostPrice" className="text-gray-700 font-medium flex items-center">
-                                                Cost Price <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500 ml-1.5 mb-0.5 shadow-sm shadow-blue-500/50"></span>
+                                                Cost Price <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500 ml-1.5 mb-0.5 shadow-sm shadow-blue-500/50" title="Actual Cost"></span>
                                             </Label>
                                             <Input id="CostPrice" name="CostPrice" type="number" step="0.01" required value={formData.CostPrice} onChange={handleChange} onBlur={handlePriceBlur} className="bg-gray-50/50 focus:bg-white" />
                                         </div>
-                                        
+
+                                        <div className="space-y-2">
+                                            <Label htmlFor="FakeCostPrice" className="text-gray-700 font-medium flex items-center">
+                                                Cost Price <span className="inline-block w-1.5 h-1.5 rounded-full bg-gray-300 ml-1.5 mb-0.5 shadow-sm" title="Display Cost"></span>
+                                            </Label>
+                                            <Input id="FakeCostPrice" name="FakeCostPrice" type="number" step="0.01" value={formData.FakeCostPrice} onChange={handleChange} onBlur={handlePriceBlur} className="bg-gray-50/50 focus:bg-white" />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label htmlFor="StockistPrice" className="text-gray-700 font-medium flex items-center">
+                                                Stockist Price
+                                            </Label>
+                                            <Input id="StockistPrice" name="StockistPrice" type="number" step="0.01" value={formData.StockistPrice} onChange={handleChange} onBlur={handlePriceBlur} className="bg-gray-50/50 focus:bg-white" />
+                                        </div>
+
                                         <div className="space-y-3">
                                             <div className="flex items-center justify-between">
-                                                <Label className="text-gray-700 font-medium">Recommended Retail Price</Label>
+                                                <Label className="text-gray-700 font-medium">RRP</Label>
                                                 <Switch checked={hasRRP} onCheckedChange={(checked) => setHasRRP(checked)} />
                                             </div>
                                             {hasRRP && (
@@ -370,7 +458,6 @@ export function ProductModal({ isOpen, onClose, product = null }) {
                                     </div>
                                 </section>
                             </div>
-
                         </div>
                     </form>
                 </div>
@@ -387,3 +474,4 @@ export function ProductModal({ isOpen, onClose, product = null }) {
         </div>
     );
 }
+

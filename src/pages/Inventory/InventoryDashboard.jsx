@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Boxes, Package, PackagePlus, AlertTriangle, XCircle, Barcode, Plus, Edit, ChevronDown, ChevronUp, MoreHorizontal, Trash2, Archive, RefreshCw, ChevronsUpDown } from 'lucide-react';
+import { Archive, Barcode, Boxes, ChevronDown, ChevronUp, ChevronsUpDown, Edit, MoreHorizontal, Package, PackagePlus, Plus, RefreshCw, Trash2, AlertTriangle, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DataTable } from '@/components/common/DataTable';
@@ -16,7 +16,7 @@ import {
     DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from '@/components/ui/dropdown-menu';
 import {
     Dialog,
     DialogContent,
@@ -24,7 +24,7 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-} from "@/components/ui/dialog";
+} from '@/components/ui/dialog';
 
 const formatCurrency = (Value) => new Intl.NumberFormat('ms-MY', {
     style: 'currency',
@@ -52,21 +52,47 @@ const getStockStatus = (Stock) => {
     };
 };
 
+const getProductPricing = (Product) => {
+    const PricingObject = Product.ProductPricing;
+    return Array.isArray(PricingObject) ? (PricingObject[0] || {}) : (PricingObject || {});
+};
+
+const getRRP = (Product) => {
+    const Pricing = getProductPricing(Product);
+    return Pricing.BasePrice ?? Product.Price ?? 0;
+};
+
+const SortableHeader = ({ column, children }) => (
+    <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+        className="-ml-4 h-8 data-[state=open]:bg-accent hover:bg-gray-100 text-gray-700"
+    >
+        {children}
+        {column.getIsSorted() === 'desc' ? (
+            <ChevronDown className="ml-2 h-3.5 w-3.5 text-blue-600" />
+        ) : column.getIsSorted() === 'asc' ? (
+            <ChevronUp className="ml-2 h-3.5 w-3.5 text-blue-600" />
+        ) : (
+            <ChevronsUpDown className="ml-2 h-3.5 w-3.5 text-gray-400 opacity-50" />
+        )}
+    </Button>
+);
+
 export function InventoryDashboard() {
     const { deleteProduct, updateProduct } = useProducts();
 
-    const [ViewMode, setViewMode] = useState('Main');
+    const [ViewMode, setViewMode] = useState('Basic');
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [confirmAction, setConfirmAction] = useState(null);
     const [showStats, setShowStats] = useState(false);
     const [activeTab, setActiveTab] = useState('Inventory');
-    
+
     const { data: Products, isLoading, error, refetch, isRefetching } = useInventoryProducts();
     const { data: RecentLogs } = useInventoryLogs(null);
 
     const InventoryProducts = useMemo(() => Products || [], [Products]);
-    const IsAllView = ViewMode === 'All';
 
     const Summary = useMemo(() => {
         const TotalUnits = InventoryProducts.reduce((Total, Product) => Total + Number(Product.Stock || 0), 0);
@@ -82,283 +108,350 @@ export function InventoryDashboard() {
     }, [InventoryProducts]);
 
     const Columns = useMemo(() => {
-        const MainColumns = [
-            {
-                id: 'Image',
-                header: 'Image',
-                meta: { className: 'w-[80px]' },
-                cell: ({ row }) => {
-                    const ImageURL = row.original.ImageURL;
-
-                    return (
-                        <div className="h-12 w-12 rounded-lg border bg-gray-50 flex items-center justify-center overflow-hidden">
-                            {ImageURL ? (
-                                <img src={ImageURL} alt={row.original.ProductName} className="h-full w-full object-cover" />
-                            ) : (
-                                <Package className="h-5 w-5 text-gray-400" />
-                            )}
-                        </div>
-                    );
-                },
+        const NumberColumn = {
+            id: 'RowNumber',
+            header: '#',
+            enableHiding: false,
+            enableSorting: false,
+            meta: { className: 'w-[56px] text-center text-gray-500' },
+            cell: ({ row, table }) => {
+                const { pageIndex, pageSize } = table.getState().pagination;
+                const VisibleIndex = table.getRowModel().rows.findIndex(VisibleRow => VisibleRow.id === row.id);
+                return pageIndex * pageSize + VisibleIndex + 1;
             },
-            {
-                accessorKey: 'MasterSKU',
-                meta: { className: 'w-[200px]' },
-                header: ({ column }) => (
-                    <Button
-                        variant="ghost"
-                        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-                        className="-ml-4 h-8 data-[state=open]:bg-accent hover:bg-gray-100 text-gray-700"
-                    >
-                        Master SKU
-                        {column.getIsSorted() === "desc" ? (
-                            <ChevronDown className="ml-2 h-3.5 w-3.5 text-blue-600" />
-                        ) : column.getIsSorted() === "asc" ? (
-                            <ChevronUp className="ml-2 h-3.5 w-3.5 text-blue-600" />
+        };
+
+        const ImageColumn = {
+            id: 'Image',
+            header: 'Image',
+            meta: { className: 'w-[80px]' },
+            cell: ({ row }) => {
+                const ImageURL = row.original.ImageURL;
+
+                return (
+                    <div className="h-12 w-12 rounded-lg border bg-gray-50 flex items-center justify-center overflow-hidden">
+                        {ImageURL ? (
+                            <img src={ImageURL} alt={row.original.ProductName} className="h-full w-full object-cover" />
                         ) : (
-                            <ChevronsUpDown className="ml-2 h-3.5 w-3.5 text-gray-400 opacity-50" />
+                            <Package className="h-5 w-5 text-gray-400" />
                         )}
-                    </Button>
-                ),
-                cell: ({ row }) => (
-                    <span className="font-mono text-sm font-semibold text-gray-900 pl-2">
-                        {row.original.MasterSKU || '-'}
-                    </span>
-                ),
-            },
-            {
-                accessorKey: 'Brand',
-                meta: { className: 'w-[140px]' },
-                header: ({ column }) => (
-                    <Button
-                        variant="ghost"
-                        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-                        className="-ml-4 h-8 data-[state=open]:bg-accent hover:bg-gray-100 text-gray-700"
-                    >
-                        Brand
-                        {column.getIsSorted() === "desc" ? (
-                            <ChevronDown className="ml-2 h-3.5 w-3.5 text-blue-600" />
-                        ) : column.getIsSorted() === "asc" ? (
-                            <ChevronUp className="ml-2 h-3.5 w-3.5 text-blue-600" />
-                        ) : (
-                            <ChevronsUpDown className="ml-2 h-3.5 w-3.5 text-gray-400 opacity-50" />
-                        )}
-                    </Button>
-                ),
-                cell: ({ row }) => (
-                    <span className="text-sm text-gray-500 font-medium">
-                        {row.original.Brand || '-'}
-                    </span>
-                ),
-            },
-            {
-                accessorKey: 'ProductName',
-                header: 'Product',
-                meta: { className: 'min-w-[200px]' },
-                cell: ({ row }) => (
-                    <span className="font-medium text-gray-900">{row.original.ProductName || '-'}</span>
-                ),
-            },
-            {
-                accessorKey: 'Variation',
-                header: 'Variation',
-                meta: { className: 'w-[100px]' },
-                cell: ({ row }) => (
-                    <span className="text-gray-500">{row.original.Variation || ''}</span>
-                ),
-            },
-            {
-                accessorKey: 'Size',
-                header: 'Size',
-                meta: { className: 'w-[80px]' },
-                cell: ({ row }) => (
-                    <span className="text-gray-500">{row.original.Size || ''}</span>
-                ),
-            },
-            {
-                accessorKey: 'Barcode',
-                meta: { className: 'w-[140px]' },
-                header: () => (
-                    <div className="group relative inline-block cursor-help">
-                        Barcode
-                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 hidden w-max bg-gray-900 text-white text-xs px-2 py-1 rounded group-hover:block z-50">
-                            Seller SKU · GTIN
-                        </div>
                     </div>
-                ),
-                cell: ({ row }) => row.original.Barcode || '-',
+                );
             },
-            {
-                accessorKey: 'Stock',
-                id: 'Quantity',
-                header: 'Quantity',
-                meta: { className: 'w-[90px] text-right' },
-                cell: ({ row }) => {
-                    const Stock = Number(row.original.Stock || 0);
-                    return (
-                        <div className="font-semibold text-gray-900 pr-4">
-                            {Stock.toLocaleString('ms-MY')}
-                        </div>
-                    );
-                },
-            },
-            {
-                id: 'Availability',
-                header: 'Availability',
-                meta: { className: 'w-[110px]' },
-                cell: ({ row }) => {
-                    const Stock = Number(row.original.Stock || 0);
-                    const Status = getStockStatus(Stock);
-                    return (
-                        <Badge variant="outline" className={Status.ClassName}>
-                            {Status.Label}
-                        </Badge>
-                    );
-                },
-            },
-            {
-                accessorKey: 'CostPrice',
-                header: 'Cost Price',
-                meta: { className: 'w-[100px] text-right' },
-                cell: ({ row }) => formatCurrency(row.original.CostPrice),
-            },
-            {
-                id: 'Retail',
-                header: 'Retail Price',
-                meta: { className: 'w-[100px] text-right' },
-                cell: ({ row }) => {
-                    const pricingObj = row.original.ProductPricing;
-                    const pricing = Array.isArray(pricingObj) ? (pricingObj[0] || {}) : (pricingObj || {});
-                    const { RetailPrice } = calculateFinalPrices(pricing);
-                    return formatCurrency(RetailPrice || row.original.Price);
-                },
-            },
-            {
-                id: 'Agent',
-                header: 'Agent Price',
-                meta: { className: 'w-[100px] text-right' },
-                cell: ({ row }) => {
-                    const pricingObj = row.original.ProductPricing;
-                    const pricing = Array.isArray(pricingObj) ? (pricingObj[0] || {}) : (pricingObj || {});
-                    const { AgentPrice } = calculateFinalPrices(pricing);
-                    return formatCurrency(AgentPrice);
-                },
-            },
-        ];
+        };
 
-        const AllColumns = [
-            {
-                accessorKey: 'SellerSKU',
-                header: 'Seller SKU',
-                cell: ({ row }) => row.original.SellerSKU || '-',
-            },
-            {
-                accessorKey: 'GTIN',
-                header: 'GTIN',
-                cell: ({ row }) => row.original.GTIN || '-',
-            },
-            {
-                id: 'Wholesale',
-                header: 'Wholesale Price',
-                cell: ({ row }) => {
-                    const pricingObj = row.original.ProductPricing;
-                    const pricing = Array.isArray(pricingObj) ? (pricingObj[0] || {}) : (pricingObj || {});
-                    const { WholesalePrice } = calculateFinalPrices(pricing);
-                    return formatCurrency(WholesalePrice);
-                },
-            },
-            {
-                accessorKey: 'WeightG',
-                header: 'Weight',
-                cell: ({ row }) => row.original.WeightG ? `${row.original.WeightG}g` : '-',
-            },
-            {
-                accessorKey: 'Dimensions',
-                header: 'Dimensions',
-                cell: ({ row }) => row.original.Dimensions || '-',
-            },
-            {
-                accessorKey: 'PlatformData',
-                header: 'Platform Data',
-                cell: ({ row }) => {
-                    const PlatformData = row.original.PlatformData || {};
-                    const Keys = Object.keys(PlatformData);
+        const MasterSKUColumn = {
+            accessorKey: 'MasterSKU',
+            meta: { className: 'w-[180px]' },
+            header: ({ column }) => <SortableHeader column={column}>Master SKU</SortableHeader>,
+            cell: ({ row }) => (
+                <span className="font-mono text-sm font-semibold text-gray-900 pl-2">
+                    {row.original.MasterSKU || '-'}
+                </span>
+            ),
+        };
 
-                    if (Keys.length === 0) return '-';
-                    return (
-                        <span className="text-xs text-gray-500">
-                            {Keys.slice(0, 4).join(', ')}{Keys.length > 4 ? '…' : ''}
-                        </span>
-                    );
-                },
-            },
-        ];
+        const BrandColumn = {
+            accessorKey: 'Brand',
+            meta: { className: 'w-[140px]' },
+            header: ({ column }) => <SortableHeader column={column}>Brand</SortableHeader>,
+            cell: ({ row }) => (
+                <span className="text-sm text-gray-500 font-medium">
+                    {row.original.Brand || '-'}
+                </span>
+            ),
+        };
 
-        return [
-            ...MainColumns,
-            ...(IsAllView ? AllColumns : []),
-            {
-                id: 'Actions',
-                header: () => <div className="w-[50px]">Action</div>,
-                cell: ({ row }) => (
-                    <div className="flex items-center">
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button 
-                                    variant="ghost" 
-                                    className="h-8 w-8 p-0 text-gray-500 hover:bg-gray-100 data-[state=open]:bg-gray-100"
-                                >
-                                    <span className="sr-only">Open menu</span>
-                                    <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-40">
-                                <DropdownMenuLabel className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                                    Actions
-                                </DropdownMenuLabel>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem 
-                                    onClick={() => {
-                                        setSelectedProduct(row.original);
-                                        setModalOpen(true);
-                                    }}
-                                    className="cursor-pointer"
-                                >
-                                    <Edit className="mr-2 h-4 w-4 text-gray-500" />
-                                    <span>Edit Details</span>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem asChild>
-                                    <Link to={`/inventory/stock-in?productId=${row.original.ProductID}`} className="cursor-pointer">
-                                        <PackagePlus className="mr-2 h-4 w-4 text-indigo-500" />
-                                        <span>Stock-In</span>
-                                    </Link>
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem 
-                                    onClick={() => {
-                                        setConfirmAction({ type: 'archive', product: row.original });
-                                    }}
-                                    className="cursor-pointer text-amber-600 focus:text-amber-700"
-                                >
-                                    <Archive className="mr-2 h-4 w-4" />
-                                    <span>Archive Product</span>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem 
-                                    onClick={() => {
-                                        setConfirmAction({ type: 'delete', product: row.original });
-                                    }}
-                                    className="cursor-pointer text-red-600 focus:text-red-700"
-                                >
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    <span>Delete Product</span>
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
+        const CategoryColumn = {
+            accessorKey: 'Category',
+            meta: { className: 'w-[150px]' },
+            header: ({ column }) => <SortableHeader column={column}>Category</SortableHeader>,
+            cell: ({ row }) => (
+                <span className="text-sm text-gray-500 font-medium">
+                    {row.original.Category || '-'}
+                </span>
+            ),
+        };
+
+        const ProductNameColumn = {
+            accessorKey: 'ProductName',
+            header: 'Product Name',
+            meta: { className: 'min-w-[220px]' },
+            cell: ({ row }) => (
+                <span className="font-medium text-gray-900">{row.original.ProductName || '-'}</span>
+            ),
+        };
+
+        const VariationColumn = {
+            accessorKey: 'Variation',
+            header: 'Variation',
+            meta: { className: 'w-[110px]' },
+            cell: ({ row }) => <span className="text-gray-500">{row.original.Variation || ''}</span>,
+        };
+
+        const SizeColumn = {
+            accessorKey: 'Size',
+            header: 'Size',
+            meta: { className: 'w-[90px]' },
+            cell: ({ row }) => <span className="text-gray-500">{row.original.Size || ''}</span>,
+        };
+
+        const BarcodeColumn = {
+            accessorKey: 'Barcode',
+            header: 'Barcode',
+            meta: { className: 'w-[140px]' },
+            cell: ({ row }) => row.original.Barcode || '-',
+        };
+
+        const QuantityColumn = {
+            accessorKey: 'Stock',
+            id: 'Quantity',
+            header: 'Quantity',
+            meta: { className: 'w-[100px] text-right' },
+            cell: ({ row }) => {
+                const Stock = Number(row.original.Stock || 0);
+                return (
+                    <div className="font-semibold text-gray-900 pr-4">
+                        {Stock.toLocaleString('ms-MY')}
                     </div>
-                ),
+                );
             },
+        };
+
+        const AvailabilityColumn = {
+            id: 'Availability',
+            header: 'Availability',
+            meta: { className: 'w-[120px]' },
+            cell: ({ row }) => {
+                const Stock = Number(row.original.Stock || 0);
+                const Status = getStockStatus(Stock);
+                return <Badge variant="outline" className={Status.ClassName}>{Status.Label}</Badge>;
+            },
+        };
+
+        const MainCostPriceColumn = {
+            id: 'MainCostPrice',
+            header: 'Cost Price',
+            meta: { className: 'w-[110px] text-right' },
+            cell: ({ row }) => formatCurrency(row.original.FakeCostPrice),
+        };
+
+        const CostPriceColumn = {
+            accessorKey: 'CostPrice',
+            header: 'Cost Price',
+            meta: { className: 'w-[110px] text-right' },
+            cell: ({ row }) => formatCurrency(row.original.CostPrice),
+        };
+
+        const StockistPriceColumn = {
+            accessorKey: 'StockistPrice',
+            header: 'Stockist Price',
+            meta: { className: 'w-[130px] text-right' },
+            cell: ({ row }) => formatCurrency(row.original.StockistPrice),
+        };
+
+        const RRPColumn = {
+            id: 'RRP',
+            header: 'RRP',
+            meta: { className: 'w-[100px] text-right' },
+            cell: ({ row }) => formatCurrency(getRRP(row.original)),
+        };
+
+        const RetailPriceColumn = {
+            id: 'RetailPrice',
+            header: 'Retail Price',
+            meta: { className: 'w-[120px] text-right' },
+            cell: ({ row }) => {
+                const Pricing = getProductPricing(row.original);
+                const { RetailPrice } = calculateFinalPrices(Pricing);
+                return formatCurrency(RetailPrice);
+            },
+        };
+
+        const WholesalePriceColumn = {
+            id: 'WholesalePrice',
+            header: 'Wholesale Price',
+            meta: { className: 'w-[140px] text-right' },
+            cell: ({ row }) => {
+                const Pricing = getProductPricing(row.original);
+                const { WholesalePrice } = calculateFinalPrices(Pricing);
+                return formatCurrency(WholesalePrice);
+            },
+        };
+
+        const AgentPriceColumn = {
+            id: 'AgentPrice',
+            header: 'Agent Price',
+            meta: { className: 'w-[120px] text-right' },
+            cell: ({ row }) => {
+                const Pricing = getProductPricing(row.original);
+                const { AgentPrice } = calculateFinalPrices(Pricing);
+                return formatCurrency(AgentPrice);
+            },
+        };
+
+        const SellerSKUColumn = {
+            accessorKey: 'SellerSKU',
+            header: 'Seller SKU',
+            cell: ({ row }) => row.original.SellerSKU || '-',
+        };
+
+        const GTINColumn = {
+            accessorKey: 'GTIN',
+            header: 'GTIN',
+            cell: ({ row }) => row.original.GTIN || '-',
+        };
+
+        const WeightColumn = {
+            accessorKey: 'WeightG',
+            header: 'Weight',
+            cell: ({ row }) => row.original.WeightG ? `${row.original.WeightG}g` : '-',
+        };
+
+        const DimensionsColumn = {
+            accessorKey: 'Dimensions',
+            header: 'Dimensions',
+            cell: ({ row }) => row.original.Dimensions || '-',
+        };
+
+        const PlatformDataColumn = {
+            accessorKey: 'PlatformData',
+            header: 'Platform Data',
+            cell: ({ row }) => {
+                const PlatformData = row.original.PlatformData || {};
+                const Keys = Object.keys(PlatformData);
+
+                if (Keys.length === 0) return '-';
+                return (
+                    <span className="text-xs text-gray-500">
+                        {Keys.slice(0, 4).join(', ')}{Keys.length > 4 ? '...' : ''}
+                    </span>
+                );
+            },
+        };
+
+        const ActionColumn = {
+            id: 'Actions',
+            header: () => <div className="w-[50px]">Action</div>,
+            enableHiding: false,
+            cell: ({ row }) => (
+                <div className="flex items-center">
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                className="h-8 w-8 p-0 text-gray-500 hover:bg-gray-100 data-[state=open]:bg-gray-100"
+                            >
+                                <span className="sr-only">Open menu</span>
+                                <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-40">
+                            <DropdownMenuLabel className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                Actions
+                            </DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                                onClick={() => {
+                                    setSelectedProduct(row.original);
+                                    setModalOpen(true);
+                                }}
+                                className="cursor-pointer"
+                            >
+                                <Edit className="mr-2 h-4 w-4 text-gray-500" />
+                                <span>Edit Details</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem asChild>
+                                <Link to={`/inventory/stock-in?productId=${row.original.ProductID}`} className="cursor-pointer">
+                                    <PackagePlus className="mr-2 h-4 w-4 text-indigo-500" />
+                                    <span>Stock-In</span>
+                                </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                                onClick={() => setConfirmAction({ type: 'archive', product: row.original })}
+                                className="cursor-pointer text-amber-600 focus:text-amber-700"
+                            >
+                                <Archive className="mr-2 h-4 w-4" />
+                                <span>Archive Product</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                                onClick={() => setConfirmAction({ type: 'delete', product: row.original })}
+                                className="cursor-pointer text-red-600 focus:text-red-700"
+                            >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                <span>Delete Product</span>
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+            ),
+        };
+
+        const BaseColumns = [
+            NumberColumn,
+            ImageColumn,
+            MasterSKUColumn,
+            BrandColumn,
+            ProductNameColumn,
+            VariationColumn,
+            SizeColumn,
+            BarcodeColumn,
+            QuantityColumn,
+            MainCostPriceColumn,
         ];
-    }, [IsAllView]);
+
+        const PricingColumns = [
+            NumberColumn,
+            ImageColumn,
+            MasterSKUColumn,
+            BrandColumn,
+            ProductNameColumn,
+            VariationColumn,
+            SizeColumn,
+            BarcodeColumn,
+            QuantityColumn,
+            CostPriceColumn,
+            StockistPriceColumn,
+            RRPColumn,
+            RetailPriceColumn,
+            WholesalePriceColumn,
+            AgentPriceColumn,
+        ];
+
+        const ShowAllColumns = [
+            NumberColumn,
+            ImageColumn,
+            MasterSKUColumn,
+            BrandColumn,
+            CategoryColumn,
+            ProductNameColumn,
+            VariationColumn,
+            SizeColumn,
+            BarcodeColumn,
+            SellerSKUColumn,
+            GTINColumn,
+            QuantityColumn,
+            AvailabilityColumn,
+            CostPriceColumn,
+            StockistPriceColumn,
+            RRPColumn,
+            RetailPriceColumn,
+            WholesalePriceColumn,
+            AgentPriceColumn,
+            WeightColumn,
+            DimensionsColumn,
+            PlatformDataColumn,
+        ];
+
+        const VisibleColumns = ViewMode === 'All'
+            ? ShowAllColumns
+            : ViewMode === 'Detail'
+                ? PricingColumns
+                : BaseColumns;
+
+        return [...VisibleColumns, ActionColumn];
+    }, [ViewMode]);
 
     if (error) {
         return (
@@ -403,8 +496,8 @@ export function InventoryDashboard() {
             </div>
 
             <div className={cn(
-                "grid transition-all duration-300 ease-in-out",
-                showStats ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+                'grid transition-all duration-300 ease-in-out',
+                showStats ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
             )}>
                 <div className="overflow-hidden">
                     <div className="grid gap-4 md:grid-cols-4 pb-4">
@@ -440,7 +533,6 @@ export function InventoryDashboard() {
                 </div>
             </div>
 
-            {/* Tabs */}
             <div className="border-b border-gray-200">
                 <nav className="-mb-px flex space-x-8">
                     {['Inventory', 'Stock Logs'].map((tab) => (
@@ -449,8 +541,8 @@ export function InventoryDashboard() {
                             onClick={() => setActiveTab(tab)}
                             className={`
                                 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors
-                                ${activeTab === tab 
-                                    ? 'border-indigo-500 text-indigo-600' 
+                                ${activeTab === tab
+                                    ? 'border-indigo-500 text-indigo-600'
                                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}
                             `}
                         >
@@ -471,33 +563,32 @@ export function InventoryDashboard() {
                             searchPlaceholder="Search"
                             actionElement={
                                 <div className="flex items-center gap-2">
-                                    <div className="flex rounded-lg border bg-gray-100 p-1 w-[140px]">
-                                        <Button
-                                            variant={ViewMode === 'Main' ? 'default' : 'ghost'}
-                                            size="sm"
-                                            onClick={() => setViewMode('Main')}
-                                            className="flex-1"
-                                        >
-                                            Main
-                                        </Button>
-                                        <Button
-                                            variant={ViewMode === 'All' ? 'default' : 'ghost'}
-                                            size="sm"
-                                            onClick={() => setViewMode('All')}
-                                            className="flex-1"
-                                        >
-                                            All
-                                        </Button>
+                                    <div className="flex rounded-lg border bg-gray-100 p-1 w-[260px]">
+                                        {[
+                                            { Label: 'Basic', Value: 'Basic' },
+                                            { Label: 'Detail', Value: 'Detail' },
+                                            { Label: 'All', Value: 'All' },
+                                        ].map((Option) => (
+                                            <Button
+                                                key={Option.Value}
+                                                variant={ViewMode === Option.Value ? 'default' : 'ghost'}
+                                                size="sm"
+                                                onClick={() => setViewMode(Option.Value)}
+                                                className="flex-1"
+                                            >
+                                                {Option.Label}
+                                            </Button>
+                                        ))}
                                     </div>
-                                    <Button 
-                                        variant="outline" 
+                                    <Button
+                                        variant="outline"
                                         size="sm"
                                         onClick={() => refetch()}
                                         disabled={isRefetching || isLoading}
                                         className="h-9 w-9 px-0 bg-white"
                                         title="Refresh Inventory"
                                     >
-                                        <RefreshCw className={cn("h-4 w-4 text-gray-500", isRefetching && "animate-spin text-indigo-500")} />
+                                        <RefreshCw className={cn('h-4 w-4 text-gray-500', isRefetching && 'animate-spin text-indigo-500')} />
                                     </Button>
                                 </div>
                             }
@@ -535,7 +626,7 @@ export function InventoryDashboard() {
                                             <Badge variant="outline" className="bg-green-50 text-green-700 border-green-100">{Log.Type}</Badge>
                                         </td>
                                         <td className="px-4 py-3 font-semibold">{Log.Quantity}</td>
-                                        <td className="px-4 py-3 text-gray-600">{Log.StockBefore} → {Log.StockAfter}</td>
+                                        <td className="px-4 py-3 text-gray-600">{Log.StockBefore} - {Log.StockAfter}</td>
                                         <td className="px-4 py-3 text-gray-500">{Log.Reference || '-'}</td>
                                     </tr>
                                 ))}
@@ -551,17 +642,15 @@ export function InventoryDashboard() {
                     </div>
                 </div>
             )}
-            
-            {/* Product Modal for Add/Edit */}
+
             {modalOpen && (
-                <ProductModal 
-                    isOpen={modalOpen} 
-                    onClose={() => setModalOpen(false)} 
-                    product={selectedProduct} 
+                <ProductModal
+                    isOpen={modalOpen}
+                    onClose={() => setModalOpen(false)}
+                    product={selectedProduct}
                 />
             )}
 
-            {/* Confirmation Dialog for Delete/Archive */}
             <Dialog open={!!confirmAction} onOpenChange={(open) => !open && setConfirmAction(null)}>
                 <DialogContent>
                     <DialogHeader>
@@ -569,15 +658,15 @@ export function InventoryDashboard() {
                             {confirmAction?.type === 'delete' ? 'Delete Product' : 'Archive Product'}
                         </DialogTitle>
                         <DialogDescription>
-                            {confirmAction?.type === 'delete' 
-                                ? `Are you sure you want to permanently delete "${confirmAction?.product?.ProductName}"? This action cannot be undone.` 
+                            {confirmAction?.type === 'delete'
+                                ? `Are you sure you want to permanently delete "${confirmAction?.product?.ProductName}"? This action cannot be undone.`
                                 : `Are you sure you want to archive "${confirmAction?.product?.ProductName}"? It will be hidden from the active inventory list.`
                             }
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setConfirmAction(null)}>Cancel</Button>
-                        <Button 
+                        <Button
                             variant={confirmAction?.type === 'delete' ? 'destructive' : 'default'}
                             className={confirmAction?.type === 'archive' ? 'bg-amber-600 hover:bg-amber-700 text-white' : ''}
                             onClick={async () => {
@@ -601,3 +690,5 @@ export function InventoryDashboard() {
         </div>
     );
 }
+
+

@@ -1,4 +1,4 @@
-export const my = {
+﻿export const my = {
     sidebar: {
         dashboard: "Papan Pemuka",
         pos: "POS",
@@ -52,5 +52,13 @@ export const my = {
         addProductDesc: "Daftar item baru ke inventori",
         agentList: "Senarai Ejen",
         agentListDesc: "Urus rangkaian reseller"
+    },
+    productModal: {
+        noBrandFound: "Tiada brand ditemui.",
+        noCategoryFound: "Tiada kategori ditemui."
+    },
+    settingsUsers: {
+        emptyTitle: "Tiada user lagi",
+        emptyDescription: "User baru yang register akan muncul di sini."
     }
 };

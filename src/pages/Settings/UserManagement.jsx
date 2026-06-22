@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+﻿import { useState, useEffect, useCallback } from 'react';
 import { NavLink } from 'react-router-dom';
 import { UserPlus, Shield, Check, X, Users, Settings } from 'lucide-react';
 import { DataTable } from '@/components/common/DataTable';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabase';
+import { useTranslation } from '@/hooks/useTranslation';
 
 const SETTINGS_TABS = [
     { name: 'General', path: '/settings/general', icon: Settings },
@@ -66,6 +67,7 @@ function PendingUserCard({ user, onApprove, onReject }) {
 }
 
 export function UserManagement() {
+    const { t } = useTranslation();
     const [ActiveUsers, setActiveUsers] = useState([]);
     const [PendingUsers, setPendingUsers] = useState([]);
 
@@ -225,8 +227,8 @@ export function UserManagement() {
                 {ActiveUsers.length === 0 && PendingUsers.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-16 text-gray-400">
                         <Users className="w-12 h-12 mb-4" />
-                        <p className="text-lg font-medium">Tiada pengguna lagi</p>
-                        <p className="text-sm mt-1">Pengguna baru yang mendaftar akan muncul di sini.</p>
+                        <p className="text-lg font-medium">{t('settingsUsers.emptyTitle')}</p>
+                        <p className="text-sm mt-1">{t('settingsUsers.emptyDescription')}</p>
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
@@ -243,3 +245,4 @@ export function UserManagement() {
         </div>
     );
 }
+

@@ -1,5 +1,33 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+﻿import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+
+const syncDistinctOptionCache = (queryClient, queryKey, value) => {
+    const normalizedValue = String(value || '').trim();
+
+    if (!normalizedValue) return;
+
+    queryClient.setQueryData(queryKey, (existingOptions) => {
+        const options = Array.isArray(existingOptions) ? existingOptions : [];
+        const alreadyExists = options.some(option => option.toLowerCase() === normalizedValue.toLowerCase());
+
+        if (alreadyExists) return options;
+
+        return [...options, normalizedValue].sort((firstValue, secondValue) => firstValue.localeCompare(secondValue));
+    });
+};
+
+const refreshProductRelatedQueries = (queryClient, product) => {
+    queryClient.invalidateQueries({ queryKey: ['products'] });
+    queryClient.invalidateQueries({ queryKey: ['inventory', 'products'] });
+    queryClient.invalidateQueries({ queryKey: ['inventory', 'logs'] });
+    queryClient.invalidateQueries({ queryKey: ['brands'] });
+    queryClient.invalidateQueries({ queryKey: ['categories'] });
+
+    if (product) {
+        syncDistinctOptionCache(queryClient, ['brands'], product.Brand);
+        syncDistinctOptionCache(queryClient, ['categories'], product.Category);
+    }
+};
 
 export function useProducts() {
     const queryClient = useQueryClient();
@@ -27,10 +55,8 @@ export function useProducts() {
             if (error) throw error;
             return data;
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['products'] });
-            queryClient.invalidateQueries({ queryKey: ['inventory', 'products'] });
-            queryClient.invalidateQueries({ queryKey: ['inventory', 'logs'] });
+        onSuccess: (savedProduct) => {
+            refreshProductRelatedQueries(queryClient, savedProduct);
         }
     });
 
@@ -45,10 +71,8 @@ export function useProducts() {
             if (error) throw error;
             return data;
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['products'] });
-            queryClient.invalidateQueries({ queryKey: ['inventory', 'products'] });
-            queryClient.invalidateQueries({ queryKey: ['inventory', 'logs'] });
+        onSuccess: (savedProduct) => {
+            refreshProductRelatedQueries(queryClient, savedProduct);
         }
     });
 
@@ -62,9 +86,7 @@ export function useProducts() {
             return id;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['products'] });
-            queryClient.invalidateQueries({ queryKey: ['inventory', 'products'] });
-            queryClient.invalidateQueries({ queryKey: ['inventory', 'logs'] });
+            refreshProductRelatedQueries(queryClient);
         }
     });
 

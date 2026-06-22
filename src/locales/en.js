@@ -1,4 +1,4 @@
-export const en = {
+﻿export const en = {
     sidebar: {
         dashboard: "Dashboard",
         pos: "POS",
@@ -52,5 +52,13 @@ export const en = {
         addProductDesc: "Register a new item to inventory",
         agentList: "Agent List",
         agentListDesc: "Manage reseller network"
+    },
+    productModal: {
+        noBrandFound: "No brands found.",
+        noCategoryFound: "No categories found."
+    },
+    settingsUsers: {
+        emptyTitle: "No users yet",
+        emptyDescription: "New registered users will appear here."
     }
 };
