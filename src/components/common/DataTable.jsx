@@ -24,8 +24,22 @@ import {
     DropdownMenuContent,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
 
-export function DataTable({ columns, data, searchPlaceholder = "Search...", actionElement }) {
+export function DataTable({ 
+    columns, 
+    data, 
+    searchPlaceholder = "Search...", 
+    actionElement,
+    rowSelection = {},
+    onRowSelectionChange
+}) {
     const [globalFilter, setGlobalFilter] = useState("")
     const [columnVisibility, setColumnVisibility] = useState({})
     const [sorting, setSorting] = useState([])
@@ -40,23 +54,54 @@ export function DataTable({ columns, data, searchPlaceholder = "Search...", acti
         getSortedRowModel: getSortedRowModel(),
         onColumnVisibilityChange: setColumnVisibility,
         onSortingChange: setSorting,
+        onRowSelectionChange: onRowSelectionChange,
+        enableRowSelection: true,
         state: {
             globalFilter,
             columnVisibility,
             sorting,
+            rowSelection,
+        },
+        initialState: {
+            pagination: {
+                pageSize: 100,
+            },
         },
         onGlobalFilterChange: setGlobalFilter,
     })
 
     return (
-        <div>
-            <div className="flex items-center justify-between py-4 gap-4 flex-wrap">
-                <Input
-                    placeholder={searchPlaceholder}
-                    value={globalFilter ?? ""}
-                    onChange={(event) => setGlobalFilter(String(event.target.value))}
-                    className="max-w-sm"
-                />
+        <div className="flex flex-col h-full w-full">
+            <div className="flex items-center justify-between pb-4 gap-4 flex-wrap shrink-0">
+                <div className="flex items-center gap-4 flex-1 flex-wrap">
+                    <Input
+                        placeholder={searchPlaceholder}
+                        value={globalFilter ?? ""}
+                        onChange={(event) => setGlobalFilter(String(event.target.value))}
+                        className="max-w-sm"
+                    />
+                    <div className="flex items-center space-x-2 text-sm text-gray-500">
+                        <span className="font-medium whitespace-nowrap">Show</span>
+                        <Select
+                            value={`${table.getState().pagination.pageSize}`}
+                            onValueChange={(value) => {
+                                table.setPageSize(Number(value))
+                            }}
+                        >
+                            <SelectTrigger className="h-9 w-[85px] bg-white">
+                                <SelectValue placeholder={table.getState().pagination.pageSize === 999999 ? 'All' : table.getState().pagination.pageSize} />
+                            </SelectTrigger>
+                            <SelectContent side="bottom">
+                                {[10, 30, 50, 100].map((pageSize) => (
+                                    <SelectItem key={pageSize} value={`${pageSize}`}>
+                                        {pageSize}
+                                    </SelectItem>
+                                ))}
+                                <SelectItem value="999999">All</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -90,7 +135,7 @@ export function DataTable({ columns, data, searchPlaceholder = "Search...", acti
                     )}
                 </div>
             </div>
-            <div className="rounded-md border">
+            <div className="rounded-md border flex-1 overflow-auto min-h-0 relative">
                 <Table>
                     <TableHeader>
                         {table.getHeaderGroups().map((headerGroup) => (
@@ -134,23 +179,63 @@ export function DataTable({ columns, data, searchPlaceholder = "Search...", acti
                     </TableBody>
                 </Table>
             </div>
-            <div className="flex items-center justify-end space-x-2 py-4">
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => table.previousPage()}
-                    disabled={!table.getCanPreviousPage()}
-                >
-                    Previous
-                </Button>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => table.nextPage()}
-                    disabled={!table.getCanNextPage()}
-                >
-                    Next
-                </Button>
+            <div className="flex items-center justify-between px-2 pt-4 shrink-0 mt-auto border-t mt-4">
+                <div className="flex-1 text-sm text-muted-foreground">
+                    {table.getFilteredSelectedRowModel().rows.length > 0 ? (
+                        <span>
+                            {table.getFilteredSelectedRowModel().rows.length} of{" "}
+                            {table.getFilteredRowModel().rows.length} row(s) selected.
+                        </span>
+                    ) : (
+                        <span>
+                            Showing {table.getFilteredRowModel().rows.length > 0 ? table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1 : 0} to {Math.min((table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize, table.getFilteredRowModel().rows.length)} of {table.getFilteredRowModel().rows.length} entries
+                        </span>
+                    )}
+                </div>
+                <div className="flex items-center space-x-6 lg:space-x-8">
+                    <div className="flex w-[100px] items-center justify-center text-sm font-medium text-gray-700">
+                        Page {table.getState().pagination.pageIndex + 1} of{" "}
+                        {table.getPageCount()}
+                    </div>
+                    <div className="flex items-center space-x-2">
+                        <Button
+                            variant="outline"
+                            className="hidden h-8 w-8 p-0 lg:flex"
+                            onClick={() => table.setPageIndex(0)}
+                            disabled={!table.getCanPreviousPage()}
+                        >
+                            <span className="sr-only">Go to first page</span>
+                            <span className="h-4 w-4">{'<<'}</span>
+                        </Button>
+                        <Button
+                            variant="outline"
+                            className="h-8 w-8 p-0"
+                            onClick={() => table.previousPage()}
+                            disabled={!table.getCanPreviousPage()}
+                        >
+                            <span className="sr-only">Go to previous page</span>
+                            <span className="h-4 w-4">{'<'}</span>
+                        </Button>
+                        <Button
+                            variant="outline"
+                            className="h-8 w-8 p-0"
+                            onClick={() => table.nextPage()}
+                            disabled={!table.getCanNextPage()}
+                        >
+                            <span className="sr-only">Go to next page</span>
+                            <span className="h-4 w-4">{'>'}</span>
+                        </Button>
+                        <Button
+                            variant="outline"
+                            className="hidden h-8 w-8 p-0 lg:flex"
+                            onClick={() => table.setPageIndex(table.getPageCount() - 1)}
+                            disabled={!table.getCanNextPage()}
+                        >
+                            <span className="sr-only">Go to last page</span>
+                            <span className="h-4 w-4">{'>>'}</span>
+                        </Button>
+                    </div>
+                </div>
             </div>
         </div>
     )

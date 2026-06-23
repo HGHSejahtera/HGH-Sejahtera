@@ -1,14 +1,17 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Archive, Barcode, Boxes, ChevronDown, ChevronUp, ChevronsUpDown, Edit, MoreHorizontal, Package, PackagePlus, Plus, RefreshCw, Trash2, AlertTriangle, XCircle } from 'lucide-react';
+import { Archive, Barcode, Boxes, ChevronDown, ChevronUp, ChevronsUpDown, Edit, MoreHorizontal, Package, PackagePlus, Plus, RefreshCw, Trash2, AlertTriangle, XCircle, Square, Maximize, Minimize } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DataTable } from '@/components/common/DataTable';
+import { Input } from '@/components/ui/input';
 import { useInventoryLogs, useInventoryProducts } from '@/hooks/useInventory';
 import { calculateFinalPrices } from '@/hooks/usePricing';
 import { useProducts } from '@/hooks/useProducts';
+import { useSecretMode } from '@/hooks/useSecretMode';
 import { ProductModal } from './ProductModal';
 import { cn } from '@/lib/utils';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -80,19 +83,61 @@ const SortableHeader = ({ column, children }) => (
 );
 
 export function InventoryDashboard() {
-    const { deleteProduct, updateProduct } = useProducts();
+    const { deleteProduct, updateProduct, bulkArchiveProducts, bulkDeleteProducts, forcePurgeProducts } = useProducts();
 
     const [ViewMode, setViewMode] = useState('Basic');
+    const [isSelectionMode, setIsSelectionMode] = useState(false);
+    const [rowSelection, setRowSelection] = useState({});
+    const [bulkActionConfirm, setBulkActionConfirm] = useState(null);
+    const [deleteVerification, setDeleteVerification] = useState('');
     const [modalOpen, setModalOpen] = useState(false);
+    const { isHGHMode } = useSecretMode();
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [confirmAction, setConfirmAction] = useState(null);
     const [showStats, setShowStats] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(false);
     const [activeTab, setActiveTab] = useState('Inventory');
 
     const { data: Products, isLoading, error, refetch, isRefetching } = useInventoryProducts();
     const { data: RecentLogs } = useInventoryLogs(null);
 
     const InventoryProducts = useMemo(() => Products || [], [Products]);
+
+    const selectedProductIds = useMemo(() => {
+        return Object.keys(rowSelection)
+            .map(index => InventoryProducts[parseInt(index)]?.ProductID)
+            .filter(Boolean);
+    }, [rowSelection, InventoryProducts]);
+
+    const executeBulkAction = async () => {
+        if (!bulkActionConfirm || selectedProductIds.length === 0) return;
+        
+        try {
+            if (bulkActionConfirm === 'archive') {
+                await bulkArchiveProducts.mutateAsync(selectedProductIds);
+            } else if (bulkActionConfirm === 'delete') {
+                const productsToDelete = selectedProductIds.map(id => InventoryProducts.find(p => p.ProductID === id));
+                const unsafeToHardDelete = productsToDelete.filter(p => Number(p.Stock || 0) > 0).map(p => p.ProductID);
+                const safeToHardDelete = productsToDelete.filter(p => Number(p.Stock || 0) === 0).map(p => p.ProductID);
+
+                if (safeToHardDelete.length > 0) {
+                    await bulkDeleteProducts.mutateAsync(safeToHardDelete);
+                }
+                if (unsafeToHardDelete.length > 0) {
+                    await bulkArchiveProducts.mutateAsync(unsafeToHardDelete);
+                }
+            } else if (bulkActionConfirm === 'force_delete') {
+                if (deleteVerification !== 'DELETE') return;
+                const productsToDelete = selectedProductIds.map(id => InventoryProducts.find(p => p.ProductID === id));
+                await forcePurgeProducts.mutateAsync(productsToDelete);
+            }
+            setRowSelection({});
+            setBulkActionConfirm(null);
+            setDeleteVerification('');
+        } catch (err) {
+            console.error('Bulk action failed', err);
+        }
+    };
 
     const Summary = useMemo(() => {
         const TotalUnits = InventoryProducts.reduce((Total, Product) => Total + Number(Product.Stock || 0), 0);
@@ -108,6 +153,35 @@ export function InventoryDashboard() {
     }, [InventoryProducts]);
 
     const Columns = useMemo(() => {
+        const SelectColumn = {
+            id: 'select',
+            header: ({ table }) => (
+                <div className="pl-4 pr-2">
+                    <Checkbox
+                        checked={
+                            table.getIsAllPageRowsSelected() ||
+                            (table.getIsSomePageRowsSelected() && "indeterminate")
+                        }
+                        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+                        aria-label="Select all"
+                        className="translate-y-[2px]"
+                    />
+                </div>
+            ),
+            cell: ({ row }) => (
+                <div className="pl-4 pr-2">
+                    <Checkbox
+                        checked={row.getIsSelected()}
+                        onCheckedChange={(value) => row.toggleSelected(!!value)}
+                        aria-label="Select row"
+                        className="translate-y-[2px]"
+                    />
+                </div>
+            ),
+            enableSorting: false,
+            enableHiding: false,
+        };
+
         const NumberColumn = {
             id: 'RowNumber',
             header: '#',
@@ -233,14 +307,14 @@ export function InventoryDashboard() {
             id: 'MainCostPrice',
             header: 'Cost Price',
             meta: { className: 'w-[110px] text-right' },
-            cell: ({ row }) => formatCurrency(row.original.FakeCostPrice),
+            cell: ({ row }) => formatCurrency(isHGHMode ? row.original.CostPrice : row.original.FakeCostPrice),
         };
 
         const CostPriceColumn = {
             accessorKey: 'CostPrice',
             header: 'Cost Price',
             meta: { className: 'w-[110px] text-right' },
-            cell: ({ row }) => formatCurrency(row.original.CostPrice),
+            cell: ({ row }) => formatCurrency(isHGHMode ? row.original.CostPrice : row.original.FakeCostPrice),
         };
 
         const StockistPriceColumn = {
@@ -450,8 +524,8 @@ export function InventoryDashboard() {
                 ? PricingColumns
                 : BaseColumns;
 
-        return [...VisibleColumns, ActionColumn];
-    }, [ViewMode]);
+        return [...(isSelectionMode ? [SelectColumn] : []), ...VisibleColumns, ActionColumn];
+    }, [ViewMode, isSelectionMode, isHGHMode]);
 
     if (error) {
         return (
@@ -462,8 +536,8 @@ export function InventoryDashboard() {
     }
 
     return (
-        <div className="space-y-6">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="space-y-6 flex flex-col h-full">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between shrink-0">
                 <div>
                     <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Inventory Dashboard</h2>
                 </div>
@@ -486,18 +560,19 @@ export function InventoryDashboard() {
                     </Button>
                 </div>
             </div>
-
-            <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-gray-900">Inventory Overview</h3>
-                <Button variant="ghost" size="sm" onClick={() => setShowStats(!showStats)} className="text-gray-500 hover:text-gray-900">
-                    {showStats ? <ChevronUp className="h-4 w-4 mr-1" /> : <ChevronDown className="h-4 w-4 mr-1" />}
-                    {showStats ? 'Hide Stats' : 'Show Stats'}
-                </Button>
-            </div>
+            {!isExpanded && (
+                <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-gray-900">Inventory Overview</h3>
+                    <Button variant="ghost" size="sm" onClick={() => setShowStats(!showStats)} className="text-gray-500 hover:text-gray-900">
+                        {showStats ? <ChevronUp className="h-4 w-4 mr-1" /> : <ChevronDown className="h-4 w-4 mr-1" />}
+                        {showStats ? 'Hide Stats' : 'Show Stats'}
+                    </Button>
+                </div>
+            )}
 
             <div className={cn(
                 'grid transition-all duration-300 ease-in-out',
-                showStats ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+                (showStats && !isExpanded) ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
             )}>
                 <div className="overflow-hidden">
                     <div className="grid gap-4 md:grid-cols-4 pb-4">
@@ -533,27 +608,29 @@ export function InventoryDashboard() {
                 </div>
             </div>
 
-            <div className="border-b border-gray-200">
-                <nav className="-mb-px flex space-x-8">
-                    {['Inventory', 'Stock Logs'].map((tab) => (
-                        <button
-                            key={tab}
-                            onClick={() => setActiveTab(tab)}
-                            className={`
-                                whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors
-                                ${activeTab === tab
-                                    ? 'border-indigo-500 text-indigo-600'
-                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}
-                            `}
-                        >
-                            {tab}
-                        </button>
-                    ))}
-                </nav>
-            </div>
+            {!isExpanded && (
+                <div className="border-b border-gray-200">
+                    <nav className="-mb-px flex space-x-8">
+                        {['Inventory', 'Stock Logs'].map((tab) => (
+                            <button
+                                key={tab}
+                                onClick={() => setActiveTab(tab)}
+                                className={`
+                                    whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors
+                                    ${activeTab === tab
+                                        ? 'border-indigo-500 text-indigo-600'
+                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}
+                                `}
+                            >
+                                {tab}
+                            </button>
+                        ))}
+                    </nav>
+                </div>
+            )}
 
             {activeTab === 'Inventory' && (
-                <div className="rounded-xl border bg-white p-4 shadow-sm">
+                <div className="rounded-xl border bg-white p-4 shadow-sm flex-1 flex flex-col min-h-0">
                     {isLoading ? (
                         <div className="py-12 text-center text-gray-500">Loading inventory...</div>
                     ) : (
@@ -561,9 +638,50 @@ export function InventoryDashboard() {
                             columns={Columns}
                             data={InventoryProducts}
                             searchPlaceholder="Search"
+                            rowSelection={rowSelection}
+                            onRowSelectionChange={setRowSelection}
                             actionElement={
                                 <div className="flex items-center gap-2">
-                                    <div className="flex rounded-lg border bg-gray-100 p-1 w-[260px]">
+                                    {isSelectionMode ? (
+                                        <>
+                                            {Object.keys(rowSelection).length > 0 ? (
+                                                <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-1 mr-4 animate-in fade-in zoom-in duration-200">
+                                                    <span className="text-sm font-medium text-indigo-700 mr-2">
+                                                        {Object.keys(rowSelection).length} selected
+                                                    </span>
+                                                    <Button size="sm" variant="outline" className="bg-white hover:bg-amber-50 hover:text-amber-700 border-amber-200 text-amber-600 h-7 text-xs" onClick={() => { setBulkActionConfirm('archive'); setDeleteVerification(''); }}>
+                                                        Archive
+                                                    </Button>
+                                                    <Button size="sm" variant="outline" className="bg-white hover:bg-red-50 hover:text-red-700 border-red-200 text-red-600 h-7 text-xs" onClick={() => { setBulkActionConfirm('delete'); setDeleteVerification(''); }}>
+                                                        Delete
+                                                    </Button>
+                                                </div>
+                                            ) : (
+                                                <span className="text-sm text-gray-500 mr-4 animate-in fade-in duration-200">
+                                                    Select items...
+                                                </span>
+                                            )}
+                                            <Button size="sm" variant="outline" className="text-gray-500" onClick={() => { setIsSelectionMode(false); setRowSelection({}); }}>
+                                                Cancel
+                                            </Button>
+                                        </>
+                                    ) : (
+                                        <Button size="sm" variant="outline" className="h-9" onClick={() => setIsSelectionMode(true)}>
+                                            <Square className="mr-2 h-4 w-4" />
+                                            Select
+                                        </Button>
+                                    )}
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setIsExpanded(!isExpanded)}
+                                        className={cn("h-9 px-3 bg-white ml-auto", isExpanded && "bg-indigo-50 border-indigo-200 text-indigo-700")}
+                                        title={isExpanded ? "Collapse View" : "Expand View"}
+                                    >
+                                        {isExpanded ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+                                        <span className="ml-2 hidden sm:inline">{isExpanded ? 'Collapse' : 'Expand'}</span>
+                                    </Button>
+                                    <div className="flex rounded-lg border bg-gray-100 p-1 w-[260px] h-9 items-center">
                                         {[
                                             { Label: 'Basic', Value: 'Basic' },
                                             { Label: 'Detail', Value: 'Detail' },
@@ -572,9 +690,8 @@ export function InventoryDashboard() {
                                             <Button
                                                 key={Option.Value}
                                                 variant={ViewMode === Option.Value ? 'default' : 'ghost'}
-                                                size="sm"
+                                                className="flex-1 h-full text-xs shadow-none"
                                                 onClick={() => setViewMode(Option.Value)}
-                                                className="flex-1"
                                             >
                                                 {Option.Label}
                                             </Button>
@@ -651,39 +768,172 @@ export function InventoryDashboard() {
                 />
             )}
 
-            <Dialog open={!!confirmAction} onOpenChange={(open) => !open && setConfirmAction(null)}>
+            <Dialog open={!!confirmAction} onOpenChange={(open) => { if (!open) { setConfirmAction(null); setDeleteVerification(''); } }}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>
-                            {confirmAction?.type === 'delete' ? 'Delete Product' : 'Archive Product'}
+                        <DialogTitle className={confirmAction?.type === 'delete' || confirmAction?.type === 'force_delete' ? 'text-red-600' : 'text-amber-600'}>
+                            {confirmAction?.type === 'archive' ? 'Archive Product' : 'Delete Product'}
                         </DialogTitle>
-                        <DialogDescription>
-                            {confirmAction?.type === 'delete'
-                                ? `Are you sure you want to permanently delete "${confirmAction?.product?.ProductName}"? This action cannot be undone.`
-                                : `Are you sure you want to archive "${confirmAction?.product?.ProductName}"? It will be hidden from the active inventory list.`
-                            }
+                        <DialogDescription className="pt-2">
+                            {confirmAction?.type === 'archive' && (
+                                <>Are you sure you want to archive "{confirmAction?.product?.ProductName}"? It will be hidden from the active inventory list.</>
+                            )}
+                            {confirmAction?.type === 'delete' && (
+                                <div className="space-y-4">
+                                    <p>Are you sure you want to delete "{confirmAction?.product?.ProductName}"?</p>
+                                    <div className="p-3 bg-red-50 text-red-700 rounded-md text-sm border border-red-100">
+                                        <strong className="block mb-1 font-semibold flex items-center">
+                                            <AlertTriangle className="h-4 w-4 mr-1.5" /> Referential Integrity:
+                                        </strong>
+                                        If this product has stock history, standard deletion will be blocked to protect the accounting ledger. You can choose to <strong>Archive</strong> it safely.
+                                    </div>
+                                </div>
+                            )}
+                            {confirmAction?.type === 'force_delete' && (
+                                <div className="space-y-4">
+                                    <div className="p-3 bg-red-50 text-red-700 rounded-md text-sm border border-red-100">
+                                        <strong className="block mb-1 font-semibold flex items-center">
+                                            <AlertTriangle className="h-4 w-4 mr-1.5" /> Force Purge Warning:
+                                        </strong>
+                                        This will permanently destroy the product and cascade delete all its related pricing and stock logs. This action will be audited.
+                                    </div>
+                                    <div className="space-y-2 mt-4 text-gray-900">
+                                        <label className="text-sm font-medium">Type <span className="font-bold text-red-600">DELETE</span> to confirm:</label>
+                                        <Input 
+                                            value={deleteVerification} 
+                                            onChange={(e) => setDeleteVerification(e.target.value)} 
+                                            className="border-red-300 focus-visible:ring-red-500"
+                                            placeholder="DELETE"
+                                        />
+                                    </div>
+                                </div>
+                            )}
                         </DialogDescription>
                     </DialogHeader>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setConfirmAction(null)}>Cancel</Button>
-                        <Button
-                            variant={confirmAction?.type === 'delete' ? 'destructive' : 'default'}
-                            className={confirmAction?.type === 'archive' ? 'bg-amber-600 hover:bg-amber-700 text-white' : ''}
-                            onClick={async () => {
-                                try {
-                                    if (confirmAction?.type === 'delete') {
-                                        await deleteProduct.mutateAsync(confirmAction.product.ProductID);
-                                    } else {
-                                        await updateProduct.mutateAsync({ id: confirmAction.product.ProductID, updates: { IsActive: false } });
-                                    }
+                    <DialogFooter className="gap-2 sm:gap-0">
+                        <Button variant="outline" onClick={() => { setConfirmAction(null); setDeleteVerification(''); }}>Cancel</Button>
+                        
+                        {confirmAction?.type === 'archive' && (
+                            <Button className="bg-amber-600 hover:bg-amber-700 text-white" onClick={async () => {
+                                await updateProduct.mutateAsync({ id: confirmAction.product.ProductID, updates: { IsActive: false } });
+                                setConfirmAction(null);
+                            }}>
+                                Archive
+                            </Button>
+                        )}
+
+                        {confirmAction?.type === 'delete' && (
+                            <>
+                                <Button className="bg-amber-600 hover:bg-amber-700 text-white" onClick={async () => {
+                                    await updateProduct.mutateAsync({ id: confirmAction.product.ProductID, updates: { IsActive: false } });
                                     setConfirmAction(null);
-                                } catch {
-                                    alert(`Failed to ${confirmAction?.type} product. It might be tied to existing stock logs.`);
-                                }
-                            }}
-                        >
-                            {confirmAction?.type === 'delete' ? 'Delete' : 'Archive'}
-                        </Button>
+                                }}>
+                                    Archive (Safe)
+                                </Button>
+                                <Button variant="destructive" onClick={async () => {
+                                    try {
+                                        await deleteProduct.mutateAsync(confirmAction.product.ProductID);
+                                        setConfirmAction(null);
+                                    } catch {
+                                        // If standard delete fails due to constraint, suggest force delete
+                                        setConfirmAction({ type: 'force_delete', product: confirmAction.product });
+                                    }
+                                }}>
+                                    Delete
+                                </Button>
+                            </>
+                        )}
+
+                        {confirmAction?.type === 'force_delete' && (
+                            <Button 
+                                variant="destructive" 
+                                disabled={deleteVerification !== 'DELETE'}
+                                onClick={async () => {
+                                    await forcePurgeProducts.mutateAsync([confirmAction.product]);
+                                    setConfirmAction(null);
+                                    setDeleteVerification('');
+                                }}
+                            >
+                                Force Purge
+                            </Button>
+                        )}
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+            {/* Bulk Action Dialog */}
+            <Dialog open={!!bulkActionConfirm} onOpenChange={(open) => { if (!open) { setBulkActionConfirm(null); setDeleteVerification(''); } }}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle className={bulkActionConfirm === 'delete' || bulkActionConfirm === 'force_delete' ? 'text-red-600' : 'text-amber-600'}>
+                            Confirm Bulk {bulkActionConfirm === 'archive' ? 'Archive' : 'Delete'}
+                        </DialogTitle>
+                        <DialogDescription className="pt-2">
+                            You have selected {selectedProductIds.length} product(s).
+                            {bulkActionConfirm === 'delete' && (
+                                <div className="space-y-4 mt-4">
+                                    <div className="p-3 bg-amber-50 text-amber-700 rounded-md text-sm border border-amber-100">
+                                        <strong className="block mb-1 font-semibold flex items-center">
+                                            <AlertTriangle className="h-4 w-4 mr-1.5" /> Referential Integrity (Safe Mode):
+                                        </strong>
+                                        Products with stock movement cannot be hard-deleted automatically. The system will <strong>Archive</strong> products with history, and <strong>Delete</strong> empty/test products.
+                                    </div>
+                                </div>
+                            )}
+                            {bulkActionConfirm === 'force_delete' && (
+                                <div className="space-y-4 mt-4">
+                                    <div className="p-3 bg-red-50 text-red-700 rounded-md text-sm border border-red-100">
+                                        <strong className="block mb-1 font-semibold flex items-center">
+                                            <AlertTriangle className="h-4 w-4 mr-1.5" /> Force Purge Warning:
+                                        </strong>
+                                        This will permanently destroy ALL selected products and cascade delete all their related pricing and stock logs. This action will be audited.
+                                    </div>
+                                    <div className="space-y-2 text-gray-900">
+                                        <label className="text-sm font-medium">Type <span className="font-bold text-red-600">DELETE</span> to confirm:</label>
+                                        <Input 
+                                            value={deleteVerification} 
+                                            onChange={(e) => setDeleteVerification(e.target.value)} 
+                                            className="border-red-300 focus-visible:ring-red-500"
+                                            placeholder="DELETE"
+                                        />
+                                    </div>
+                                </div>
+                            )}
+                            {bulkActionConfirm === 'archive' && (
+                                <div className="mt-2 text-gray-600">
+                                    Archived products will be hidden from the active inventory list but their ledger history remains intact.
+                                </div>
+                            )}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="gap-2 sm:gap-0">
+                        <Button variant="outline" onClick={() => { setBulkActionConfirm(null); setDeleteVerification(''); }}>Cancel</Button>
+                        
+                        {bulkActionConfirm === 'archive' && (
+                            <Button className="bg-amber-600 hover:bg-amber-700 text-white" onClick={executeBulkAction}>
+                                Confirm Archive
+                            </Button>
+                        )}
+
+                        {bulkActionConfirm === 'delete' && (
+                            <>
+                                <Button variant="outline" className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => setBulkActionConfirm('force_delete')}>
+                                    Force Purge
+                                </Button>
+                                <Button variant="destructive" className="bg-red-600 hover:bg-red-700 text-white" onClick={executeBulkAction}>
+                                    Safe Delete
+                                </Button>
+                            </>
+                        )}
+
+                        {bulkActionConfirm === 'force_delete' && (
+                            <Button 
+                                variant="destructive" 
+                                disabled={deleteVerification !== 'DELETE'}
+                                onClick={executeBulkAction}
+                            >
+                                Confirm Force Purge
+                            </Button>
+                        )}
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

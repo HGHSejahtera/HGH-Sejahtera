@@ -1,4 +1,4 @@
-﻿import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 
 const syncDistinctOptionCache = (queryClient, queryKey, value) => {
@@ -90,10 +90,93 @@ export function useProducts() {
         }
     });
 
+    const bulkArchiveProducts = useMutation({
+        mutationFn: async (productIds) => {
+            const { error } = await supabase
+                .from('Products')
+                .update({ IsActive: false })
+                .in('ProductID', productIds);
+            if (error) throw error;
+            return productIds;
+        },
+        onSuccess: () => {
+            refreshProductRelatedQueries(queryClient);
+        }
+    });
+
+    const bulkDeleteProducts = useMutation({
+        mutationFn: async (productIds) => {
+            const { error } = await supabase
+                .from('Products')
+                .delete()
+                .in('ProductID', productIds);
+            if (error) throw error;
+            return productIds;
+        },
+        onSuccess: () => {
+            refreshProductRelatedQueries(queryClient);
+        }
+    });
+
+    const forcePurgeProducts = useMutation({
+        mutationFn: async (products) => {
+            const productIds = products.map(p => p.ProductID);
+
+            // 1. Snapshot into AuditLogs
+            const auditLogs = products.map(p => ({
+                ActionType: 'PRODUCT_DELETED',
+                Details: {
+                    ProductID: p.ProductID,
+                    ProductName: p.ProductName,
+                    MasterSKU: p.MasterSKU,
+                    Stock: p.Stock,
+                    Brand: p.Brand,
+                    Category: p.Category,
+                    Price: p.Price
+                },
+                PerformedBy: 'System Admin'
+            }));
+
+            const { error: auditError } = await supabase
+                .from('AuditLogs')
+                .insert(auditLogs);
+            if (auditError) console.error('AuditLog Error:', auditError); // Don't throw if audit log fails just in case table isn't ready
+
+            // 2. Cascade Delete: InventoryLogs
+            const { error: logsError } = await supabase
+                .from('InventoryLogs')
+                .delete()
+                .in('ProductID', productIds);
+            if (logsError) throw logsError;
+
+            // 3. Cascade Delete: ProductPricing
+            const { error: pricingError } = await supabase
+                .from('ProductPricing')
+                .delete()
+                .in('ProductID', productIds);
+            if (pricingError) throw pricingError;
+
+            // 4. Delete Products
+            const { error: productError } = await supabase
+                .from('Products')
+                .delete()
+                .in('ProductID', productIds);
+            if (productError) throw productError;
+
+            return productIds;
+        },
+        onSuccess: () => {
+            refreshProductRelatedQueries(queryClient);
+        }
+    });
+
     return {
         ...query,
         addProduct,
         updateProduct,
-        deleteProduct
+        deleteProduct,
+        bulkArchiveProducts,
+        bulkDeleteProducts,
+        forcePurgeProducts
     };
 }

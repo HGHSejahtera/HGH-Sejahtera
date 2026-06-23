@@ -24,8 +24,7 @@ import { InventoryDashboard } from './pages/Inventory/InventoryDashboard';
 import { StockIn } from './pages/Inventory/StockIn';
 
 import { Dashboard } from './pages/Dashboard/Dashboard';
-
-
+import { ReportDashboard } from './pages/Reports/ReportDashboard';
 export default function App() {
     const { isAuthenticated, isLoading } = useAuthStore();
 
@@ -59,6 +58,7 @@ export default function App() {
                             <Route path="/barcode" element={<BarcodeGenerator />} />
                             <Route path="/inventory" element={<InventoryDashboard />} />
                             <Route path="/inventory/stock-in" element={<StockIn />} />
+                            <Route path="/reports" element={<ReportDashboard />} />
                             <Route path="/agents" element={<AgentList />} />
                             <Route path="/agents/:id" element={<AgentDetails />} />
                             <Route path="/settings/general" element={<Settings />} />

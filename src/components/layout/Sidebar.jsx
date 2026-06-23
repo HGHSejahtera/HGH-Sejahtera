@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, ShoppingCart, Users, Settings, FileText, Pickaxe, Boxes, Box, ChevronLeft, X } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, Users, Settings, FileText, Pickaxe, Boxes, Box, ChevronLeft, X, BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/hooks/useAuth';
 import { useSidebar } from './SidebarContext';
@@ -7,7 +7,7 @@ import { useTranslation } from '@/hooks/useTranslation';
 
 const SidebarContent = ({ isCollapsed, toggleSidebar, closeMobile, allowedLinks, user, role }) => (
     <aside className={cn(
-        "flex flex-col h-screen transition-all duration-300 ease-in-out",
+        "flex flex-col h-full w-full transition-all duration-300 ease-in-out",
         "bg-gradient-to-b from-[oklch(0.18_0.05_270)] via-[oklch(0.15_0.04_270)] to-[oklch(0.12_0.06_275)]",
         isCollapsed ? "w-16" : "w-64"
     )}>
@@ -103,6 +103,7 @@ export function Sidebar() {
         { name: t('sidebar.pickPack'), icon: Pickaxe, path: '/pick-pack', roles: ['Founder', 'Manager', 'Developer', 'Staff'] },
         { name: t('sidebar.inventory'), icon: Boxes, path: '/inventory', roles: ['Founder', 'Manager', 'Developer', 'Staff'] },
         { name: t('sidebar.agents'), icon: Users, path: '/agents', roles: ['Founder', 'Manager', 'Developer'] },
+        { name: 'Reports', icon: BarChart3, path: '/reports', roles: ['Founder', 'Manager', 'Developer'] },
         { name: t('sidebar.settings'), icon: Settings, path: '/settings', roles: ['Founder', 'Manager', 'Developer'] },
         { name: 'New Order', icon: ShoppingCart, path: '/agent/orders/new', roles: ['Agent'] },
         { name: 'My Orders', icon: Box, path: '/agent/orders', roles: ['Agent'] },
@@ -114,7 +115,7 @@ export function Sidebar() {
     return (
         <>
             {/* Desktop Sidebar */}
-            <div className="hidden md:block shrink-0">
+            <div className="hidden md:block shrink-0 h-full">
                 <SidebarContent 
                     isCollapsed={isCollapsed} 
                     toggleSidebar={toggleSidebar} 

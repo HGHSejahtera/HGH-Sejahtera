@@ -144,8 +144,8 @@ export function ProductModal({ isOpen, onClose, product = null }) {
             if (!finalBarcode || finalBarcode.trim() === '') {
                 finalBarcode = generateInternalBarcode();
             } else {
-                if (!/^\d{13}$/.test(finalBarcode)) {
-                    setFieldErrors({ Barcode: 'Barcode (EAN-13) must be exactly 13 digits.' });
+                if (!/^\d{8,14}$/.test(finalBarcode)) {
+                    setFieldErrors({ Barcode: 'Barcode must be between 8 to 14 digits (e.g. UPC or EAN).' });
                     setIsLoading(false);
                     return;
                 }
@@ -325,7 +325,7 @@ export function ProductModal({ isOpen, onClose, product = null }) {
                                                         setFieldErrors({});
                                                         handleChange({ target: { name: 'Barcode', value: e.target.value.replace(/\D/g, '') } });
                                                     }}
-                                                    maxLength="13"
+                                                    maxLength="14"
                                                     className={`pr-12 ${fieldErrors.Barcode ? 'border-red-500 focus-visible:ring-red-500 bg-red-50' : 'bg-gray-50/50 focus:bg-white'}`}
                                                 />
                                                 <button

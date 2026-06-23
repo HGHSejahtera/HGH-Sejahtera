@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 export const useAuthStore = create((set, get) => ({
     user: null, 
     isAuthenticated: false,
+    isLoading: true,
     initialize: () => {
         if (get().isInitialized) return;
 

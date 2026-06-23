@@ -8,14 +8,17 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useSecretMode } from '@/hooks/useSecretMode';
 
 export function Header() {
     const { toggleSidebar } = useSidebar();
     const location = useLocation();
 
     const { t, language, setLanguage } = useTranslation();
+    const { isHGHMode, toggleHGHMode } = useSecretMode();
 
     // Generate dynamic title based on path
     const getPageTitle = () => {
@@ -71,6 +74,21 @@ export function Header() {
                         >
                             <span className="fi fi-my text-lg rounded-sm overflow-hidden shadow-sm shrink-0"></span> 
                             <span>Bahasa Melayu</span>
+                        </DropdownMenuItem>
+                        
+                        <DropdownMenuSeparator className="my-1" />
+                        
+                        <DropdownMenuItem 
+                            onClick={() => toggleHGHMode()} 
+                            className="flex items-center justify-between cursor-pointer py-2.5 px-3 rounded-lg transition-colors outline-none text-gray-600 hover:bg-gray-50 focus:bg-gray-50"
+                        >
+                            <div className="flex items-center gap-3">
+                                <span className="text-lg rounded-sm overflow-hidden shadow-sm shrink-0 bg-gradient-to-br from-indigo-500 to-violet-600" style={{ width: '1.333333em', height: '1em', display: 'inline-block' }}></span>
+                                <span>HGH</span>
+                            </div>
+                            {isHGHMode && (
+                                <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div>
+                            )}
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
