@@ -115,24 +115,6 @@ export function ProductModal({ isOpen, onClose, product = null }) {
         setFieldErrors({});
     };
 
-    const parsePlatformData = () => {
-        const PlatformDataText = formData.PlatformData.trim();
-
-        if (!PlatformDataText) return {};
-
-        try {
-            const ParsedPlatformData = JSON.parse(PlatformDataText);
-
-            if (!ParsedPlatformData || typeof ParsedPlatformData !== 'object' || Array.isArray(ParsedPlatformData)) {
-                return { Error: 'Platform Data must be a valid JSON object.' };
-            }
-
-            return { Value: ParsedPlatformData };
-        } catch {
-            return { Error: 'Platform Data must be valid JSON.' };
-        }
-    };
-
     const handleSubmit = async (e) => {
         e.preventDefault();
         setIsLoading(true);
@@ -149,13 +131,6 @@ export function ProductModal({ isOpen, onClose, product = null }) {
                     setIsLoading(false);
                     return;
                 }
-            }
-
-            const PlatformDataResult = parsePlatformData();
-            if (PlatformDataResult.Error) {
-                setFieldErrors({ PlatformData: PlatformDataResult.Error });
-                setIsLoading(false);
-                return;
             }
 
             const WeightG = formData.WeightG === '' ? null : parseInt(formData.WeightG, 10);
@@ -178,7 +153,6 @@ export function ProductModal({ isOpen, onClose, product = null }) {
                 Price: ProductRRP,
                 WeightG: Number.isFinite(WeightG) ? WeightG : null,
                 Dimensions: formData.Dimensions || null,
-                PlatformData: PlatformDataResult.Value || {},
                 IsActive: true
             };
 
@@ -382,23 +356,6 @@ export function ProductModal({ isOpen, onClose, product = null }) {
                                         <div className="space-y-2">
                                             <Label htmlFor="Dimensions" className="text-gray-700 font-medium flex items-center">Dimensions</Label>
                                             <Input id="Dimensions" name="Dimensions" value={formData.Dimensions} onChange={handleChange} placeholder="L x W x H cm" className="bg-gray-50/50 focus:bg-white" />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="PlatformData" className={`font-medium flex items-center ${fieldErrors.PlatformData ? 'text-red-600' : 'text-gray-700'}`}>Platform Data (JSON)</Label>
-                                            <textarea
-                                                id="PlatformData"
-                                                name="PlatformData"
-                                                value={formData.PlatformData}
-                                                onChange={handleChange}
-                                                placeholder={'{\n  "tiktok": {},\n  "shopee": {}\n}'}
-                                                rows={5}
-                                                className={`w-full rounded-lg border px-3 py-2 text-sm font-mono outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 ${fieldErrors.PlatformData ? 'border-red-500 bg-red-50' : 'border-input bg-gray-50/50 focus:bg-white'}`}
-                                            />
-                                            {fieldErrors.PlatformData && (
-                                                <p className="text-xs font-medium text-red-600 flex items-center gap-1 mt-1.5">
-                                                    <AlertTriangle className="h-3 w-3" /> {fieldErrors.PlatformData}
-                                                </p>
-                                            )}
                                         </div>
                                     </div>
                                 </section>
