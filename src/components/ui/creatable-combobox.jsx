@@ -23,7 +23,8 @@ export function CreatableCombobox({
   onChange, 
   placeholder = "Select", 
   emptyMessage = "No matching items.",
-  id
+  id,
+  formatDisplay = (val) => val
 }) {
   const [open, setOpen] = React.useState(false)
   const [inputValue, setInputValue] = React.useState("")
@@ -45,7 +46,7 @@ export function CreatableCombobox({
             !value && "text-muted-foreground"
           )}
         >
-          {value || placeholder}
+          {value ? formatDisplay(value) : placeholder}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
@@ -97,7 +98,7 @@ export function CreatableCombobox({
                       value === option ? "opacity-100" : "opacity-0"
                     )}
                   />
-                  {option}
+                  {formatDisplay(option)}
                 </CommandItem>
               ))}
               

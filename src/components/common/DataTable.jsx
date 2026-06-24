@@ -38,11 +38,16 @@ export function DataTable({
     searchPlaceholder = "Search...", 
     actionElement,
     rowSelection = {},
-    onRowSelectionChange
+    onRowSelectionChange,
+    columnVisibility: externalColumnVisibility,
+    onColumnVisibilityChange: externalOnColumnVisibilityChange
 }) {
     const [globalFilter, setGlobalFilter] = useState("")
-    const [columnVisibility, setColumnVisibility] = useState({})
+    const [internalColumnVisibility, setInternalColumnVisibility] = useState({})
     const [sorting, setSorting] = useState([])
+
+    const columnVisibility = externalColumnVisibility !== undefined ? externalColumnVisibility : internalColumnVisibility;
+    const setColumnVisibility = externalOnColumnVisibilityChange || setInternalColumnVisibility;
 
     // eslint-disable-next-line react-hooks/incompatible-library
     const table = useReactTable({

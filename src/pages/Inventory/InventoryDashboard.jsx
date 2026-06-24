@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Archive, Barcode, Boxes, ChevronDown, ChevronUp, ChevronsUpDown, Edit, MoreHorizontal, Package, PackagePlus, Plus, RefreshCw, Trash2, AlertTriangle, XCircle, Square, Maximize, Minimize } from 'lucide-react';
+import { Archive, Barcode, Boxes, ChevronDown, ChevronUp, ChevronsUpDown, Edit, MoreHorizontal, Package, PackagePlus, Plus, RefreshCw, Trash2, AlertTriangle, XCircle, Square, Maximize, Minimize, Download, X } from 'lucide-react';
+import * as XLSX from 'xlsx-js-style';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DataTable } from '@/components/common/DataTable';
@@ -19,6 +20,7 @@ import {
     DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
+    DropdownMenuCheckboxItem,
 } from '@/components/ui/dropdown-menu';
 import {
     Dialog,
@@ -98,6 +100,56 @@ export function InventoryDashboard() {
     const [isExpanded, setIsExpanded] = useState(false);
     const [activeTab, setActiveTab] = useState('Inventory');
 
+    const [exportColumns, setExportColumns] = useState({
+        masterSKU: true,
+        barcode: true,
+        productName: true,
+        category: true,
+        categoryID: false,
+        stock: true,
+        costPrice: true,
+        stockistPrice: false,
+        retailPrice: true,
+        wholesalePrice: false,
+        agentPrice: false,
+        weight: false,
+        dimensions: false,
+    });
+
+    const [ExpandedImage, SetExpandedImage] = useState(null);
+
+    const [tableColumnVisibility, setTableColumnVisibility] = useState(() => {
+        const base = ['RowNumber', 'Image', 'MasterSKU', 'Brand', 'CategoryName', 'ProductName', 'Variation', 'Size', 'Barcode', 'Quantity', 'MainCostPrice'];
+        const all = ['RowNumber', 'Image', 'MasterSKU', 'Brand', 'CategoryName', 'CategoryID', 'ProductName', 'Variation', 'Size', 'Barcode', 'SellerSKU', 'GTIN', 'Quantity', 'Availability', 'CostPrice', 'StockistPrice', 'RRP', 'RetailPrice', 'WholesalePrice', 'AgentPrice', 'WeightG', 'Dimensions', 'PlatformData'];
+        const visibility = {};
+        all.forEach(id => {
+            visibility[id] = base.includes(id);
+        });
+        visibility['Actions'] = true;
+        visibility['select'] = true;
+        return visibility;
+    });
+
+    const modeColumns = useMemo(() => {
+        const base = ['RowNumber', 'Image', 'MasterSKU', 'Brand', 'CategoryName', 'ProductName', 'Variation', 'Size', 'Barcode', 'Quantity', 'MainCostPrice'];
+        const pricing = ['RowNumber', 'Image', 'MasterSKU', 'Brand', 'CategoryName', 'ProductName', 'Variation', 'Size', 'Barcode', 'Quantity', 'CostPrice', 'StockistPrice', 'RRP', 'RetailPrice', 'WholesalePrice', 'AgentPrice'];
+        const all = ['RowNumber', 'Image', 'MasterSKU', 'Brand', 'CategoryName', 'CategoryID', 'ProductName', 'Variation', 'Size', 'Barcode', 'SellerSKU', 'GTIN', 'Quantity', 'Availability', 'CostPrice', 'StockistPrice', 'RRP', 'RetailPrice', 'WholesalePrice', 'AgentPrice', 'WeightG', 'Dimensions', 'PlatformData'];
+        
+        return { Basic: base, Detail: pricing, All: all };
+    }, []);
+
+    const handleViewModeChange = (mode) => {
+        setViewMode(mode);
+        const targetCols = modeColumns[mode];
+        const visibility = {};
+        modeColumns.All.forEach(id => {
+            visibility[id] = targetCols.includes(id);
+        });
+        visibility['Actions'] = true;
+        visibility['select'] = true;
+        setTableColumnVisibility(visibility);
+    };
+
     const { data: Products, isLoading, error, refetch, isRefetching } = useInventoryProducts();
     const { data: RecentLogs } = useInventoryLogs(null);
 
@@ -137,6 +189,182 @@ export function InventoryDashboard() {
         } catch (err) {
             console.error('Bulk action failed', err);
         }
+    };
+
+    const handleExportExcel = () => {
+        const Headers = [];
+        if (exportColumns.masterSKU) Headers.push('Master SKU');
+        if (exportColumns.barcode) Headers.push('Barcode');
+        if (exportColumns.productName) Headers.push('Product Name');
+        if (exportColumns.category) Headers.push('Category Name');
+        if (exportColumns.categoryID) Headers.push('Category ID');
+        if (exportColumns.stock) Headers.push('Current Stock');
+        if (exportColumns.costPrice) Headers.push('Cost Price');
+        if (exportColumns.stockistPrice) Headers.push('Stockist Price');
+        if (exportColumns.retailPrice) Headers.push('Retail Price');
+        if (exportColumns.wholesalePrice) Headers.push('Wholesale Price');
+        if (exportColumns.agentPrice) Headers.push('Agent Price');
+        if (exportColumns.weight) Headers.push('Weight (g)');
+        if (exportColumns.dimensions) Headers.push('Dimensions');
+        if (exportColumns.platformData) Headers.push('Platform Data');
+
+        const aoaData = [];
+        
+        // Row 0: Title
+        const titleRow = Array(Headers.length).fill('');
+        titleRow[0] = 'HGH Sejahtera Inventory';
+        aoaData.push(titleRow);
+
+        // Row 1: Headers
+        aoaData.push(Headers);
+
+        // Row 2+: Data
+        InventoryProducts.forEach((Product) => {
+            const Pricing = getProductPricing(Product);
+            const formattedName = [Product.Brand, Product.ProductName, Product.Variation, Product.Size]
+                .filter(Boolean)
+                .join(' ')
+                .trim();
+            
+            const row = [];
+            Headers.forEach(header => {
+                if (header === 'Master SKU') row.push(Product.MasterSKU || '');
+                else if (header === 'Barcode') row.push(Product.Barcode || '');
+                else if (header === 'Product Name') row.push(formattedName);
+                else if (header === 'Category Name') row.push(Product.CategoryName || '');
+                else if (header === 'Category ID') row.push(Product.CategoryID || '');
+                else if (header === 'Current Stock') row.push(Product.Stock || 0);
+                else if (header === 'Cost Price') row.push(Product.CostPrice || 0);
+                else if (header === 'Stockist Price') row.push(Product.StockistPrice || 0);
+                else if (header === 'Retail Price') row.push(Pricing.RetailRule || 0);
+                else if (header === 'Wholesale Price') row.push(Pricing.WholesaleRule || 0);
+                else if (header === 'Agent Price') row.push(Pricing.AgentMarkup || 0);
+                else if (header === 'Weight (g)') row.push(Product.WeightG || '');
+                else if (header === 'Dimensions') row.push(Product.Dimensions || '');
+                else if (header === 'Platform Data') row.push(Product.PlatformData ? JSON.stringify(Product.PlatformData) : '');
+            });
+            aoaData.push(row);
+        });
+
+        const worksheet = XLSX.utils.aoa_to_sheet(aoaData);
+        
+        // Merges for Title
+        worksheet['!merges'] = [
+            { s: { r: 0, c: 0 }, e: { r: 0, c: Headers.length > 0 ? Headers.length - 1 : 0 } }
+        ];
+
+        // Row heights
+        worksheet['!rows'] = [
+            { hpt: 31.5 }, // Title row
+            { hpt: 25 }    // Header row
+        ];
+
+        // Styles
+        const titleStyle = {
+            font: { bold: true, color: { rgb: "FFFFFF" }, name: 'Arial', sz: 14 },
+            fill: { fgColor: { rgb: "1F3864" } },
+            alignment: { horizontal: "center", vertical: "center" }
+        };
+
+        const headerStyle = {
+            font: { bold: true, color: { rgb: "FFFFFF" }, name: 'Arial', sz: 11 },
+            fill: { fgColor: { rgb: "2F5496" } },
+            alignment: { horizontal: "center", vertical: "center" },
+            border: {
+                top: { style: "thin", color: { rgb: "1F3864" } },
+                bottom: { style: "thin", color: { rgb: "1F3864" } },
+                left: { style: "thin", color: { rgb: "1F3864" } },
+                right: { style: "thin", color: { rgb: "1F3864" } }
+            }
+        };
+
+        const cellStyle = {
+            font: { name: 'Arial', sz: 10, color: { rgb: "000000" } },
+            alignment: { vertical: "center" },
+            border: {
+                top: { style: "thin", color: { rgb: "E5E7EB" } },
+                bottom: { style: "thin", color: { rgb: "E5E7EB" } },
+                left: { style: "thin", color: { rgb: "E5E7EB" } },
+                right: { style: "thin", color: { rgb: "E5E7EB" } }
+            }
+        };
+
+        const numberStyle = {
+            ...cellStyle,
+            alignment: { horizontal: "right", vertical: "center" },
+            numFmt: "#,##0.00"
+        };
+
+        const stockStyle = {
+            ...cellStyle,
+            alignment: { horizontal: "center", vertical: "center" },
+            font: { bold: true, name: 'Arial', sz: 10, color: { rgb: "000000" } }
+        };
+
+        const range = XLSX.utils.decode_range(worksheet['!ref']);
+        const colWidths = [];
+
+        let barcodeColIndex = -1;
+        let skuColIndex = -1;
+
+        for (let R = range.s.r; R <= range.e.r; ++R) {
+            for (let C = range.s.c; C <= range.e.c; ++C) {
+                const address = XLSX.utils.encode_cell({ c: C, r: R });
+                const cell = worksheet[address];
+                
+                if (!cell) continue;
+
+                if (R === 0) {
+                    if (C === 0) cell.s = titleStyle;
+                } else if (R === 1) {
+                    if (cell.v === 'Barcode') barcodeColIndex = C;
+                    if (cell.v === 'Master SKU') skuColIndex = C;
+                    
+                    cell.s = headerStyle;
+                    
+                    if (cell.v === 'Product Name') {
+                        colWidths[C] = { wpx: 600 };
+                    } else {
+                        const len = cell.v ? cell.v.toString().length : 0;
+                        colWidths[C] = { wch: Math.max(15, len + 5) };
+                    }
+                } else {
+                    if (!colWidths[C]) colWidths[C] = { wch: 10 };
+                    if (!colWidths[C].wpx) {
+                        const cellContentLength = cell.v ? cell.v.toString().length : 0;
+                        colWidths[C].wch = Math.max(colWidths[C].wch || 10, cellContentLength + 3);
+                    }
+
+                    if (C === barcodeColIndex || C === skuColIndex) {
+                        cell.t = 's';
+                        cell.s = { ...cellStyle, alignment: { horizontal: "center", vertical: "center" }, font: { name: 'Consolas', sz: 10, color: { rgb: "000000" } } };
+                    } 
+                    else if (typeof cell.v === 'number') {
+                        const headerAddress = XLSX.utils.encode_cell({ c: C, r: 1 });
+                        const headerCell = worksheet[headerAddress];
+                        if (headerCell && (headerCell.v === 'Current Stock' || headerCell.v === 'Weight (g)')) {
+                            cell.s = stockStyle;
+                        } else {
+                            cell.s = numberStyle;
+                        }
+                    } 
+                    else {
+                        cell.s = cellStyle;
+                    }
+                }
+            }
+        }
+
+        worksheet['!cols'] = colWidths.map(col => {
+            if (col.wpx) return col;
+            return { wch: Math.min(col.wch, 100) };
+        });
+
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Inventory');
+        
+        const timestamp = new Date().toISOString().slice(0,10).replace(/-/g, '');
+        XLSX.writeFile(workbook, `Inventory_Export_${timestamp}.xlsx`);
     };
 
     const Summary = useMemo(() => {
@@ -203,9 +431,17 @@ export function InventoryDashboard() {
                 const ImageURL = row.original.ImageURL;
 
                 return (
-                    <div className="h-12 w-12 rounded-lg border bg-gray-50 flex items-center justify-center overflow-hidden">
+                    <div 
+                        className={cn("h-12 w-12 rounded-lg border bg-gray-50 flex items-center justify-center overflow-hidden", ImageURL ? "group relative cursor-pointer" : "")}
+                        onClick={() => ImageURL && SetExpandedImage(row.original)}
+                    >
                         {ImageURL ? (
-                            <img src={ImageURL} alt={row.original.ProductName} className="h-full w-full object-cover" />
+                            <>
+                                <img src={ImageURL} alt={row.original.ProductName} className="h-full w-full object-cover" />
+                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Maximize className="h-5 w-5 text-white" />
+                                </div>
+                            </>
                         ) : (
                             <Package className="h-5 w-5 text-gray-400" />
                         )}
@@ -237,12 +473,23 @@ export function InventoryDashboard() {
         };
 
         const CategoryColumn = {
-            accessorKey: 'Category',
+            accessorKey: 'CategoryName',
             meta: { className: 'w-[150px]' },
-            header: ({ column }) => <SortableHeader column={column}>Category</SortableHeader>,
+            header: ({ column }) => <SortableHeader column={column}>Category Name</SortableHeader>,
             cell: ({ row }) => (
                 <span className="text-sm text-gray-500 font-medium">
-                    {row.original.Category || '-'}
+                    {row.original.CategoryName || '-'}
+                </span>
+            ),
+        };
+
+        const CategoryIDColumn = {
+            accessorKey: 'CategoryID',
+            meta: { className: 'w-[120px]' },
+            header: ({ column }) => <SortableHeader column={column}>Category ID</SortableHeader>,
+            cell: ({ row }) => (
+                <span className="text-sm text-gray-500 font-mono">
+                    {row.original.CategoryID || '-'}
                 </span>
             ),
         };
@@ -303,12 +550,7 @@ export function InventoryDashboard() {
             },
         };
 
-        const MainCostPriceColumn = {
-            id: 'MainCostPrice',
-            header: 'Cost Price',
-            meta: { className: 'w-[110px] text-right' },
-            cell: ({ row }) => formatCurrency(isHGHMode ? row.original.CostPrice : row.original.FakeCostPrice),
-        };
+
 
         const CostPriceColumn = {
             accessorKey: 'CostPrice',
@@ -462,36 +704,7 @@ export function InventoryDashboard() {
             ),
         };
 
-        const BaseColumns = [
-            NumberColumn,
-            ImageColumn,
-            MasterSKUColumn,
-            BrandColumn,
-            ProductNameColumn,
-            VariationColumn,
-            SizeColumn,
-            BarcodeColumn,
-            QuantityColumn,
-            MainCostPriceColumn,
-        ];
 
-        const PricingColumns = [
-            NumberColumn,
-            ImageColumn,
-            MasterSKUColumn,
-            BrandColumn,
-            ProductNameColumn,
-            VariationColumn,
-            SizeColumn,
-            BarcodeColumn,
-            QuantityColumn,
-            CostPriceColumn,
-            StockistPriceColumn,
-            RRPColumn,
-            RetailPriceColumn,
-            WholesalePriceColumn,
-            AgentPriceColumn,
-        ];
 
         const ShowAllColumns = [
             NumberColumn,
@@ -499,6 +712,7 @@ export function InventoryDashboard() {
             MasterSKUColumn,
             BrandColumn,
             CategoryColumn,
+            CategoryIDColumn,
             ProductNameColumn,
             VariationColumn,
             SizeColumn,
@@ -518,14 +732,8 @@ export function InventoryDashboard() {
             PlatformDataColumn,
         ];
 
-        const VisibleColumns = ViewMode === 'All'
-            ? ShowAllColumns
-            : ViewMode === 'Detail'
-                ? PricingColumns
-                : BaseColumns;
-
-        return [...(isSelectionMode ? [SelectColumn] : []), ...VisibleColumns, ActionColumn];
-    }, [ViewMode, isSelectionMode, isHGHMode]);
+        return [...(isSelectionMode ? [SelectColumn] : []), ...ShowAllColumns, ActionColumn];
+    }, [isSelectionMode, isHGHMode]);
 
     if (error) {
         return (
@@ -637,19 +845,32 @@ export function InventoryDashboard() {
                         <DataTable
                             columns={Columns}
                             data={InventoryProducts}
+                            columnVisibility={tableColumnVisibility}
+                            onColumnVisibilityChange={setTableColumnVisibility}
                             searchPlaceholder="Search"
                             rowSelection={rowSelection}
                             onRowSelectionChange={setRowSelection}
                             actionElement={
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 w-full">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setIsExpanded(!isExpanded)}
+                                        className={cn("h-9 px-3 bg-white", isExpanded && "bg-indigo-50 border-indigo-200 text-indigo-700")}
+                                        title={isExpanded ? "Collapse View" : "Expand View"}
+                                    >
+                                        {isExpanded ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+                                        <span className="ml-2 hidden sm:inline">{isExpanded ? 'Collapse' : 'Expand'}</span>
+                                    </Button>
+
                                     {isSelectionMode ? (
                                         <>
                                             {Object.keys(rowSelection).length > 0 ? (
-                                                <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-1 mr-4 animate-in fade-in zoom-in duration-200">
-                                                    <span className="text-sm font-medium text-indigo-700 mr-2">
+                                                <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-1 animate-in fade-in zoom-in duration-200">
+                                                    <span className="text-sm font-medium text-indigo-700">
                                                         {Object.keys(rowSelection).length} selected
                                                     </span>
-                                                    <Button size="sm" variant="outline" className="bg-white hover:bg-amber-50 hover:text-amber-700 border-amber-200 text-amber-600 h-7 text-xs" onClick={() => { setBulkActionConfirm('archive'); setDeleteVerification(''); }}>
+                                                    <Button size="sm" variant="outline" className="bg-white hover:bg-amber-50 hover:text-amber-700 border-amber-200 text-amber-600 h-7 text-xs ml-2" onClick={() => { setBulkActionConfirm('archive'); setDeleteVerification(''); }}>
                                                         Archive
                                                     </Button>
                                                     <Button size="sm" variant="outline" className="bg-white hover:bg-red-50 hover:text-red-700 border-red-200 text-red-600 h-7 text-xs" onClick={() => { setBulkActionConfirm('delete'); setDeleteVerification(''); }}>
@@ -657,30 +878,74 @@ export function InventoryDashboard() {
                                                     </Button>
                                                 </div>
                                             ) : (
-                                                <span className="text-sm text-gray-500 mr-4 animate-in fade-in duration-200">
+                                                <span className="text-sm text-gray-500 animate-in fade-in duration-200 mr-2">
                                                     Select items...
                                                 </span>
                                             )}
-                                            <Button size="sm" variant="outline" className="text-gray-500" onClick={() => { setIsSelectionMode(false); setRowSelection({}); }}>
+                                            <Button size="sm" variant="outline" className="text-gray-500 h-9" onClick={() => { setIsSelectionMode(false); setRowSelection({}); }}>
                                                 Cancel
                                             </Button>
                                         </>
                                     ) : (
-                                        <Button size="sm" variant="outline" className="h-9" onClick={() => setIsSelectionMode(true)}>
+                                         <Button size="sm" variant="outline" className="h-9" onClick={() => setIsSelectionMode(true)}>
                                             <Square className="mr-2 h-4 w-4" />
                                             Select
                                         </Button>
                                     )}
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => setIsExpanded(!isExpanded)}
-                                        className={cn("h-9 px-3 bg-white ml-auto", isExpanded && "bg-indigo-50 border-indigo-200 text-indigo-700")}
-                                        title={isExpanded ? "Collapse View" : "Expand View"}
-                                    >
-                                        {isExpanded ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
-                                        <span className="ml-2 hidden sm:inline">{isExpanded ? 'Collapse' : 'Expand'}</span>
-                                    </Button>
+
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="h-9 px-3 bg-white"
+                                                title="Smart Export to Excel"
+                                            >
+                                                <Download className="h-4 w-4" />
+                                                <span className="ml-2 hidden sm:inline">Export</span>
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" className="w-56">
+                                            <DropdownMenuLabel>Columns to Export</DropdownMenuLabel>
+                                            <DropdownMenuSeparator />
+                                            <div className="max-h-[300px] overflow-y-auto">
+                                                {Object.entries({
+                                                    masterSKU: 'Master SKU',
+                                                    barcode: 'Barcode',
+                                                    productName: 'Product Name',
+                                                    category: 'Category Name',
+                                                    categoryID: 'Category ID',
+                                                    stock: 'Current Stock',
+                                                    costPrice: 'Cost Price',
+                                                    stockistPrice: 'Stockist Price',
+                                                    retailPrice: 'Retail Price',
+                                                    wholesalePrice: 'Wholesale Price',
+                                                    agentPrice: 'Agent Price',
+                                                    weight: 'Weight (g)',
+                                                    dimensions: 'Dimensions',
+                                                }).map(([key, label]) => (
+                                                    <DropdownMenuCheckboxItem
+                                                        key={key}
+                                                        checked={exportColumns[key]}
+                                                        onCheckedChange={(checked) => setExportColumns(prev => ({ ...prev, [key]: checked }))}
+                                                        onSelect={(e) => e.preventDefault()}
+                                                    >
+                                                        {label}
+                                                    </DropdownMenuCheckboxItem>
+                                                ))}
+                                            </div>
+                                            <DropdownMenuSeparator />
+                                            <div className="p-2 flex gap-2">
+                                                <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={(e) => { e.preventDefault(); setExportColumns(Object.keys(exportColumns).reduce((acc, k) => ({...acc, [k]: true}), {})); }}>
+                                                    All
+                                                </Button>
+                                                <Button size="sm" className="flex-1 text-xs" onClick={handleExportExcel}>
+                                                    Download
+                                                </Button>
+                                            </div>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+
                                     <div className="flex rounded-lg border bg-gray-100 p-1 w-[260px] h-9 items-center">
                                         {[
                                             { Label: 'Basic', Value: 'Basic' },
@@ -691,12 +956,13 @@ export function InventoryDashboard() {
                                                 key={Option.Value}
                                                 variant={ViewMode === Option.Value ? 'default' : 'ghost'}
                                                 className="flex-1 h-full text-xs shadow-none"
-                                                onClick={() => setViewMode(Option.Value)}
+                                                onClick={() => handleViewModeChange(Option.Value)}
                                             >
                                                 {Option.Label}
                                             </Button>
                                         ))}
                                     </div>
+                                    
                                     <Button
                                         variant="outline"
                                         size="sm"
@@ -935,6 +1201,27 @@ export function InventoryDashboard() {
                             </Button>
                         )}
                     </DialogFooter>
+                </DialogContent>
+            </Dialog>
+            
+            {/* Expanded Image Dialog */}
+            <Dialog open={!!ExpandedImage} onOpenChange={(open) => { if (!open) SetExpandedImage(null); }}>
+                <DialogContent showCloseButton={false} className="sm:max-w-[400px] p-0 overflow-hidden bg-transparent border-0 shadow-none rounded-none">
+                    {ExpandedImage && (
+                        <div className="relative w-full h-[400px] flex items-center justify-center">
+                            <img 
+                                src={ExpandedImage.ImageURL} 
+                                alt={ExpandedImage.ProductName} 
+                                className="max-w-full max-h-full object-contain shadow-2xl"
+                            />
+                            <button
+                                onClick={() => SetExpandedImage(null)}
+                                className="absolute top-2 right-2 bg-black/30 rounded-full p-2 text-white hover:bg-black/50 transition-colors"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+                    )}
                 </DialogContent>
             </Dialog>
         </div>

@@ -1,4 +1,4 @@
-﻿export const my = {
+export const my = {
     sidebar: {
         dashboard: "Papan Pemuka",
         pos: "POS",
@@ -54,6 +54,8 @@
         agentListDesc: "Urus rangkaian reseller"
     },
     productModal: {
+        category: "Pilih Kategori",
+        selectBrand: "Pilih Brand",
         noBrandFound: "Tiada brand ditemui.",
         noCategoryFound: "Tiada kategori ditemui."
     },

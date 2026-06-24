@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useProducts } from '@/hooks/useProducts';
+import { GenerateMasterSKU } from '@/utils/MasterSKUGenerator';
 import { useBrands } from '@/hooks/useBrands';
 import { useCategories } from '@/hooks/useCategories';
 import { useBulkUpdatePricing } from '@/hooks/usePricing';
@@ -23,9 +24,27 @@ const formatPlatformData = (PlatformData) => {
     }
 };
 
+const KNOWN_ACRONYMS = new Set(['UV', 'SPF', 'PA', 'BB', 'CC', 'AHA', 'BHA', 'PHA', 'PH']);
+
+const formatTitleCase = (str) => {
+    if (!str) return '';
+    return str.split(/\s+/).map(word => {
+        const cleanWord = word.replace(/[^a-zA-Z]/g, '').toUpperCase();
+        if (KNOWN_ACRONYMS.has(cleanWord)) {
+            return word.toUpperCase();
+        }
+        return word.charAt(0).toUpperCase() + word.substring(1).toLowerCase();
+    }).join(' ');
+};
+
+const formatSizeStr = (str) => {
+    if (!str) return '';
+    return str.toUpperCase().replace(/(\d+)\s*([A-Z]+)/g, '$1 $2').trim();
+};
+
 export function ProductModal({ isOpen, onClose, product = null }) {
     const { t } = useTranslation();
-    const { addProduct, updateProduct } = useProducts();
+    const { data: allProducts = [], addProduct, updateProduct } = useProducts();
     const { data: brands = [] } = useBrands();
     const { data: categories = [] } = useCategories();
     const updatePricing = useBulkUpdatePricing();
@@ -74,6 +93,10 @@ export function ProductModal({ isOpen, onClose, product = null }) {
                 SellerSKU: value,
                 GTIN: value
             }));
+        } else if (name === 'ProductName' || name === 'Variation') {
+            setFormData(prev => ({ ...prev, [name]: formatTitleCase(value) }));
+        } else if (name === 'Size') {
+            setFormData(prev => ({ ...prev, Size: formatSizeStr(value) }));
         } else {
             setFormData(prev => ({ ...prev, [name]: value }));
         }
@@ -115,6 +138,26 @@ export function ProductModal({ isOpen, onClose, product = null }) {
         setFieldErrors({});
     };
 
+    const handleGenerateMasterSKU = () => {
+        const existingSkus = allProducts.map(p => p.MasterSKU).filter(Boolean);
+        const result = GenerateMasterSKU(formData, existingSkus);
+        
+        if (result.status === 'error') {
+            setErrorMsg(result.message);
+            return;
+        }
+
+        setFormData(prev => ({
+            ...prev,
+            MasterSKU: result.master_sku
+        }));
+        setErrorMsg('');
+        
+        if (result.conflict_detected) {
+            setErrorMsg(`Master SKU generated with numeric suffix (${result.master_sku}) due to a clash with an existing SKU.`);
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setIsLoading(true);
@@ -136,12 +179,28 @@ export function ProductModal({ isOpen, onClose, product = null }) {
             const WeightG = formData.WeightG === '' ? null : parseInt(formData.WeightG, 10);
             const ProductRRP = hasRRP ? (parseFloat(formData.BasePrice) || 0) : 0;
 
+            let finalCategory = formData.Category || null;
+            let finalCategoryName = null;
+            let finalCategoryID = null;
+            
+            if (finalCategory) {
+                const match = finalCategory.match(/^(.*)\s\((\d{6,})\)$/);
+                if (match) {
+                    finalCategoryName = match[1].trim();
+                    finalCategoryID = match[2];
+                } else {
+                    finalCategoryName = finalCategory;
+                }
+            }
+
             const productData = {
                 ImageURL: formData.ImageURL || null,
                 MasterSKU: formData.MasterSKU || null,
                 ProductName: formData.ProductName,
                 Brand: formData.Brand || null,
-                Category: formData.Category || null,
+                Category: finalCategory,
+                CategoryName: finalCategoryName,
+                CategoryID: finalCategoryID,
                 Variation: formData.Variation || null,
                 Size: formData.Size || null,
                 Barcode: finalBarcode,
@@ -237,7 +296,8 @@ export function ProductModal({ isOpen, onClose, product = null }) {
                                                 id="Brand"
                                                 options={brands}
                                                 value={formData.Brand}
-                                                onChange={(val) => setFormData(prev => ({ ...prev, Brand: val }))}
+                                                onChange={(val) => setFormData(prev => ({ ...prev, Brand: val ? val.toUpperCase() : val }))}
+                                                placeholder={t('productModal.selectBrand')}
                                                 emptyMessage={t('productModal.noBrandFound')}
                                             />
                                         </div>
@@ -254,7 +314,9 @@ export function ProductModal({ isOpen, onClose, product = null }) {
                                                 options={categories}
                                                 value={formData.Category}
                                                 onChange={(val) => setFormData(prev => ({ ...prev, Category: val }))}
+                                                placeholder={t('productModal.category')}
                                                 emptyMessage={t('productModal.noCategoryFound')}
+                                                formatDisplay={(val) => val ? val.replace(/\s\(\d+\)$/, '') : val}
                                             />
                                         </div>
                                         <div className="space-y-2">
@@ -283,7 +345,23 @@ export function ProductModal({ isOpen, onClose, product = null }) {
                                     <div className="space-y-5">
                                         <div className="space-y-2">
                                             <Label htmlFor="MasterSKU" className="text-gray-700 font-medium flex items-center">Master SKU</Label>
-                                            <Input id="MasterSKU" name="MasterSKU" value={formData.MasterSKU} onChange={handleChange} className="bg-gray-50/50 focus:bg-white" />
+                                            <div className="relative">
+                                                <Input 
+                                                    id="MasterSKU" 
+                                                    name="MasterSKU" 
+                                                    value={formData.MasterSKU} 
+                                                    onChange={handleChange} 
+                                                    className="bg-gray-50/50 focus:bg-white pr-10" 
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={handleGenerateMasterSKU}
+                                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                                                    title="Auto-generate Master SKU"
+                                                >
+                                                    <Wand2 className="w-4 h-4" />
+                                                </button>
+                                            </div>
                                         </div>
 
                                         <div className="space-y-2">

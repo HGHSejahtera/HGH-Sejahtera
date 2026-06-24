@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import { TIKTOK_CATEGORIES } from '@/constants/tiktokCategories';
 
 export function useCategories() {
     return useQuery({
@@ -11,7 +12,9 @@ export function useCategories() {
                 .order('CategoryName');
 
             if (error) throw error;
-            return data.map(d => d.CategoryName);
+            const dbCategories = data.map(d => d.CategoryName).filter(Boolean);
+            const combinedCategories = [...new Set([...dbCategories, ...TIKTOK_CATEGORIES])];
+            return combinedCategories.sort((a, b) => a.localeCompare(b));
         },
         staleTime: 1000 * 60 * 5, // Cache for 5 minutes
     });

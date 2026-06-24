@@ -1,4 +1,4 @@
-﻿export const en = {
+export const en = {
     sidebar: {
         dashboard: "Dashboard",
         pos: "POS",
@@ -54,6 +54,8 @@
         agentListDesc: "Manage reseller network"
     },
     productModal: {
+        category: "Select Category",
+        selectBrand: "Select Brand",
         noBrandFound: "No brands found.",
         noCategoryFound: "No categories found."
     },

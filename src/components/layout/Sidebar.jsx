@@ -15,7 +15,7 @@ const SidebarContent = ({ isCollapsed, toggleSidebar, closeMobile, allowedLinks,
         <div className="h-16 flex items-center border-b border-white/[0.06] shrink-0 px-2 relative">
             <button 
                 onClick={toggleSidebar} 
-                className={cn("absolute left-2 right-2 p-2 rounded-md hover:bg-white/10 transition-all duration-300 flex justify-center items-center group hidden lg:flex",
+                className={cn("absolute left-2 right-2 p-2 rounded-md hover:bg-white/10 transition-all duration-300 flex justify-center items-center group hidden md:flex",
                     !isCollapsed ? "opacity-0 invisible pointer-events-none" : "opacity-100 visible"
                 )}
                 title="Expand Sidebar"
@@ -29,7 +29,7 @@ const SidebarContent = ({ isCollapsed, toggleSidebar, closeMobile, allowedLinks,
                 <span className="text-xl font-black bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent tracking-wider whitespace-nowrap">HGH</span>
                 <button 
                     onClick={toggleSidebar} 
-                    className="p-1 rounded-md text-zinc-500 hover:text-white hover:bg-white/10 transition-colors hidden lg:block shrink-0"
+                    className="p-1 rounded-md text-zinc-500 hover:text-white hover:bg-white/10 transition-colors hidden md:block shrink-0"
                 >
                     <ChevronLeft className="h-4 w-4" />
                 </button>
@@ -71,9 +71,11 @@ const SidebarContent = ({ isCollapsed, toggleSidebar, closeMobile, allowedLinks,
                 <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-lg shadow-indigo-500/20">
                     {user?.name?.charAt(0)?.toUpperCase() || role.charAt(0)}
                 </div>
-                <div className={cn("overflow-hidden transition-all duration-300 whitespace-nowrap", isCollapsed ? "w-0 opacity-0 ml-0" : "w-full opacity-100 ml-3 pr-2")}>
-                    <p className="text-sm font-medium text-white truncate leading-tight">{user?.name || 'User'}</p>
-                    <p className="text-xs text-zinc-500 truncate mt-0.5">{role}</p>
+                <div className={cn("overflow-hidden transition-all duration-300", isCollapsed ? "w-0 opacity-0 ml-0" : "w-full opacity-100 ml-3 pr-2")}>
+                    <div className="w-[140px]">
+                        <p className="text-sm font-medium text-white leading-tight break-words">{user?.name || 'User'}</p>
+                        <p className="text-xs text-zinc-500 truncate mt-0.5">{role}</p>
+                    </div>
                 </div>
             </div>
             
