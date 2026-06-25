@@ -40,6 +40,22 @@ const SidebarContent = ({ isCollapsed, toggleSidebar, closeMobile, allowedLinks,
         <div className="flex-1 overflow-y-auto py-3 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-white/20">
             <nav className={cn("space-y-0.5", isCollapsed ? "px-2" : "px-3")}>
                 {allowedLinks.map((link) => (
+                    link.comingSoon ? (
+                        <div
+                            key={link.path}
+                            title={isCollapsed ? `${link.name} (Coming Soon)` : undefined}
+                            className={cn(
+                                "flex items-center rounded-lg text-sm font-medium cursor-not-allowed opacity-40",
+                                isCollapsed ? "justify-center p-2.5" : "px-3 py-2.5",
+                                "text-zinc-500"
+                            )}
+                        >
+                            <link.icon className={cn("h-[18px] w-[18px] shrink-0", !isCollapsed && "mr-3")} />
+                            <span className={cn("overflow-hidden whitespace-nowrap transition-all duration-300", isCollapsed ? "w-0 opacity-0" : "w-full opacity-100")}>
+                                {link.name}
+                            </span>
+                        </div>
+                    ) : (
                     <NavLink
                         key={link.path}
                         to={link.path}
@@ -58,6 +74,7 @@ const SidebarContent = ({ isCollapsed, toggleSidebar, closeMobile, allowedLinks,
                             {link.name}
                         </span>
                     </NavLink>
+                    )
                 ))}
             </nav>
         </div>
@@ -100,12 +117,12 @@ export function Sidebar() {
     const role = user?.role || 'Staff';
     
     const links = [
-        { name: t('sidebar.dashboard'), icon: LayoutDashboard, path: '/dashboard', roles: ['Founder', 'Manager', 'Developer', 'Staff'] },
-        { name: t('sidebar.pos'), icon: ShoppingCart, path: '/pos', roles: ['Founder', 'Manager', 'Developer', 'Staff'] },
-        { name: t('sidebar.pickPack'), icon: Pickaxe, path: '/pick-pack', roles: ['Founder', 'Manager', 'Developer', 'Staff'] },
+        { name: t('sidebar.dashboard'), icon: LayoutDashboard, path: '/dashboard', roles: ['Founder', 'Manager', 'Developer', 'Staff'], comingSoon: true },
+        { name: t('sidebar.pos'), icon: ShoppingCart, path: '/pos', roles: ['Founder', 'Manager', 'Developer', 'Staff'], comingSoon: true },
+        { name: t('sidebar.pickPack'), icon: Pickaxe, path: '/pick-pack', roles: ['Founder', 'Manager', 'Developer', 'Staff'], comingSoon: true },
         { name: t('sidebar.inventory'), icon: Boxes, path: '/inventory', roles: ['Founder', 'Manager', 'Developer', 'Staff'] },
-        { name: t('sidebar.agents'), icon: Users, path: '/agents', roles: ['Founder', 'Manager', 'Developer'] },
-        { name: 'Reports', icon: BarChart3, path: '/reports', roles: ['Founder', 'Manager', 'Developer'] },
+        { name: t('sidebar.agents'), icon: Users, path: '/agents', roles: ['Founder', 'Manager', 'Developer'], comingSoon: true },
+        { name: 'Reports', icon: BarChart3, path: '/reports', roles: ['Founder', 'Manager', 'Developer'], comingSoon: true },
         { name: t('sidebar.settings'), icon: Settings, path: '/settings', roles: ['Founder', 'Manager', 'Developer'] },
         { name: 'New Order', icon: ShoppingCart, path: '/agent/orders/new', roles: ['Agent'] },
         { name: 'My Orders', icon: Box, path: '/agent/orders', roles: ['Agent'] },

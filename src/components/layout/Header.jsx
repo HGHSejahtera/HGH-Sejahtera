@@ -93,9 +93,8 @@ export function Header() {
                     </DropdownMenuContent>
                 </DropdownMenu>
 
-                <Button variant="ghost" size="icon" className="relative">
-                    <Bell className="h-5 w-5 text-gray-500" />
-                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
+                <Button variant="ghost" size="icon" className="relative cursor-not-allowed opacity-40 hover:bg-transparent">
+                    <Bell className="h-5 w-5 text-zinc-400" />
                 </Button>
             </div>
         </header>

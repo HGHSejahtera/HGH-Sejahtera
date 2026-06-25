@@ -75,7 +75,9 @@ export function ProductModal({ isOpen, onClose, product = null }) {
         StockistPrice: product?.StockistPrice || '',
         Stock: product?.Stock || 0,
         WeightG: product?.WeightG || '',
-        Dimensions: product?.Dimensions || '',
+        LengthCM: product?.LengthCM || '',
+        WidthCM: product?.WidthCM || '',
+        HeightCM: product?.HeightCM || '',
         PlatformData: formatPlatformData(product?.PlatformData),
         PricingModel: pricing.PricingModel || 'HQ_DISCOUNT',
         BasePrice: pricing.BasePrice ?? product?.Price ?? '',
@@ -177,6 +179,9 @@ export function ProductModal({ isOpen, onClose, product = null }) {
             }
 
             const WeightG = formData.WeightG === '' ? null : parseInt(formData.WeightG, 10);
+            const LengthCM = formData.LengthCM === '' ? null : parseFloat(formData.LengthCM);
+            const WidthCM = formData.WidthCM === '' ? null : parseFloat(formData.WidthCM);
+            const HeightCM = formData.HeightCM === '' ? null : parseFloat(formData.HeightCM);
             const ProductRRP = hasRRP ? (parseFloat(formData.BasePrice) || 0) : 0;
 
             let finalCategory = formData.Category || null;
@@ -211,7 +216,9 @@ export function ProductModal({ isOpen, onClose, product = null }) {
                 StockistPrice: parseFloat(formData.StockistPrice) || 0,
                 Price: ProductRRP,
                 WeightG: Number.isFinite(WeightG) ? WeightG : null,
-                Dimensions: formData.Dimensions || null,
+                LengthCM: Number.isFinite(LengthCM) ? LengthCM : null,
+                WidthCM: Number.isFinite(WidthCM) ? WidthCM : null,
+                HeightCM: Number.isFinite(HeightCM) ? HeightCM : null,
                 IsActive: true
             };
 
@@ -432,8 +439,12 @@ export function ProductModal({ isOpen, onClose, product = null }) {
                                             <Input id="WeightG" name="WeightG" type="number" min="0" value={formData.WeightG} onChange={handleChange} className="bg-gray-50/50 focus:bg-white" />
                                         </div>
                                         <div className="space-y-2">
-                                            <Label htmlFor="Dimensions" className="text-gray-700 font-medium flex items-center">Dimensions</Label>
-                                            <Input id="Dimensions" name="Dimensions" value={formData.Dimensions} onChange={handleChange} placeholder="L x W x H cm" className="bg-gray-50/50 focus:bg-white" />
+                                            <Label className="text-gray-700 font-medium flex items-center">Dimensions (cm)</Label>
+                                            <div className="grid grid-cols-3 gap-2">
+                                                <Input id="LengthCM" name="LengthCM" type="number" min="0" step="0.01" value={formData.LengthCM} onChange={handleChange} placeholder="Length" className="bg-gray-50/50 focus:bg-white" />
+                                                <Input id="WidthCM" name="WidthCM" type="number" min="0" step="0.01" value={formData.WidthCM} onChange={handleChange} placeholder="Width" className="bg-gray-50/50 focus:bg-white" />
+                                                <Input id="HeightCM" name="HeightCM" type="number" min="0" step="0.01" value={formData.HeightCM} onChange={handleChange} placeholder="Height" className="bg-gray-50/50 focus:bg-white" />
+                                            </div>
                                         </div>
                                     </div>
                                 </section>

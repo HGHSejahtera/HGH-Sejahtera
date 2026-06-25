@@ -126,8 +126,9 @@ export function DataTable({
                                             className="capitalize"
                                             checked={column.getIsVisible()}
                                             onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                                            onSelect={(e) => e.preventDefault()}
                                         >
-                                            {column.id.replace(/([A-Z])/g, ' $1').trim().replace('S K U', 'SKU')}
+                                            {typeof column.columnDef.header === 'string' ? column.columnDef.header : column.id}
                                         </DropdownMenuCheckboxItem>
                                     )
                                 })}
@@ -140,9 +141,8 @@ export function DataTable({
                     )}
                 </div>
             </div>
-            <div className="rounded-md border flex-1 overflow-auto min-h-0 relative">
-                <Table>
-                    <TableHeader>
+            <Table containerClassName="rounded-md border flex-1 min-h-0 relative">
+                <TableHeader>
                         {table.getHeaderGroups().map((headerGroup) => (
                             <TableRow key={headerGroup.id}>
                                 {headerGroup.headers.map((header) => {
@@ -182,8 +182,7 @@ export function DataTable({
                             </TableRow>
                         )}
                     </TableBody>
-                </Table>
-            </div>
+            </Table>
             <div className="flex items-center justify-between px-2 pt-4 shrink-0 mt-auto border-t mt-4">
                 <div className="flex-1 text-sm text-muted-foreground">
                     {table.getFilteredSelectedRowModel().rows.length > 0 ? (

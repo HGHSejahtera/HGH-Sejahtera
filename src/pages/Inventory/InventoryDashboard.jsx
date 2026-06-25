@@ -36,6 +36,15 @@ const formatCurrency = (Value) => new Intl.NumberFormat('ms-MY', {
     currency: 'MYR',
 }).format(Number(Value || 0));
 
+const PriceCell = ({ value }) => {
+    const numStr = Number(value || 0).toLocaleString('ms-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return (
+        <div className="font-medium text-gray-900 text-right tabular-nums w-full">
+            {numStr}
+        </div>
+    );
+};
+
 const getStockStatus = (Stock) => {
     if (Stock <= 0) {
         return {
@@ -71,7 +80,7 @@ const SortableHeader = ({ column, children }) => (
     <Button
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-        className="-ml-4 h-8 data-[state=open]:bg-accent hover:bg-gray-100 text-gray-700"
+        className="px-0 h-8 hover:bg-transparent data-[state=open]:bg-transparent text-gray-700 font-medium justify-start"
     >
         {children}
         {column.getIsSorted() === 'desc' ? (
@@ -119,8 +128,8 @@ export function InventoryDashboard() {
     const [ExpandedImage, SetExpandedImage] = useState(null);
 
     const [tableColumnVisibility, setTableColumnVisibility] = useState(() => {
-        const base = ['RowNumber', 'Image', 'MasterSKU', 'Brand', 'CategoryName', 'ProductName', 'Variation', 'Size', 'Barcode', 'Quantity', 'MainCostPrice'];
-        const all = ['RowNumber', 'Image', 'MasterSKU', 'Brand', 'CategoryName', 'CategoryID', 'ProductName', 'Variation', 'Size', 'Barcode', 'SellerSKU', 'GTIN', 'Quantity', 'Availability', 'CostPrice', 'StockistPrice', 'RRP', 'RetailPrice', 'WholesalePrice', 'AgentPrice', 'WeightG', 'Dimensions', 'PlatformData'];
+        const base = ['RowNumber', 'Image', 'MasterSKU', 'Brand', 'CategoryName', 'ProductName', 'Variation', 'Size', 'Barcode', 'Quantity', 'CostPrice'];
+        const all = ['RowNumber', 'Image', 'MasterSKU', 'Brand', 'CategoryName', 'CategoryID', 'ProductName', 'Variation', 'Size', 'Barcode', 'SellerSKU', 'GTIN', 'Quantity', 'Availability', 'CostPrice', 'StockistPrice', 'RRP', 'RetailPrice', 'WholesalePrice', 'AgentPrice', 'WeightG', 'LengthCM', 'WidthCM', 'HeightCM', 'PlatformData'];
         const visibility = {};
         all.forEach(id => {
             visibility[id] = base.includes(id);
@@ -131,9 +140,9 @@ export function InventoryDashboard() {
     });
 
     const modeColumns = useMemo(() => {
-        const base = ['RowNumber', 'Image', 'MasterSKU', 'Brand', 'CategoryName', 'ProductName', 'Variation', 'Size', 'Barcode', 'Quantity', 'MainCostPrice'];
+        const base = ['RowNumber', 'Image', 'MasterSKU', 'Brand', 'CategoryName', 'ProductName', 'Variation', 'Size', 'Barcode', 'Quantity', 'CostPrice'];
         const pricing = ['RowNumber', 'Image', 'MasterSKU', 'Brand', 'CategoryName', 'ProductName', 'Variation', 'Size', 'Barcode', 'Quantity', 'CostPrice', 'StockistPrice', 'RRP', 'RetailPrice', 'WholesalePrice', 'AgentPrice'];
-        const all = ['RowNumber', 'Image', 'MasterSKU', 'Brand', 'CategoryName', 'CategoryID', 'ProductName', 'Variation', 'Size', 'Barcode', 'SellerSKU', 'GTIN', 'Quantity', 'Availability', 'CostPrice', 'StockistPrice', 'RRP', 'RetailPrice', 'WholesalePrice', 'AgentPrice', 'WeightG', 'Dimensions', 'PlatformData'];
+        const all = ['RowNumber', 'Image', 'MasterSKU', 'Brand', 'CategoryName', 'CategoryID', 'ProductName', 'Variation', 'Size', 'Barcode', 'SellerSKU', 'GTIN', 'Quantity', 'Availability', 'CostPrice', 'StockistPrice', 'RRP', 'RetailPrice', 'WholesalePrice', 'AgentPrice', 'WeightG', 'LengthCM', 'WidthCM', 'HeightCM', 'PlatformData'];
         
         return { Basic: base, Detail: pricing, All: all };
     }, []);
@@ -234,7 +243,7 @@ export function InventoryDashboard() {
                 else if (header === 'Category Name') row.push(Product.CategoryName || '');
                 else if (header === 'Category ID') row.push(Product.CategoryID || '');
                 else if (header === 'Current Stock') row.push(Product.Stock || 0);
-                else if (header === 'Cost Price') row.push(Product.CostPrice || 0);
+                else if (header === 'Cost Price') row.push(isHGHMode ? (Product.CostPrice || 0) : (Product.FakeCostPrice || 0));
                 else if (header === 'Stockist Price') row.push(Product.StockistPrice || 0);
                 else if (header === 'Retail Price') row.push(Pricing.RetailRule || 0);
                 else if (header === 'Wholesale Price') row.push(Pricing.WholesaleRule || 0);
@@ -455,7 +464,7 @@ export function InventoryDashboard() {
             meta: { className: 'w-[180px]' },
             header: ({ column }) => <SortableHeader column={column}>Master SKU</SortableHeader>,
             cell: ({ row }) => (
-                <span className="font-mono text-sm font-semibold text-gray-900 pl-2">
+                <span className="font-mono text-sm font-semibold text-gray-900">
                     {row.original.MasterSKU || '-'}
                 </span>
             ),
@@ -532,9 +541,9 @@ export function InventoryDashboard() {
             cell: ({ row }) => {
                 const Stock = Number(row.original.Stock || 0);
                 return (
-                    <div className="font-semibold text-gray-900 pr-4">
+                    <span className="font-semibold text-gray-900 tabular-nums">
                         {Stock.toLocaleString('ms-MY')}
-                    </div>
+                    </span>
                 );
             },
         };
@@ -553,56 +562,56 @@ export function InventoryDashboard() {
 
 
         const CostPriceColumn = {
-            accessorKey: 'CostPrice',
-            header: 'Cost Price',
-            meta: { className: 'w-[110px] text-right' },
-            cell: ({ row }) => formatCurrency(isHGHMode ? row.original.CostPrice : row.original.FakeCostPrice),
+            id: 'CostPrice',
+            header: () => <div className="text-right w-full">Cost</div>,
+            meta: { className: 'min-w-[120px] max-w-[120px] w-[120px] text-right' },
+            cell: ({ row }) => <PriceCell value={isHGHMode ? row.original.CostPrice : row.original.FakeCostPrice} />,
         };
 
         const StockistPriceColumn = {
             accessorKey: 'StockistPrice',
-            header: 'Stockist Price',
-            meta: { className: 'w-[130px] text-right' },
-            cell: ({ row }) => formatCurrency(row.original.StockistPrice),
+            header: () => <div className="text-right w-full">Stockist</div>,
+            meta: { className: 'min-w-[120px] max-w-[120px] w-[120px] text-right' },
+            cell: ({ row }) => <PriceCell value={row.original.StockistPrice} />,
         };
 
         const RRPColumn = {
             id: 'RRP',
-            header: 'RRP',
-            meta: { className: 'w-[100px] text-right' },
-            cell: ({ row }) => formatCurrency(getRRP(row.original)),
+            header: () => <div className="text-right w-full">RRP</div>,
+            meta: { className: 'min-w-[120px] max-w-[120px] w-[120px] text-right' },
+            cell: ({ row }) => <PriceCell value={getRRP(row.original)} />,
         };
 
         const RetailPriceColumn = {
             id: 'RetailPrice',
-            header: 'Retail Price',
-            meta: { className: 'w-[120px] text-right' },
+            header: () => <div className="text-right w-full">Retail</div>,
+            meta: { className: 'min-w-[120px] max-w-[120px] w-[120px] text-right' },
             cell: ({ row }) => {
                 const Pricing = getProductPricing(row.original);
                 const { RetailPrice } = calculateFinalPrices(Pricing);
-                return formatCurrency(RetailPrice);
+                return <PriceCell value={RetailPrice} />;
             },
         };
 
         const WholesalePriceColumn = {
             id: 'WholesalePrice',
-            header: 'Wholesale Price',
-            meta: { className: 'w-[140px] text-right' },
+            header: () => <div className="text-right w-full">Wholesale</div>,
+            meta: { className: 'min-w-[120px] max-w-[120px] w-[120px] text-right' },
             cell: ({ row }) => {
                 const Pricing = getProductPricing(row.original);
                 const { WholesalePrice } = calculateFinalPrices(Pricing);
-                return formatCurrency(WholesalePrice);
+                return <PriceCell value={WholesalePrice} />;
             },
         };
 
         const AgentPriceColumn = {
             id: 'AgentPrice',
-            header: 'Agent Price',
-            meta: { className: 'w-[120px] text-right' },
+            header: () => <div className="text-right w-full">Agent</div>,
+            meta: { className: 'min-w-[120px] max-w-[120px] w-[120px] text-right' },
             cell: ({ row }) => {
                 const Pricing = getProductPricing(row.original);
                 const { AgentPrice } = calculateFinalPrices(Pricing);
-                return formatCurrency(AgentPrice);
+                return <PriceCell value={AgentPrice} />;
             },
         };
 
@@ -624,10 +633,22 @@ export function InventoryDashboard() {
             cell: ({ row }) => row.original.WeightG ? `${row.original.WeightG}g` : '-',
         };
 
-        const DimensionsColumn = {
-            accessorKey: 'Dimensions',
-            header: 'Dimensions',
-            cell: ({ row }) => row.original.Dimensions || '-',
+        const LengthCMColumn = {
+            accessorKey: 'LengthCM',
+            header: 'Length',
+            cell: ({ row }) => row.original.LengthCM ? `${row.original.LengthCM}cm` : '-',
+        };
+
+        const WidthCMColumn = {
+            accessorKey: 'WidthCM',
+            header: 'Width',
+            cell: ({ row }) => row.original.WidthCM ? `${row.original.WidthCM}cm` : '-',
+        };
+
+        const HeightCMColumn = {
+            accessorKey: 'HeightCM',
+            header: 'Height',
+            cell: ({ row }) => row.original.HeightCM ? `${row.original.HeightCM}cm` : '-',
         };
 
         const PlatformDataColumn = {
@@ -648,10 +669,11 @@ export function InventoryDashboard() {
 
         const ActionColumn = {
             id: 'Actions',
-            header: () => <div className="w-[50px]">Action</div>,
+            header: () => <div className="w-[60px] text-center">Action</div>,
             enableHiding: false,
+            meta: { className: 'w-[60px]' },
             cell: ({ row }) => (
-                <div className="flex items-center">
+                <div className="flex items-center justify-center">
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button
@@ -728,7 +750,9 @@ export function InventoryDashboard() {
             WholesalePriceColumn,
             AgentPriceColumn,
             WeightColumn,
-            DimensionsColumn,
+            LengthCMColumn,
+            WidthCMColumn,
+            HeightCMColumn,
             PlatformDataColumn,
         ];
 

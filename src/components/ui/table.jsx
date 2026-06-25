@@ -4,10 +4,11 @@ import { cn } from "@/lib/utils"
 
 function Table({
   className,
+  containerClassName,
   ...props
 }) {
   return (
-    <div data-slot="table-container" className="relative w-full overflow-x-auto">
+    <div data-slot="table-container" className={cn("relative w-full overflow-auto", containerClassName)}>
       <table
         data-slot="table"
         className={cn("w-full caption-bottom text-sm", className)}
@@ -23,7 +24,7 @@ function TableHeader({
   return (
     <thead
       data-slot="table-header"
-      className={cn("[&_tr]:border-b", className)}
+      className={cn("[&_tr]:border-b sticky top-0 z-10 bg-white", className)}
       {...props} />
   );
 }
@@ -75,7 +76,7 @@ function TableHead({
     <th
       data-slot="table-head"
       className={cn(
-        "h-10 px-2 text-left align-middle font-medium whitespace-nowrap text-foreground [&:has([role=checkbox])]:pr-0",
+        "h-10 px-2 text-left align-middle font-medium whitespace-nowrap text-foreground overflow-hidden text-ellipsis [&:has([role=checkbox])]:pr-0",
         className
       )}
       {...props} />
@@ -90,7 +91,7 @@ function TableCell({
     <td
       data-slot="table-cell"
       className={cn(
-        "p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0",
+        "p-2 align-middle whitespace-nowrap overflow-hidden text-ellipsis [&:has([role=checkbox])]:pr-0",
         className
       )}
       {...props} />
