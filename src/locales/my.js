@@ -62,5 +62,10 @@ export const my = {
     settingsUsers: {
         emptyTitle: "Tiada user lagi",
         emptyDescription: "User baru yang register akan muncul di sini."
+    },
+    errors: {
+        uploadFailedPresigned: "Gagal mendapatkan kebenaran upload (Pre-signed URL gagal)",
+        uploadFailedR2: "Gagal upload gambar ke Cloudflare R2",
+        uploadFailedGeneric: "Gagal memuat naik gambar."
     }
 };

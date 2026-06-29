@@ -62,5 +62,10 @@ export const en = {
     settingsUsers: {
         emptyTitle: "No users yet",
         emptyDescription: "New registered users will appear here."
+    },
+    errors: {
+        uploadFailedPresigned: "Failed to get upload permission (Pre-signed URL failed)",
+        uploadFailedR2: "Failed to upload image to Cloudflare R2",
+        uploadFailedGeneric: "Failed to upload image."
     }
 };

@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Eye, EyeOff, Sparkles } from "lucide-react";
-
+import ForgotPasswordModal from "@/components/auth/ForgotPasswordModal";
 const Pupil = ({ 
   size = 12, 
   maxDistance = 5,
@@ -141,6 +141,7 @@ export function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
   
   const [mouseX, setMouseX] = useState(0);
   const [mouseY, setMouseY] = useState(0);
@@ -551,6 +552,13 @@ export function Login() {
                   Remember Me
                 </Label>
               </div>
+              <button
+                type="button"
+                onClick={() => setIsForgotPasswordOpen(true)}
+                className="text-sm font-medium text-indigo-400 hover:text-indigo-300 hover:underline"
+              >
+                Forgot Password?
+              </button>
             </div>
 
             {error && (
@@ -570,6 +578,11 @@ export function Login() {
           </form>
         </div>
       </div>
+      
+      <ForgotPasswordModal 
+        isOpen={isForgotPasswordOpen} 
+        onClose={() => setIsForgotPasswordOpen(false)} 
+      />
     </div>
   );
 }

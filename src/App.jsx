@@ -9,6 +9,7 @@ import { Login } from './pages/Auth/Login';
 import { Registration } from './pages/Auth/Registration';
 import { AccountActivation } from './pages/Auth/AccountActivation';
 import { PendingApproval } from './pages/Auth/PendingApproval';
+import ResetPassword from './pages/Auth/ResetPassword';
 import { POS } from './pages/POS/POS';
 import { PickPack } from './pages/Orders/PickPack';
 import { PackOrder } from './pages/Orders/PackOrder';
@@ -44,6 +45,7 @@ export default function App() {
                 <Route path="/HGH/Registration" element={<Registration />} />
                 <Route path="/activation" element={<AccountActivation />} />
                 <Route path="/pending-approval" element={<PendingApproval />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
                 
                 {/* Protected Routes inside Layout */}
                 {isAuthenticated ? (

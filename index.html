@@ -16,7 +16,7 @@
         if (hasToken || hasError) {
             sessionStorage.setItem('hgh_auth_search', s);
             sessionStorage.setItem('hgh_auth_hash', h);
-            if (p !== '/activation') {
+            if (p !== '/activation' && p !== '/reset-password') {
                 window.location.replace('/activation' + s + h);
             }
         }

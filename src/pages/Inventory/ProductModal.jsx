@@ -270,7 +270,7 @@ export function ProductModal({ isOpen, onClose, product = null }) {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm overflow-y-auto p-4 sm:p-6 lg:p-10 animate-in fade-in duration-200">
-            <div className="w-full max-w-[1400px] bg-white rounded-xl shadow-2xl relative flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
+            <div className="w-full max-w-[1400px] bg-white rounded-none shadow-2xl relative flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
                 <div className="flex items-center justify-between px-10 py-6 border-b border-gray-100 shrink-0">
                     <h2 className="text-2xl font-bold tracking-tight text-gray-900">
                         {product ? 'Edit Product Profile' : 'Add New Product'}

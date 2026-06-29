@@ -1,12 +1,15 @@
 import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import imageCompression from 'browser-image-compression';
-import { UploadCloud, X, Loader2 } from 'lucide-react';
+import { UploadCloud, X, Loader2, ZoomIn, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export function ImageDropzone({ value, onChange, className }) {
+    const { t } = useTranslation();
     const [isUploading, setIsUploading] = useState(false);
     const [error, setError] = useState('');
+    const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
     const onDrop = useCallback(async (acceptedFiles) => {
         const file = acceptedFiles[0];
@@ -42,7 +45,7 @@ export function ImageDropzone({ value, onChange, className }) {
             });
 
             if (!res.ok) {
-                throw new Error('Gagal mendapatkan kebenaran upload (Pre-signed URL gagal)');
+                throw new Error(t('errors.uploadFailedPresigned'));
             }
 
             const { url: presignedUrl, publicUrl } = await res.json();
@@ -57,14 +60,14 @@ export function ImageDropzone({ value, onChange, className }) {
             });
 
             if (!uploadRes.ok) {
-                throw new Error('Gagal upload gambar ke Cloudflare R2');
+                throw new Error(t('errors.uploadFailedR2'));
             }
 
             // 4. Update UI with the final public URL
             onChange(publicUrl);
         } catch (err) {
             console.error('Upload error:', err);
-            setError(err.message || 'Failed to upload image.');
+            setError(err.message || t('errors.uploadFailedGeneric'));
         } finally {
             setIsUploading(false);
         }
@@ -83,18 +86,55 @@ export function ImageDropzone({ value, onChange, className }) {
 
     if (value) {
         return (
-            <div className={cn("relative rounded-xl overflow-hidden border border-gray-200 bg-white group aspect-square flex items-center justify-center", className)}>
-                <img src={value} alt="Product" className="w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); onChange(''); }}
-                        className="p-2 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-md transform hover:scale-105 transition-transform"
-                    >
-                        <X className="h-5 w-5" />
-                    </button>
+            <>
+                <div className={cn("relative rounded-xl overflow-hidden border border-gray-200 bg-gray-50 group flex flex-col justify-center", className)}>
+                    <img 
+                        src={value} 
+                        alt="Product" 
+                        className="w-full h-auto max-h-[300px] object-contain cursor-pointer" 
+                        onClick={() => setIsPreviewOpen(true)}
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4 pointer-events-none group-hover:pointer-events-auto">
+                        <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setIsPreviewOpen(true); }}
+                            className="p-2 bg-white/20 hover:bg-white/40 backdrop-blur-sm text-white rounded-full shadow-md transform hover:scale-105 transition-transform"
+                            title="Expand Image"
+                        >
+                            <ZoomIn className="h-5 w-5" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); onChange(''); }}
+                            className="p-2 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-md transform hover:scale-105 transition-transform"
+                            title="Remove Image"
+                        >
+                            <Trash2 className="h-5 w-5" />
+                        </button>
+                    </div>
                 </div>
-            </div>
+
+                {isPreviewOpen && (
+                    <div 
+                        className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/90 p-4 sm:p-8 animate-in fade-in duration-200 cursor-pointer"
+                        onClick={() => setIsPreviewOpen(false)}
+                    >
+                        <img 
+                            src={value} 
+                            alt="Preview" 
+                            className="max-w-full max-h-full object-contain rounded-md shadow-2xl cursor-default" 
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                        <button 
+                            type="button"
+                            className="absolute top-4 right-4 md:top-8 md:right-8 p-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-sm transition-colors"
+                            onClick={(e) => { e.stopPropagation(); setIsPreviewOpen(false); }}
+                        >
+                            <X className="h-6 w-6" />
+                        </button>
+                    </div>
+                )}
+            </>
         );
     }
 
