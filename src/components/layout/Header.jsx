@@ -24,13 +24,13 @@ export function Header() {
     const getPageTitle = () => {
         const path = location.pathname;
         if (path.includes('/dashboard')) return t('header.dashboard');
-        if (path.includes('/pos')) return t('header.pos');
+        if (path.toLowerCase().includes('/pos')) return 'POS';
         if (path.includes('/pick-queue')) return t('header.pickPack');
         if (path.includes('/pack-order')) return t('header.packOrder');
         if (path.includes('/orders/upload')) return t('header.orderUpload');
         if (path.includes('/products/barcodes')) return t('header.barcodes');
         if (path.includes('/products')) return t('header.products');
-        if (path.includes('/inventory')) return t('header.inventory');
+        if (path.toLowerCase().includes('/inventory')) return t('header.inventory');
         if (path.includes('/agents')) return t('header.agents');
         if (path.includes('/pricing')) return t('header.pricing');
         if (path.includes('/settings')) return t('header.settings');

@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import imageCompression from 'browser-image-compression';
-import { UploadCloud, X, Loader2, ZoomIn, Trash2 } from 'lucide-react';
+import { UploadCloud, X, Loader2, ZoomIn, Trash2, Maximize } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTranslation } from '@/hooks/useTranslation';
 
@@ -87,31 +87,29 @@ export function ImageDropzone({ value, onChange, className }) {
     if (value) {
         return (
             <>
-                <div className={cn("relative rounded-xl overflow-hidden border border-gray-200 bg-gray-50 group flex flex-col justify-center", className)}>
-                    <img 
-                        src={value} 
-                        alt="Product" 
-                        className="w-full h-auto max-h-[300px] object-contain cursor-pointer" 
-                        onClick={() => setIsPreviewOpen(true)}
-                    />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4 pointer-events-none group-hover:pointer-events-auto">
-                        <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); setIsPreviewOpen(true); }}
-                            className="p-2 bg-white/20 hover:bg-white/40 backdrop-blur-sm text-white rounded-full shadow-md transform hover:scale-105 transition-transform"
-                            title="Expand Image"
+                <div className="relative inline-block group">
+                    <div className="relative rounded-xl overflow-hidden border border-gray-200 bg-gray-50 flex items-center justify-center">
+                        <img 
+                            src={value} 
+                            alt="Product" 
+                            className="max-h-32 w-auto object-contain cursor-pointer transition-transform duration-300 group-hover:scale-[1.02]" 
+                            onClick={() => setIsPreviewOpen(true)}
+                        />
+                        <div 
+                            className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none group-hover:pointer-events-auto cursor-pointer"
+                            onClick={() => setIsPreviewOpen(true)}
                         >
-                            <ZoomIn className="h-5 w-5" />
-                        </button>
-                        <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); onChange(''); }}
-                            className="p-2 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-md transform hover:scale-105 transition-transform"
-                            title="Remove Image"
-                        >
-                            <Trash2 className="h-5 w-5" />
-                        </button>
+                            <Maximize className="h-6 w-6 text-white" />
+                        </div>
                     </div>
+                    <button
+                        type="button"
+                        onClick={(e) => { e.preventDefault(); onChange(''); }}
+                        className="absolute -top-2 -right-2 p-1.5 bg-white border border-gray-200 text-gray-500 hover:text-red-500 hover:border-red-200 rounded-full shadow-sm hover:shadow-md transition-all z-10"
+                        title="Remove Image"
+                    >
+                        <X className="h-3.5 w-3.5" />
+                    </button>
                 </div>
 
                 {isPreviewOpen && (

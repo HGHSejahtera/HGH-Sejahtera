@@ -6,7 +6,7 @@ import { DataTable } from '@/components/common/DataTable';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/hooks/useAuth';
 
-const MOCK_ORDERS = [];
+import { useOrders } from '@/hooks/useOrders';
 
 export function PickPack() {
     const navigate = useNavigate();
@@ -18,20 +18,24 @@ export function PickPack() {
 
     // Queue State
     const queueColumns = [
-        { header: 'Order ID', accessorKey: 'OrderID' },
+        { header: 'Order ID', accessorKey: 'PlatformOrderID' },
         { header: 'Platform', accessorKey: 'Platform' },
-        { header: 'Customer', accessorKey: 'Customer' },
-        { header: 'Items', accessorKey: 'ItemsCount' },
+        { header: 'Customer/Agent', accessorKey: 'AccountName' },
+        { 
+            header: 'Items', 
+            id: 'itemCount',
+            cell: ({ row }) => row.original.ImportedOrderItems?.length || 0
+        },
         { 
             header: 'Status', 
-            accessorKey: 'Status',
+            accessorKey: 'OrderStatus',
             cell: ({ row }) => (
                 <span className={`px-2 py-1 rounded-full text-xs font-semibold
-                    ${row.original.Status === 'Pending' ? 'bg-yellow-100 text-yellow-800' : 
-                      row.original.Status === 'Packing' ? 'bg-blue-100 text-blue-800' : 
+                    ${row.original.OrderStatus === 'Pending' ? 'bg-yellow-100 text-yellow-800' : 
+                      row.original.OrderStatus === 'Picking' ? 'bg-blue-100 text-blue-800' : 
                       'bg-green-100 text-green-800'}`}
                 >
-                    {row.original.Status}
+                    {row.original.OrderStatus}
                 </span>
             )
         },
@@ -42,19 +46,25 @@ export function PickPack() {
                 <Button 
                     size="sm" 
                     className="flex items-center"
-                    onClick={() => navigate(`/pack-order/${row.original.OrderID}`)}
+                    onClick={() => navigate(`/pack-order/${row.original.ImportedOrderID}`)}
                 >
-                    {row.original.Status === 'Pending' ? <Play className="w-4 h-4 mr-1" /> : <Package className="w-4 h-4 mr-1" />}
-                    {row.original.Status === 'Pending' ? 'Start Packing' : 'Continue'}
+                    {row.original.OrderStatus === 'Pending' ? <Play className="w-4 h-4 mr-1" /> : <Package className="w-4 h-4 mr-1" />}
+                    {row.original.OrderStatus === 'Pending' ? 'Start Packing' : 'Continue'}
                 </Button>
             )
         }
     ];
 
-    const filteredOrders = MOCK_ORDERS.filter(order => 
-        order.OrderID.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        order.Customer.toLowerCase().includes(searchQuery.toLowerCase())
+    const { activeOrders, isLoadingActive } = useOrders();
+
+    const filteredOrders = activeOrders.filter(order => 
+        (order.PlatformOrderID || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (order.AccountName || '').toLowerCase().includes(searchQuery.toLowerCase())
     );
+
+    const pendingCount = activeOrders.filter(o => o.OrderStatus === 'Pending').length;
+    const pickingCount = activeOrders.filter(o => o.OrderStatus === 'Picking').length;
+    const packedCount = activeOrders.filter(o => o.OrderStatus === 'Packed').length;
 
     if (isAgent) {
         return (
@@ -83,7 +93,7 @@ export function PickPack() {
                         </div>
                         <div>
                             <p className="text-xs text-gray-500 font-semibold uppercase">Pending</p>
-                            <p className="text-xl font-bold text-gray-900">0</p>
+                            <p className="text-xl font-bold text-gray-900">{pendingCount}</p>
                         </div>
                     </div>
                     <div className="bg-white p-3 rounded-xl shadow-sm border flex items-center space-x-3 w-48">
@@ -91,8 +101,8 @@ export function PickPack() {
                             <Package className="h-5 w-5" />
                         </div>
                         <div>
-                            <p className="text-xs text-gray-500 font-semibold uppercase">Packing</p>
-                            <p className="text-xl font-bold text-gray-900">0</p>
+                            <p className="text-xs text-gray-500 font-semibold uppercase">Picking</p>
+                            <p className="text-xl font-bold text-gray-900">{pickingCount}</p>
                         </div>
                     </div>
                     <div className="bg-white p-3 rounded-xl shadow-sm border flex items-center space-x-3 w-48">
@@ -100,8 +110,8 @@ export function PickPack() {
                             <CheckCircle className="h-5 w-5" />
                         </div>
                         <div>
-                            <p className="text-xs text-gray-500 font-semibold uppercase">Ready</p>
-                            <p className="text-xl font-bold text-gray-900">0</p>
+                            <p className="text-xs text-gray-500 font-semibold uppercase">Packed Today</p>
+                            <p className="text-xl font-bold text-gray-900">{packedCount}</p>
                         </div>
                     </div>
                 </div>
@@ -120,7 +130,12 @@ export function PickPack() {
                         </div>
                     </div>
                     <div className="p-4">
-                        <DataTable columns={queueColumns} data={filteredOrders} />
+                        <DataTable 
+                            columns={queueColumns} 
+                            data={filteredOrders} 
+                            searchable={false}
+                            isLoading={isLoadingActive}
+                        />
                     </div>
                 </div>
             </div>

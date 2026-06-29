@@ -3,11 +3,12 @@ import { CheckCircle, UploadCloud, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useDropzone } from 'react-dropzone';
 import { TikTokPdfParser } from '@/services/parsers/TikTokPdfParser';
-import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/hooks/useAuth';
+import { useAgentPortal } from '@/hooks/useAgentPortal';
 
 export function AgentOrderCreate() {
     const { user } = useAuthStore();
+    const { uploadOrders } = useAgentPortal();
     // Assuming this component is strictly used by agents
     const isAgent = true;
 
@@ -52,84 +53,18 @@ export function AgentOrderCreate() {
         setFileStatus('Upload');
         setErrorMessage('');
         try {
-            // 1. Create parent OrderImports record
-            const { data: ImportRecord, error: ImportError } = await supabase
-                .from('OrderImports')
-                .insert([{
-                    Platform: 'TikTok',
-                    Source: 'AgentOrder',
-                    FileType: 'PDF',
-                    FileName: Summary?.FileName || 'unknown.pdf',
-                    AgentID: user?.id || null,
-                    TotalOrders: OrderList.length,
-                    TotalItems: OrderList.reduce((Sum, Order) => Sum + Order.Items.length, 0),
-                    ImportStatus: 'Completed',
-                    ImportedBy: user?.id || null
-                }])
-                .select()
-                .single();
+            const payload = {
+                Platform: 'TikTok',
+                FileType: 'PDF',
+                FileName: Summary?.FileName || 'unknown.pdf',
+                OrderList: OrderList
+            };
 
-            if (ImportError) {
-                console.error('OrderImports Insert Error:', ImportError);
-                setErrorMessage(`[OrderImports] ${ImportError.message} (code: ${ImportError.code})`);
-                setFileStatus('Error');
-                return;
-            }
-
-            const ImportID = ImportRecord.ImportID;
-            let FailCount = 0;
-
-            // 2. Insert each order into ImportedOrders
-            for (const Order of OrderList) {
-                const { data: OrderRecord, error: OrderError } = await supabase
-                    .from('ImportedOrders')
-                    .insert([{
-                        ImportID: ImportID,
-                        PlatformOrderID: Order.OrderID,
-                        Platform: Order.Platform,
-                        OrderStatus: 'Pending',
-                        TrackingID: Order.TrackingNumber,
-                    }])
-                    .select()
-                    .single();
-
-                if (OrderError) {
-                    console.error('ImportedOrders Insert Error:', OrderError);
-                    setErrorMessage(`[ImportedOrders] ${OrderError.message} (code: ${OrderError.code})`);
-                    FailCount++;
-                    continue;
-                }
-
-                // 3. Insert items into ImportedOrderItems
-                if (Order.Items.length > 0) {
-                    const ItemsToInsert = Order.Items.map(Item => ({
-                        ImportedOrderID: OrderRecord.ImportedOrderID,
-                        PlatformSKU: Item.Barcode,
-                        ProductName: Item.ProductName,
-                        Quantity: Item.Quantity,
-                        MatchStatus: 'Pending'
-                    }));
-
-                    const { error: ItemsError } = await supabase
-                        .from('ImportedOrderItems')
-                        .insert(ItemsToInsert);
-
-                    if (ItemsError) {
-                        console.error('ImportedOrderItems Insert Error:', ItemsError);
-                        setErrorMessage(`[ImportedOrderItems] ${ItemsError.message} (code: ${ItemsError.code})`);
-                    }
-                }
-            }
-
-            if (FailCount === OrderList.length) {
-                setErrorMessage(`Semua ${FailCount} orders gagal disimpan. Sila semak console untuk details.`);
-                setFileStatus('Error');
-            } else {
-                setFileStatus('Complete');
-            }
+            await uploadOrders(payload);
+            setFileStatus('Complete');
         } catch (ErrorObj) {
             console.error('Save error:', ErrorObj);
-            setErrorMessage(`Unexpected: ${ErrorObj.message}`);
+            setErrorMessage(`Failed to submit orders: ${ErrorObj.message}`);
             setFileStatus('Error');
         }
     };

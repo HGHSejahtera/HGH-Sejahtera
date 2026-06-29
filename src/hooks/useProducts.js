@@ -37,11 +37,21 @@ export function useProducts() {
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('Products')
-                .select('*')
+                .select(`
+                    *,
+                    ProductPricing (
+                        RetailRule,
+                        WholesaleRule
+                    )
+                `)
                 .order('ProductName');
             
             if (error) throw error;
-            return data;
+            return data.map(p => ({
+                ...p,
+                RetailPrice: p.ProductPricing?.RetailRule || p.Price || 0,
+                WholesalePrice: p.ProductPricing?.WholesaleRule || p.Price || 0,
+            }));
         }
     });
 

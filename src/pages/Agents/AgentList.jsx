@@ -3,10 +3,11 @@ import { ShieldAlert, Eye } from 'lucide-react';
 import { DataTable } from '@/components/common/DataTable';
 import { Button } from '@/components/ui/button';
 
-const MOCK_AGENTS = [];
+import { useAgentSummaries } from '@/hooks/useAgentManagement';
 
 export function AgentList() {
     const navigate = useNavigate();
+    const { data: agents = [], isLoading } = useAgentSummaries();
 
     const columns = [
         { header: 'Agent ID', accessorKey: 'AgentID', cell: ({ row }) => <span className="font-semibold text-indigo-600">{row.original.AgentID}</span> },
@@ -64,7 +65,7 @@ export function AgentList() {
             <div className="bg-white rounded-xl shadow-sm border p-4">
                 <div className="overflow-x-auto">
                     <div className="min-w-[760px]">
-                        <DataTable columns={columns} data={MOCK_AGENTS} />
+                        <DataTable columns={columns} data={agents} isLoading={isLoading} />
                     </div>
                 </div>
             </div>

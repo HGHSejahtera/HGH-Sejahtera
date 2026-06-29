@@ -53,12 +53,12 @@ export default function App() {
                         <Route element={<PageLayout />}>
                             <Route path="/" element={<Navigate to="/dashboard" replace />} />
                             <Route path="/dashboard" element={<Dashboard />} />
-                            <Route path="/pos" element={<POS />} />
+                            <Route path="/POS" element={<POS />} />
                             <Route path="/pick-pack" element={<PickPack />} />
                             <Route path="/pack-order/:orderId" element={<PackOrder />} />
                             <Route path="/inventory/import" element={<ProductBulkImport />} />
                             <Route path="/barcode" element={<BarcodeGenerator />} />
-                            <Route path="/inventory" element={<InventoryDashboard />} />
+                            <Route path="/Inventory" element={<InventoryDashboard />} />
                             <Route path="/inventory/stock-in" element={<StockIn />} />
                             <Route path="/reports" element={<ReportDashboard />} />
                             <Route path="/agents" element={<AgentList />} />

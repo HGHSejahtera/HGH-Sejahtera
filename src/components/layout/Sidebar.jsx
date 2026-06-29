@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, ShoppingCart, Users, Settings, FileText, Pickaxe, Boxes, Box, ChevronLeft, X, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, Users, Settings, FileText, Pickaxe, Boxes, Box, ChevronLeft, X, BarChart3, ScanLine } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/hooks/useAuth';
 import { useSidebar } from './SidebarContext';
@@ -118,10 +118,10 @@ export function Sidebar() {
     
     const links = [
         { name: t('sidebar.dashboard'), icon: LayoutDashboard, path: '/dashboard', roles: ['Founder', 'Manager', 'Developer', 'Staff'], comingSoon: true },
-        { name: t('sidebar.pos'), icon: ShoppingCart, path: '/pos', roles: ['Founder', 'Manager', 'Developer', 'Staff'], comingSoon: true },
-        { name: t('sidebar.pickPack'), icon: Pickaxe, path: '/pick-pack', roles: ['Founder', 'Manager', 'Developer', 'Staff'], comingSoon: true },
-        { name: t('sidebar.inventory'), icon: Boxes, path: '/inventory', roles: ['Founder', 'Manager', 'Developer', 'Staff'] },
-        { name: t('sidebar.agents'), icon: Users, path: '/agents', roles: ['Founder', 'Manager', 'Developer'], comingSoon: true },
+        { name: t('sidebar.pos'), icon: ScanLine, path: '/POS', roles: ['Founder', 'Manager', 'Developer', 'Staff'] },
+        { name: t('sidebar.pickPack'), icon: Pickaxe, path: '/pick-pack', roles: ['Founder', 'Manager', 'Developer', 'Staff'] },
+        { name: t('sidebar.inventory'), icon: Boxes, path: '/Inventory', roles: ['Founder', 'Manager', 'Developer', 'Staff'] },
+        { name: t('sidebar.agents'), icon: Users, path: '/agents', roles: ['Founder', 'Manager', 'Developer'] },
         { name: 'Reports', icon: BarChart3, path: '/reports', roles: ['Founder', 'Manager', 'Developer'], comingSoon: true },
         { name: t('sidebar.settings'), icon: Settings, path: '/settings', roles: ['Founder', 'Manager', 'Developer'] },
         { name: 'New Order', icon: ShoppingCart, path: '/agent/orders/new', roles: ['Agent'] },

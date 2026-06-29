@@ -31,11 +31,6 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 
-const formatCurrency = (Value) => new Intl.NumberFormat('ms-MY', {
-    style: 'currency',
-    currency: 'MYR',
-}).format(Number(Value || 0));
-
 const PriceCell = ({ value }) => {
     const numStr = Number(value || 0).toLocaleString('ms-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     return (
@@ -770,8 +765,14 @@ export function InventoryDashboard() {
     return (
         <div className="space-y-6 flex flex-col h-full">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between shrink-0">
-                <div>
-                    <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Inventory Dashboard</h2>
+                <div 
+                    className="flex items-center gap-2 cursor-pointer group"
+                    onClick={() => setShowStats(!showStats)}
+                >
+                    <h2 className="text-2xl md:text-3xl font-bold tracking-tight group-hover:text-indigo-600 transition-colors">Inventory Overview</h2>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-gray-100 group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors">
+                        {showStats ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </Button>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                     <Button variant="outline" asChild className="h-10 w-36">
@@ -792,15 +793,6 @@ export function InventoryDashboard() {
                     </Button>
                 </div>
             </div>
-            {!isExpanded && (
-                <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-gray-900">Inventory Overview</h3>
-                    <Button variant="ghost" size="sm" onClick={() => setShowStats(!showStats)} className="text-gray-500 hover:text-gray-900">
-                        {showStats ? <ChevronUp className="h-4 w-4 mr-1" /> : <ChevronDown className="h-4 w-4 mr-1" />}
-                        {showStats ? 'Hide Stats' : 'Show Stats'}
-                    </Button>
-                </div>
-            )}
 
             <div className={cn(
                 'grid transition-all duration-300 ease-in-out',

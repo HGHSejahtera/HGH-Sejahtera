@@ -2,10 +2,10 @@ import { Receipt, CreditCard, Upload } from 'lucide-react';
 import { DataTable } from '@/components/common/DataTable';
 import { Button } from '@/components/ui/button';
 
-const MOCK_LEDGER = [];
+import { useAgentPortal } from '@/hooks/useAgentPortal';
 
 export function AgentMyLedger() {
-    const currentBalance = 0.00; // Mock current debt
+    const { myLedger, currentBalance, isLoadingLedger } = useAgentPortal();
     const creditLimit = 0.00;
 
     const columns = [
@@ -90,7 +90,7 @@ export function AgentMyLedger() {
                     <h3 className="font-bold text-lg">Transaction History</h3>
                 </div>
                 <div className="p-4">
-                    <DataTable columns={columns} data={MOCK_LEDGER} />
+                    <DataTable columns={columns} data={myLedger} isLoading={isLoadingLedger} />
                 </div>
             </div>
         </div>

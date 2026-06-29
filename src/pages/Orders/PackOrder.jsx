@@ -4,7 +4,7 @@ import { Package, CheckCircle, ArrowLeft, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useHardwareScanner } from '@/hooks/useHardwareScanner';
 
-const MOCK_ORDER_DATA = {};
+import { useOrders, useOrderDetails } from '@/hooks/useOrders';
 
 export function PackOrder() {
     const { orderId } = useParams();
@@ -12,13 +12,29 @@ export function PackOrder() {
     const [order, setOrder] = useState(null);
     const [isComplete, setIsComplete] = useState(false);
 
+    const { packOrder, isPacking } = useOrders();
+    const { data: rawOrder, isLoading } = useOrderDetails(orderId);
+
     useEffect(() => {
-        // Load mock data
-        if (MOCK_ORDER_DATA[orderId]) {
-            // eslint-disable-next-line react-hooks/set-state-in-effect
-            setOrder(JSON.parse(JSON.stringify(MOCK_ORDER_DATA[orderId]))); // deep copy
+        if (rawOrder && !order) {
+            // Map the raw order items into the expected format for the UI
+            const formattedItems = rawOrder.ImportedOrderItems.map(item => ({
+                ItemID: item.ItemID,
+                ProductName: item.ProductName,
+                Variation: item.Variation,
+                Barcode: item.Products?.Barcode || 'NO-BARCODE',
+                RequiredQty: item.Quantity,
+                PackedQty: 0
+            }));
+
+            // eslint-disable-next-line
+            setOrder({
+                ...rawOrder,
+                AccountName: rawOrder.AccountName || 'Unknown',
+                Items: formattedItems
+            });
         }
-    }, [orderId]);
+    }, [rawOrder, order]);
 
     useHardwareScanner((barcode) => {
         if (!order || isComplete) return;
@@ -54,12 +70,17 @@ export function PackOrder() {
         }
     }, [order]);
 
-    const handleCompleteOrder = () => {
-        // Here we would typically update the DB status to Shipped and deduct inventory
-        alert(`Order ${orderId} marked as ready to ship! Inventory deducted.`);
-        navigate('/pick-queue');
+    const handleCompleteOrder = async () => {
+        try {
+            await packOrder(orderId);
+            alert(`Order ${orderId} marked as packed! Inventory deducted.`);
+            navigate('/pick-queue');
+        } catch (error) {
+            alert(error.message || 'Failed to complete order');
+        }
     };
 
+    if (isLoading) return <div className="p-8 text-center text-gray-500">Loading order details...</div>;
     if (!order) return <div className="p-8 text-center text-gray-500">Order not found or still loading...</div>;
 
     const totalRequired = order.Items.reduce((sum, item) => sum + item.RequiredQty, 0);
@@ -73,8 +94,8 @@ export function PackOrder() {
                     <ArrowLeft className="h-5 w-5" />
                 </Button>
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Pack Order: {order.OrderID}</h1>
-                    <p className="text-gray-500 mt-1">{order.Platform} • {order.Customer}</p>
+                    <h1 className="text-3xl font-bold tracking-tight">Pack Order: {order.PlatformOrderID}</h1>
+                    <p className="text-gray-500 mt-1">{order.Platform} • {order.AccountName}</p>
                 </div>
             </div>
 
@@ -105,8 +126,13 @@ export function PackOrder() {
                             </div>
                             <h2 className="text-2xl font-bold text-gray-900 mb-2">Order Fully Packed!</h2>
                             <p className="text-gray-500 mb-8">All items have been verified via barcode scanner.</p>
-                            <Button size="lg" className="h-14 px-8 text-lg font-bold" onClick={handleCompleteOrder}>
-                                Confirm & Update Inventory
+                            <Button 
+                                size="lg" 
+                                className="h-14 px-8 text-lg font-bold" 
+                                onClick={handleCompleteOrder}
+                                disabled={isPacking}
+                            >
+                                {isPacking ? 'Processing...' : 'Confirm & Update Inventory'}
                             </Button>
                         </div>
                     ) : (

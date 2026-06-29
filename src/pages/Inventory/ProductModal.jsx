@@ -339,7 +339,7 @@ export function ProductModal({ isOpen, onClose, product = null }) {
                                             <ImageDropzone
                                                 value={formData.ImageURL}
                                                 onChange={(url) => setFormData(prev => ({ ...prev, ImageURL: url }))}
-                                                className="h-28 aspect-video w-full"
+                                                className="w-full"
                                             />
                                         </div>
                                     </div>
@@ -435,11 +435,11 @@ export function ProductModal({ isOpen, onClose, product = null }) {
                                     <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-5 border-b border-gray-100 pb-2">Logistics & Platform</h3>
                                     <div className="space-y-5">
                                         <div className="space-y-2">
-                                            <Label htmlFor="WeightG" className="text-gray-700 font-medium flex items-center">Weight (g)</Label>
+                                            <Label htmlFor="WeightG" className="text-gray-700 font-medium flex items-center">Weight</Label>
                                             <Input id="WeightG" name="WeightG" type="number" min="0" value={formData.WeightG} onChange={handleChange} className="bg-gray-50/50 focus:bg-white" />
                                         </div>
                                         <div className="space-y-2">
-                                            <Label className="text-gray-700 font-medium flex items-center">Dimensions (cm)</Label>
+                                            <Label className="text-gray-700 font-medium flex items-center">Dimensions</Label>
                                             <div className="grid grid-cols-3 gap-2">
                                                 <Input id="LengthCM" name="LengthCM" type="number" min="0" step="0.01" value={formData.LengthCM} onChange={handleChange} placeholder="Length" className="bg-gray-50/50 focus:bg-white" />
                                                 <Input id="WidthCM" name="WidthCM" type="number" min="0" step="0.01" value={formData.WidthCM} onChange={handleChange} placeholder="Width" className="bg-gray-50/50 focus:bg-white" />

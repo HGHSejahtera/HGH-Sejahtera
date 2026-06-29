@@ -2,7 +2,7 @@ import { Download } from 'lucide-react';
 import { DataTable } from '@/components/common/DataTable';
 import { Button } from '@/components/ui/button';
 
-const MOCK_ORDERS = [];
+import { useAgentPortal } from '@/hooks/useAgentPortal';
 
 export function AgentMyOrders() {
     const columns = [
@@ -41,6 +41,8 @@ export function AgentMyOrders() {
         }
     ];
 
+    const { myOrders, isLoadingOrders } = useAgentPortal();
+
     return (
         <div className="max-w-5xl mx-auto space-y-6">
             <div className="flex justify-between items-end">
@@ -52,7 +54,7 @@ export function AgentMyOrders() {
 
             <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
                 <div className="p-4">
-                    <DataTable columns={columns} data={MOCK_ORDERS} />
+                    <DataTable columns={columns} data={myOrders} isLoading={isLoadingOrders} />
                 </div>
             </div>
         </div>
