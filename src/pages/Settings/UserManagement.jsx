@@ -1,38 +1,13 @@
-﻿import { useState, useEffect, useCallback } from 'react';
-import { NavLink } from 'react-router-dom';
-import { UserPlus, Shield, Check, X, Users, Settings } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+
+import { UserPlus, Shield, Check, X, Users } from 'lucide-react';
 import { DataTable } from '@/components/common/DataTable';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabase';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useAuthStore } from '@/hooks/useAuth';
 
-const SETTINGS_TABS = [
-    { name: 'General', path: '/settings/general', icon: Settings },
-    { name: 'User Management', path: '/settings/users', icon: Users },
-];
-
-function SettingsTabs() {
-    return (
-        <div className="flex gap-1 bg-gray-100 p-1 rounded-lg w-fit mb-6">
-            {SETTINGS_TABS.map(tab => (
-                <NavLink
-                    key={tab.path}
-                    to={tab.path}
-                    className={({ isActive }) =>
-                        `flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                            isActive
-                                ? 'bg-white text-gray-900 shadow-sm'
-                                : 'text-gray-500 hover:text-gray-700'
-                        }`
-                    }
-                >
-                    <tab.icon className="w-4 h-4" />
-                    {tab.name}
-                </NavLink>
-            ))}
-        </div>
-    );
-}
+import { SettingsTabs } from './Settings';
 
 function PendingUserCard({ user, onApprove, onReject }) {
     const [SelectedRole, setSelectedRole] = useState('Agent');
@@ -68,6 +43,8 @@ function PendingUserCard({ user, onApprove, onReject }) {
 
 export function UserManagement() {
     const { t } = useTranslation();
+    const { user } = useAuthStore();
+    const currentUserRole = user?.role || 'Staff';
     const [ActiveUsers, setActiveUsers] = useState([]);
     const [PendingUsers, setPendingUsers] = useState([]);
 
@@ -80,10 +57,17 @@ export function UserManagement() {
         if (error) {
             console.error('Error fetching users:', error);
         } else {
-            setActiveUsers(data.filter(u => u.Role !== 'Pending' && u.Role !== 'Rejected'));
+            let active = data.filter(u => u.Role !== 'Pending' && u.Role !== 'Rejected');
+            
+            // Hide Developer role from Founder and Manager
+            if (currentUserRole === 'Founder' || currentUserRole === 'Manager') {
+                active = active.filter(u => u.Role !== 'Developer');
+            }
+            
+            setActiveUsers(active);
             setPendingUsers(data.filter(u => u.Role === 'Pending'));
         }
-    }, []);
+    }, [currentUserRole]);
 
     useEffect(() => {
         fetchUsers(); // eslint-disable-line react-hooks/set-state-in-effect

@@ -9,7 +9,8 @@ export function SidebarProvider({ children }) {
     // Set initial state based on screen size and current route
     const [isCollapsed, setIsCollapsed] = useState(() => {
         if (window.innerWidth < 1024) return true;
-        if (location.pathname.startsWith('/inventory')) return true;
+        const path = location.pathname.toLowerCase();
+        if (path.startsWith('/inventory') || path.startsWith('/price')) return true;
         return false;
     });
     
@@ -23,7 +24,8 @@ export function SidebarProvider({ children }) {
                 setIsMobileOpen(false);
             } else {
                 // If screen is large, auto-expand UNLESS on the inventory page
-                if (location.pathname.startsWith('/inventory')) {
+                const path = location.pathname.toLowerCase();
+                if (path.startsWith('/inventory') || path.startsWith('/price')) {
                     setIsCollapsed(true);
                 } else {
                     setIsCollapsed(false);

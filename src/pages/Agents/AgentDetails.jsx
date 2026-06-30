@@ -80,7 +80,7 @@ export function AgentDetails() {
                         </Button>
                         <Button onClick={() => setIsPaymentModalOpen(true)}>Add Manual Payment</Button>
                     </div>
-                    <Button variant="secondary" className="w-full">Generate Statement</Button>
+                    <Button variant="secondary" className="w-full" onClick={() => navigate(`/agents/${id}/statement`)}>View Statement</Button>
                 </div>
             </div>
 

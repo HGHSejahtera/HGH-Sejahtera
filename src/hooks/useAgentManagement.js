@@ -49,6 +49,67 @@ export const useAgentDetails = (agentId) => {
     });
 };
 
+export const useAgentStatement = (agentId, month, year) => {
+    const user = useAuthStore(state => state.user);
+    const isAuthorized = user && ['Founder', 'Manager', 'Staff'].includes(user.Role);
+
+    return useQuery({
+        queryKey: ['admin', 'agents', 'statement', agentId, month, year],
+        queryFn: async () => {
+            const startDate = new Date(year, month - 1, 1).toISOString();
+            const endDate = new Date(year, month, 0, 23, 59, 59, 999).toISOString();
+
+            // 1. Fetch user info
+            const { data: userData, error: userError } = await supabase
+                .from('Users')
+                .select('*')
+                .eq('UserID', agentId)
+                .single();
+            if (userError) throw userError;
+
+            // 2. Fetch all previous ledger entries to calculate Opening Balance
+            const { data: previousEntries, error: prevError } = await supabase
+                .from('AgentLedger')
+                .select('Amount')
+                .eq('AgentID', agentId)
+                .lt('CreatedAt', startDate);
+            if (prevError) throw prevError;
+            
+            const openingBalance = previousEntries.reduce((sum, entry) => sum + parseFloat(entry.Amount), 0);
+
+            // 3. Fetch current month's ledger entries
+            const { data: currentEntries, error: currentError } = await supabase
+                .from('AgentLedger')
+                .select('*')
+                .eq('AgentID', agentId)
+                .gte('CreatedAt', startDate)
+                .lte('CreatedAt', endDate)
+                .order('CreatedAt', { ascending: true });
+            if (currentError) throw currentError;
+
+            // Calculate totals
+            const totalCharges = currentEntries.filter(e => parseFloat(e.Amount) > 0).reduce((sum, e) => sum + parseFloat(e.Amount), 0);
+            const totalPayments = currentEntries.filter(e => parseFloat(e.Amount) < 0).reduce((sum, e) => sum + Math.abs(parseFloat(e.Amount)), 0);
+            
+            const closingBalance = openingBalance + totalCharges - totalPayments;
+
+            return {
+                agent: userData,
+                statement: {
+                    month,
+                    year,
+                    openingBalance,
+                    totalCharges,
+                    totalPayments,
+                    closingBalance,
+                    transactions: currentEntries
+                }
+            };
+        },
+        enabled: !!agentId && isAuthorized && !!month && !!year,
+    });
+};
+
 export const useAgentMutations = () => {
     const queryClient = useQueryClient();
 

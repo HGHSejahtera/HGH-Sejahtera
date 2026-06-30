@@ -66,11 +66,6 @@ const getProductPricing = (Product) => {
     return Array.isArray(PricingObject) ? (PricingObject[0] || {}) : (PricingObject || {});
 };
 
-const getRRP = (Product) => {
-    const Pricing = getProductPricing(Product);
-    return Pricing.BasePrice ?? Product.Price ?? 0;
-};
-
 const SortableHeader = ({ column, children }) => (
     <Button
         variant="ghost"
@@ -124,7 +119,7 @@ export function InventoryDashboard() {
 
     const [tableColumnVisibility, setTableColumnVisibility] = useState(() => {
         const base = ['RowNumber', 'Image', 'MasterSKU', 'Brand', 'CategoryName', 'ProductName', 'Variation', 'Size', 'Barcode', 'Quantity', 'CostPrice'];
-        const all = ['RowNumber', 'Image', 'MasterSKU', 'Brand', 'CategoryName', 'CategoryID', 'ProductName', 'Variation', 'Size', 'Barcode', 'SellerSKU', 'GTIN', 'Quantity', 'Availability', 'CostPrice', 'StockistPrice', 'RRP', 'RetailPrice', 'WholesalePrice', 'AgentPrice', 'WeightG', 'LengthCM', 'WidthCM', 'HeightCM', 'PlatformData'];
+        const all = ['RowNumber', 'Image', 'MasterSKU', 'Brand', 'CategoryName', 'CategoryID', 'ProductName', 'Variation', 'Size', 'Barcode', 'SellerSKU', 'GTIN', 'Quantity', 'Availability', 'CostPrice', 'StockistPrice', 'RetailPrice', 'WholesalePrice', 'AgentPrice', 'WeightG', 'LengthCM', 'WidthCM', 'HeightCM', 'PlatformData'];
         const visibility = {};
         all.forEach(id => {
             visibility[id] = base.includes(id);
@@ -136,8 +131,8 @@ export function InventoryDashboard() {
 
     const modeColumns = useMemo(() => {
         const base = ['RowNumber', 'Image', 'MasterSKU', 'Brand', 'CategoryName', 'ProductName', 'Variation', 'Size', 'Barcode', 'Quantity', 'CostPrice'];
-        const pricing = ['RowNumber', 'Image', 'MasterSKU', 'Brand', 'CategoryName', 'ProductName', 'Variation', 'Size', 'Barcode', 'Quantity', 'CostPrice', 'StockistPrice', 'RRP', 'RetailPrice', 'WholesalePrice', 'AgentPrice'];
-        const all = ['RowNumber', 'Image', 'MasterSKU', 'Brand', 'CategoryName', 'CategoryID', 'ProductName', 'Variation', 'Size', 'Barcode', 'SellerSKU', 'GTIN', 'Quantity', 'Availability', 'CostPrice', 'StockistPrice', 'RRP', 'RetailPrice', 'WholesalePrice', 'AgentPrice', 'WeightG', 'LengthCM', 'WidthCM', 'HeightCM', 'PlatformData'];
+        const pricing = ['RowNumber', 'Image', 'MasterSKU', 'Brand', 'CategoryName', 'ProductName', 'Variation', 'Size', 'Barcode', 'Quantity', 'CostPrice', 'StockistPrice', 'RetailPrice', 'WholesalePrice', 'AgentPrice'];
+        const all = ['RowNumber', 'Image', 'MasterSKU', 'Brand', 'CategoryName', 'CategoryID', 'ProductName', 'Variation', 'Size', 'Barcode', 'SellerSKU', 'GTIN', 'Quantity', 'Availability', 'CostPrice', 'StockistPrice', 'RetailPrice', 'WholesalePrice', 'AgentPrice', 'WeightG', 'LengthCM', 'WidthCM', 'HeightCM', 'PlatformData'];
         
         return { Basic: base, Detail: pricing, All: all };
     }, []);
@@ -558,7 +553,7 @@ export function InventoryDashboard() {
 
         const CostPriceColumn = {
             id: 'CostPrice',
-            header: () => <div className="text-right w-full">Cost</div>,
+            header: () => <div className={`text-right w-full ${isHGHMode ? 'text-green-500' : ''}`}>Cost</div>,
             meta: { className: 'min-w-[120px] max-w-[120px] w-[120px] text-right' },
             cell: ({ row }) => <PriceCell value={isHGHMode ? row.original.CostPrice : row.original.FakeCostPrice} />,
         };
@@ -568,13 +563,6 @@ export function InventoryDashboard() {
             header: () => <div className="text-right w-full">Stockist</div>,
             meta: { className: 'min-w-[120px] max-w-[120px] w-[120px] text-right' },
             cell: ({ row }) => <PriceCell value={row.original.StockistPrice} />,
-        };
-
-        const RRPColumn = {
-            id: 'RRP',
-            header: () => <div className="text-right w-full">RRP</div>,
-            meta: { className: 'min-w-[120px] max-w-[120px] w-[120px] text-right' },
-            cell: ({ row }) => <PriceCell value={getRRP(row.original)} />,
         };
 
         const RetailPriceColumn = {
@@ -740,7 +728,6 @@ export function InventoryDashboard() {
             AvailabilityColumn,
             CostPriceColumn,
             StockistPriceColumn,
-            RRPColumn,
             RetailPriceColumn,
             WholesalePriceColumn,
             AgentPriceColumn,

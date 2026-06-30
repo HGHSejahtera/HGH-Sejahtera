@@ -5,6 +5,23 @@ export const useAuthStore = create((set, get) => ({
     user: null, 
     isAuthenticated: false,
     isLoading: true,
+    isLocked: false,
+
+    lockApp: () => set({ isLocked: true }),
+    unlockApp: async (pin) => {
+        try {
+            const { data, error } = await supabase.rpc('verify_my_pin', { entered_pin: pin });
+            if (error) throw error;
+            if (data === true) {
+                set({ isLocked: false });
+                return true;
+            }
+            return false;
+        } catch (err) {
+            console.error('Error verifying PIN:', err);
+            return false;
+        }
+    },
     initialize: () => {
         if (get().isInitialized) return;
 
@@ -50,7 +67,7 @@ export const useAuthStore = create((set, get) => ({
         // Block Rejected or Inactive users
         if (!profile || profile.Role === 'Rejected' || profile.IsActive === false) {
             await supabase.auth.signOut();
-            set({ user: null, isAuthenticated: false, isLoading: false });
+            set({ user: null, isAuthenticated: false, isLoading: false, isLocked: false });
             return;
         }
 
@@ -112,6 +129,6 @@ export const useAuthStore = create((set, get) => ({
 
     logout: async () => {
         await supabase.auth.signOut();
-        set({ user: null, isAuthenticated: false });
+        set({ user: null, isAuthenticated: false, isLocked: false });
     },
 }));

@@ -11,7 +11,7 @@ CREATE TABLE public."Settings" (
 INSERT INTO public."Settings" ("Key", "Value", "Description") VALUES
 ('DuitNowQRImage', '', 'URL to DuitNow QR image in Supabase Storage'),
 ('CostPerParcel', '0.80', 'Packaging material cost per parcel'),
-('CompanyName', 'Perniagaan Sejhatera Utama', 'Company Name for Invoices'),
+('CompanyName', 'Perniagaan Sejahtera Utama', 'Company Name for Invoices'),
 ('CompanyAddress', '', 'Company Address'),
 ('CompanySSM', '', 'Company Registration Number'),
 ('DefaultPlatformFee', '25', 'Default platform fee percentage for calculations'),

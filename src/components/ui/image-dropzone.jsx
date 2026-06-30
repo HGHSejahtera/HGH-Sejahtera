@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import imageCompression from 'browser-image-compression';
-import { UploadCloud, X, Loader2, ZoomIn, Trash2, Maximize } from 'lucide-react';
+import { UploadCloud, X, Loader2, Maximize } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTranslation } from '@/hooks/useTranslation';
 
@@ -71,7 +71,7 @@ export function ImageDropzone({ value, onChange, className }) {
         } finally {
             setIsUploading(false);
         }
-    }, [onChange]);
+    }, [onChange, t]);
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,

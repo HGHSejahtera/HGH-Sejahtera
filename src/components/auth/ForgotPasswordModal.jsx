@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import {
   Dialog,
@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Mail, Loader2, CheckCircle2 } from "lucide-react";
+import { Mail, Loader2, CheckCircle2, X } from "lucide-react";
 
 export default function ForgotPasswordModal({ isOpen, onClose }) {
   const [email, setEmail] = useState('');
@@ -59,9 +59,17 @@ export default function ForgotPasswordModal({ isOpen, onClose }) {
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md bg-zinc-950 text-white border-zinc-800 rounded-none sm:rounded-none">
+      <DialogContent showCloseButton={false} className="sm:max-w-md bg-zinc-950 text-white border-zinc-800 rounded-none sm:rounded-none relative">
+        <button 
+          onClick={handleClose}
+          disabled={isLoading}
+          className="absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none disabled:pointer-events-none"
+        >
+          <X className="h-5 w-5 text-zinc-400 hover:text-white" />
+          <span className="sr-only">Close</span>
+        </button>
         <DialogHeader>
-          <DialogTitle className="text-xl">Reset Password</DialogTitle>
+          <DialogTitle className="text-xl pr-6">Reset Password</DialogTitle>
           <DialogDescription className="text-zinc-400">
             Enter your email address and we will send you a link to reset your password.
           </DialogDescription>

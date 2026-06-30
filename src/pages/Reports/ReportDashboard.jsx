@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
-import { Archive, AlertTriangle, Activity, Trash2, DollarSign, PackageX, History } from 'lucide-react';
-import { useAuditLogs, useArchivedProducts } from '@/hooks/useReports';
+import { Archive, Activity, Trash2, DollarSign, PackageX, History, FileText, Loader2 } from 'lucide-react';
+import { useAuditLogs, useArchivedProducts, useSalesReports } from '@/hooks/useReports';
 import { useInventoryProducts } from '@/hooks/useInventory';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +18,7 @@ export function ReportDashboard() {
     const { data: auditLogs, isLoading: loadingAudit } = useAuditLogs();
     const { data: archivedProducts, isLoading: loadingArchived } = useArchivedProducts();
     const { data: activeProducts, isLoading: loadingActive } = useInventoryProducts();
+    const { data: posSales, isLoading: loadingSales } = useSalesReports();
     const { updateProduct } = useProducts();
 
     const auditColumns = useMemo(() => [
@@ -209,13 +210,78 @@ export function ReportDashboard() {
         }
 
         if (activeTab === 'Sales') {
+            const totalSalesValue = (posSales || []).reduce((sum, s) => sum + Number(s.TotalAmount || 0), 0);
+            
             return (
-                <div className="flex-1 flex flex-col min-h-0 bg-white rounded-xl border shadow-sm p-4 items-center justify-center">
-                    <DollarSign className="w-12 h-12 text-green-200 mb-4" />
-                    <h3 className="text-lg font-semibold text-gray-900">Sales & Profit Engine</h3>
-                    <p className="text-sm text-gray-500 max-w-md text-center mt-2">
-                        The Sales & Order Management module needs to be fully integrated before real-time profit and COGS calculations can be generated here.
-                    </p>
+                <div className="flex-1 flex flex-col min-h-0 bg-white rounded-xl border shadow-sm overflow-hidden">
+                    <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+                        <div>
+                            <h3 className="text-lg font-semibold flex items-center text-gray-900">
+                                <DollarSign className="w-5 h-5 mr-2 text-green-500" />
+                                Sales Monitor (POS Records)
+                            </h3>
+                            <p className="text-sm text-gray-500 mt-1">Review test sales records before flushing the database.</p>
+                        </div>
+                        <div className="flex items-center space-x-2 bg-indigo-50 text-indigo-700 px-4 py-2 rounded-lg font-bold shadow-sm">
+                            Total: RM {totalSalesValue.toFixed(2)}
+                        </div>
+                    </div>
+                    
+                    <div className="flex-1 overflow-auto">
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-gray-50/50 text-gray-500 font-medium sticky top-0 z-10 shadow-sm">
+                                <tr>
+                                    <th className="px-6 py-4">Receipt ID</th>
+                                    <th className="px-6 py-4">Tarikh & Masa</th>
+                                    <th className="px-6 py-4 text-center">Kaedah Bayaran</th>
+                                    <th className="px-6 py-4 text-right">Jumlah (RM)</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {loadingSales ? (
+                                    <tr>
+                                        <td colSpan="4" className="px-6 py-12 text-center text-gray-500">
+                                            <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
+                                            Sedang memuatkan data...
+                                        </td>
+                                    </tr>
+                                ) : (!posSales || posSales.length === 0) ? (
+                                    <tr>
+                                        <td colSpan="4" className="px-6 py-12 text-center text-gray-500 flex flex-col items-center">
+                                            <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mb-3">
+                                                <FileText className="w-6 h-6 text-gray-400" />
+                                            </div>
+                                            <p className="font-medium text-gray-900">Tiada rekod jualan ditemui.</p>
+                                            <p className="text-sm mt-1">Jadual POSSales bersih dari sebarang data.</p>
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    posSales.map((sale) => (
+                                        <tr key={sale.POSSaleID} className="hover:bg-gray-50/50 transition-colors">
+                                            <td className="px-6 py-4 font-mono text-xs text-gray-900">{sale.ReceiptNumber || sale.POSSaleID}</td>
+                                            <td className="px-6 py-4 text-gray-600">
+                                                {new Date(sale.CreatedAt).toLocaleString('ms-MY', { 
+                                                    dateStyle: 'medium', 
+                                                    timeStyle: 'short' 
+                                                })}
+                                            </td>
+                                            <td className="px-6 py-4 text-center">
+                                                <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold
+                                                    ${sale.PaymentMethod === 'Cash' ? 'bg-emerald-100 text-emerald-700' : 
+                                                    sale.PaymentMethod === 'Online' ? 'bg-blue-100 text-blue-700' : 
+                                                    'bg-purple-100 text-purple-700'}`}>
+                                                    {sale.PaymentMethod || 'Unknown'}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-right font-bold text-gray-900">
+                                                {Number(sale.TotalAmount || 0).toFixed(2)}
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             );
         }

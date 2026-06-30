@@ -23,7 +23,7 @@ export const my = {
         products: "Katalog Produk",
         inventory: "Lejar Inventori",
         agents: "Pengurusan Ejen",
-        pricing: "Strategi Harga",
+        pricing: "Price Setup",
         settings: "Tetapan",
         workspace: "Ruang Kerja"
     },
@@ -67,5 +67,22 @@ export const my = {
         uploadFailedPresigned: "Gagal mendapatkan kebenaran upload (Pre-signed URL gagal)",
         uploadFailedR2: "Gagal upload gambar ke Cloudflare R2",
         uploadFailedGeneric: "Gagal memuat naik gambar."
+    },
+    pricingSetup: {
+        saveChanges: "Simpan",
+        searchPlaceholder: "Cari",
+        stealthActive: "Stealth Mode Aktif",
+        productName: "Nama Produk",
+        realCost: "Cost",
+        fakeCost: "Fake Cost",
+        stockist: "Stokis",
+        wholesale: "Borong",
+        agent: "Ejen",
+        retail: "Retail",
+        noProducts: "Tiada produk dijumpai.",
+        success: "Harga berjaya dikemas kini!",
+        errorSave: "Gagal menyimpan harga. Sila cuba lagi.",
+        errorLoad: "Gagal memuatkan data harga.",
+        saving: "Menyimpan perubahan harga..."
     }
 };

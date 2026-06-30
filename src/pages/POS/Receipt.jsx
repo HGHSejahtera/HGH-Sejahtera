@@ -2,6 +2,7 @@ export function Receipt({ saleData }) {
     if (!saleData) return null;
 
     const { items, subtotal, total, paymentMethod, change, amountReceived, isTestMode, saleId, date } = saleData;
+    // eslint-disable-next-line
     const dateObj = new Date(date || Date.now());
     const formattedDate = `${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getMonth() + 1).padStart(2, '0')}/${dateObj.getFullYear()} ${String(dateObj.getHours()).padStart(2, '0')}:${String(dateObj.getMinutes()).padStart(2, '0')}`;
 

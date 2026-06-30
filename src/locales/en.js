@@ -8,7 +8,7 @@ export const en = {
         barcodes: "Barcodes",
         inventory: "Inventory",
         agents: "Agents",
-        pricing: "Pricing",
+        pricing: "Price",
         settings: "Settings",
         myOrders: "My Orders",
         myLedger: "My Ledger"
@@ -23,7 +23,7 @@ export const en = {
         products: "Product Catalog",
         inventory: "Inventory Ledger",
         agents: "Agents Management",
-        pricing: "Pricing Strategy",
+        pricing: "Price Setup",
         settings: "Settings",
         workspace: "Workspace"
     },
@@ -67,5 +67,22 @@ export const en = {
         uploadFailedPresigned: "Failed to get upload permission (Pre-signed URL failed)",
         uploadFailedR2: "Failed to upload image to Cloudflare R2",
         uploadFailedGeneric: "Failed to upload image."
+    },
+    pricingSetup: {
+        saveChanges: "Save",
+        searchPlaceholder: "Search",
+        stealthActive: "Stealth Mode Active",
+        productName: "Product Name",
+        realCost: "Cost",
+        fakeCost: "Fake Cost",
+        stockist: "Stockist",
+        wholesale: "Wholesale",
+        agent: "Agent",
+        retail: "Retail",
+        noProducts: "No products found.",
+        success: "Prices successfully updated!",
+        errorSave: "Failed to save prices. Please try again.",
+        errorLoad: "Failed to load pricing data.",
+        saving: "Saving price changes..."
     }
 };

@@ -31,3 +31,18 @@ export function useArchivedProducts() {
         }
     });
 }
+
+export function useSalesReports() {
+    return useQuery({
+        queryKey: ['pos_sales'],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('POSSales')
+                .select('*')
+                .order('CreatedAt', { ascending: false });
+            
+            if (error) throw error;
+            return data;
+        }
+    });
+}

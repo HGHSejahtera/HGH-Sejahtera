@@ -1,34 +1,53 @@
-import { TrendingUp, Users, Package, AlertCircle, ShoppingCart, FileText, ArrowRight } from 'lucide-react';
+import { useState } from 'react';
+import { TrendingUp, Users, Package, AlertCircle, ShoppingCart, ArrowRight, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useDashboardMetrics } from '@/hooks/useDashboard';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export function Dashboard() {
     const navigate = useNavigate();
     const { t } = useTranslation();
+    const [timeframe, setTimeframe] = useState('this_month');
+
+    const { data: metrics, isLoading } = useDashboardMetrics(timeframe);
 
     const stats = [
-        { title: t('dashboard.totalSales'), value: 'RM 0.00', trend: '0%', icon: TrendingUp, color: 'from-emerald-400 to-emerald-600' },
-        { title: t('dashboard.totalOrders'), value: '0', trend: '0%', icon: ShoppingCart, color: 'from-blue-400 to-blue-600' },
-        { title: t('dashboard.lowStockItems'), value: '0', trend: '0', icon: AlertCircle, color: 'from-amber-400 to-amber-600' },
-        { title: t('dashboard.activeAgents'), value: '0', trend: '0', icon: Users, color: 'from-violet-400 to-violet-600' },
+        { title: t('dashboard.totalSales'), value: isLoading ? <Loader2 className="w-5 h-5 animate-spin"/> : `RM ${Number(metrics?.totalSales || 0).toLocaleString('ms-MY', {minimumFractionDigits: 2})}`, trend: '', icon: TrendingUp, color: 'from-emerald-400 to-emerald-600' },
+        { title: t('dashboard.totalOrders'), value: isLoading ? <Loader2 className="w-5 h-5 animate-spin"/> : metrics?.totalOrders || 0, trend: '', icon: ShoppingCart, color: 'from-blue-400 to-blue-600' },
+        { title: t('dashboard.lowStockItems'), value: isLoading ? <Loader2 className="w-5 h-5 animate-spin"/> : metrics?.lowStockItems || 0, trend: '', icon: AlertCircle, color: 'from-amber-400 to-amber-600' },
+        { title: t('dashboard.activeAgents'), value: isLoading ? <Loader2 className="w-5 h-5 animate-spin"/> : metrics?.activeAgents || 0, trend: '', icon: Users, color: 'from-violet-400 to-violet-600' },
     ];
 
     const quickActions = [
         { title: t('dashboard.startPOS'), desc: t('dashboard.startPOSDesc'), icon: ShoppingCart, action: () => navigate('/pos') },
-        { title: t('dashboard.importOrders'), desc: t('dashboard.importOrdersDesc'), icon: FileText, action: () => navigate('/orders/upload') },
-        { title: t('dashboard.addProduct'), desc: t('dashboard.addProductDesc'), icon: Package, action: () => navigate('/products/create') },
+        { title: 'Manage Inventory', desc: t('dashboard.addProductDesc'), icon: Package, action: () => navigate('/Inventory') },
         { title: t('dashboard.agentList'), desc: t('dashboard.agentListDesc'), icon: Users, action: () => navigate('/agents') },
     ];
 
-    const recentOrders = [];
+    const recentOrders = metrics?.recentOrders || [];
 
     return (
         <div className="space-y-6 max-w-7xl mx-auto">
             {/* Header */}
-            <div>
-                <h1 className="text-3xl font-bold tracking-tight text-gray-900">{t('dashboard.overview')}</h1>
-                <p className="text-gray-500 mt-1">{t('dashboard.welcomeText')}</p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight text-gray-900">{t('dashboard.overview')}</h1>
+                </div>
+                <div className="flex items-center space-x-2 bg-white rounded-xl shadow-sm border border-gray-100 p-1">
+                    <Select value={timeframe} onValueChange={setTimeframe}>
+                        <SelectTrigger className="w-[160px] border-0 shadow-none focus:ring-0 bg-transparent font-medium text-gray-700">
+                            <SelectValue placeholder="Select timeframe" />
+                        </SelectTrigger>
+                        <SelectContent align="end">
+                            <SelectItem value="today">Today</SelectItem>
+                            <SelectItem value="this_week">This Week</SelectItem>
+                            <SelectItem value="this_month">This Month</SelectItem>
+                            <SelectItem value="all_time">All Time</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
             </div>
 
             {/* Stat Cards */}

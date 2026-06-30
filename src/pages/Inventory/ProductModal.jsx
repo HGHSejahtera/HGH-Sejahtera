@@ -7,7 +7,6 @@ import { useBulkUpdatePricing } from '@/hooks/usePricing';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { CreatableCombobox } from '@/components/ui/creatable-combobox';
 import { ImageDropzone } from '@/components/ui/image-dropzone';
 import { X, AlertTriangle, Wand2 } from 'lucide-react';
@@ -55,10 +54,6 @@ export function ProductModal({ isOpen, onClose, product = null }) {
     const pricingObj = product?.ProductPricing;
     const pricing = Array.isArray(pricingObj) ? (pricingObj[0] || {}) : (pricingObj || {});
 
-    const [hasRRP, setHasRRP] = useState(
-        product ? (pricing.BasePrice !== null && pricing.BasePrice !== undefined) : false
-    );
-
     const [formData, setFormData] = useState({
         ImageURL: product?.ImageURL || '',
         MasterSKU: product?.MasterSKU || '',
@@ -80,8 +75,7 @@ export function ProductModal({ isOpen, onClose, product = null }) {
         HeightCM: product?.HeightCM || '',
         PlatformData: formatPlatformData(product?.PlatformData),
         PricingModel: pricing.PricingModel || 'HQ_DISCOUNT',
-        BasePrice: pricing.BasePrice ?? product?.Price ?? '',
-        RetailRule: pricing.RetailRule ?? '',
+        RetailRule: pricing.RetailRule ?? product?.Price ?? '',
         WholesaleRule: pricing.WholesaleRule ?? '',
         AgentMarkup: pricing.AgentMarkup ?? '',
     });
@@ -182,7 +176,7 @@ export function ProductModal({ isOpen, onClose, product = null }) {
             const LengthCM = formData.LengthCM === '' ? null : parseFloat(formData.LengthCM);
             const WidthCM = formData.WidthCM === '' ? null : parseFloat(formData.WidthCM);
             const HeightCM = formData.HeightCM === '' ? null : parseFloat(formData.HeightCM);
-            const ProductRRP = hasRRP ? (parseFloat(formData.BasePrice) || 0) : 0;
+            const ProductRetailPrice = parseFloat(formData.RetailRule) || 0;
 
             let finalCategory = formData.Category || null;
             let finalCategoryName = null;
@@ -214,7 +208,7 @@ export function ProductModal({ isOpen, onClose, product = null }) {
                 CostPrice: parseFloat(formData.CostPrice) || 0,
                 FakeCostPrice: parseFloat(formData.FakeCostPrice) || 0,
                 StockistPrice: parseFloat(formData.StockistPrice) || 0,
-                Price: ProductRRP,
+                Price: ProductRetailPrice,
                 WeightG: Number.isFinite(WeightG) ? WeightG : null,
                 LengthCM: Number.isFinite(LengthCM) ? LengthCM : null,
                 WidthCM: Number.isFinite(WidthCM) ? WidthCM : null,
@@ -245,8 +239,8 @@ export function ProductModal({ isOpen, onClose, product = null }) {
                 const pricingData = {
                     ProductID: savedProductId,
                     PricingModel: formData.PricingModel,
-                    BasePrice: hasRRP ? (parseFloat(formData.BasePrice) || 0) : null,
-                    RetailRule: parseFloat(formData.RetailRule) || 0,
+                    BasePrice: ProductRetailPrice,
+                    RetailRule: ProductRetailPrice,
                     WholesaleRule: parseFloat(formData.WholesaleRule) || 0,
                     AgentMarkup: parseFloat(formData.AgentMarkup) || 0,
                 };
@@ -475,17 +469,7 @@ export function ProductModal({ isOpen, onClose, product = null }) {
                                             <Input id="StockistPrice" name="StockistPrice" type="number" step="0.01" value={formData.StockistPrice} onChange={handleChange} onBlur={handlePriceBlur} className="bg-gray-50/50 focus:bg-white" />
                                         </div>
 
-                                        <div className="space-y-3">
-                                            <div className="flex items-center justify-between">
-                                                <Label className="text-gray-700 font-medium">RRP</Label>
-                                                <Switch checked={hasRRP} onCheckedChange={(checked) => setHasRRP(checked)} />
-                                            </div>
-                                            {hasRRP && (
-                                                <div className="animate-in slide-in-from-top-2 duration-200">
-                                                    <Input id="BasePrice" name="BasePrice" type="number" step="0.01" required={hasRRP} value={formData.BasePrice} onChange={handleChange} onBlur={handlePriceBlur} className="bg-gray-50/50 focus:bg-white" />
-                                                </div>
-                                            )}
-                                        </div>
+
 
                                         <div className="space-y-2">
                                             <Label htmlFor="RetailRule" className="text-gray-700 font-medium flex items-center">Retail Price</Label>

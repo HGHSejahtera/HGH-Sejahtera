@@ -1,19 +1,28 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Save, Upload, Building2, CreditCard, Package, Settings as SettingsIcon, Users } from 'lucide-react';
+import { Save, Building2, CreditCard, Package, Settings as SettingsIcon, Users, UserRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useSettings, useUpdateSettings } from '@/hooks/useSettings';
+import { ImageDropzone } from '@/components/ui/image-dropzone';
+import { Loader2 } from 'lucide-react';
+import { useAuthStore } from '@/hooks/useAuth';
 
 const SETTINGS_TABS = [
-    { name: 'General', path: '/settings/general', icon: SettingsIcon },
-    { name: 'User Management', path: '/settings/users', icon: Users },
+    { name: 'My Account', path: '/Settings/Account', icon: UserRound, roles: ['Founder', 'Manager', 'Developer', 'Staff', 'Agent'] },
+    { name: 'General', path: '/Settings/General', icon: SettingsIcon, roles: ['Founder', 'Manager', 'Developer'] },
+    { name: 'User Management', path: '/Settings/Users', icon: Users, roles: ['Founder', 'Manager', 'Developer'] },
 ];
 
-function SettingsTabs() {
+export function SettingsTabs() {
+    const { user } = useAuthStore();
+    const role = user?.role || 'Staff';
+    const allowedTabs = SETTINGS_TABS.filter(tab => tab.roles.includes(role));
+
     return (
-        <div className="flex gap-1 bg-gray-100 p-1 rounded-lg w-fit mb-6">
-            {SETTINGS_TABS.map(tab => (
+        <div className="flex gap-1 bg-gray-100 p-1 rounded-lg w-fit mb-6 overflow-x-auto">
+            {allowedTabs.map(tab => (
                 <NavLink
                     key={tab.path}
                     to={tab.path}
@@ -34,15 +43,50 @@ function SettingsTabs() {
 }
 
 export function Settings() {
+    const { data: settingsData, isLoading } = useSettings();
+
+    if (isLoading) {
+        return (
+            <div className="flex h-[50vh] items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+            </div>
+        );
+    }
+
+    if (!settingsData) return null;
+
+    return <SettingsForm settingsData={settingsData} />;
+}
+
+function SettingsForm({ settingsData }) {
+    const updateSettingsMutation = useUpdateSettings();
+
     const [settings, setSettings] = useState({
-        companyName: '',
-        supportEmail: '',
-        costPerParcel: '5.50',
-        settlementCycle: '7'
+        companyName: settingsData.CompanyName || '',
+        companyAddress: settingsData.CompanyAddress || '',
+        companySSM: settingsData.CompanySSM || '',
+        supportEmail: settingsData.SupportEmail || '',
+        costPerParcel: settingsData.CostPerParcel || '0.80',
+        settlementCycle: settingsData.SettlementCycle || 'monthly',
+        defaultPlatformFee: settingsData.DefaultPlatformFee || '25',
+        duitNowQRImage: settingsData.DuitNowQRImage || ''
     });
 
     const handleChange = (e) => {
         setSettings({ ...settings, [e.target.name]: e.target.value });
+    };
+
+    const handleSave = () => {
+        updateSettingsMutation.mutate({
+            CompanyName: settings.companyName,
+            CompanyAddress: settings.companyAddress,
+            CompanySSM: settings.companySSM,
+            SupportEmail: settings.supportEmail,
+            CostPerParcel: settings.costPerParcel,
+            SettlementCycle: settings.settlementCycle,
+            DefaultPlatformFee: settings.defaultPlatformFee,
+            DuitNowQRImage: settings.duitNowQRImage
+        });
     };
 
     return (
@@ -51,9 +95,17 @@ export function Settings() {
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight mb-2">System Settings</h1>
                 </div>
-                <Button className="h-10">
-                    <Save className="w-4 h-4 mr-2" />
-                    Save Settings
+                <Button 
+                    className="h-10" 
+                    onClick={handleSave}
+                    disabled={updateSettingsMutation.isPending}
+                >
+                    {updateSettingsMutation.isPending ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                        <Save className="w-4 h-4 mr-2" />
+                    )}
+                    {updateSettingsMutation.isPending ? 'Saving...' : 'Save Settings'}
                 </Button>
             </div>
 
@@ -73,6 +125,20 @@ export function Settings() {
                             <Input 
                                 id="companyName" name="companyName" 
                                 value={settings.companyName} onChange={handleChange} 
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="companySSM">Company SSM</Label>
+                            <Input 
+                                id="companySSM" name="companySSM" 
+                                value={settings.companySSM} onChange={handleChange} 
+                            />
+                        </div>
+                        <div className="space-y-2 md:col-span-2">
+                            <Label htmlFor="companyAddress">Company Address</Label>
+                            <Input 
+                                id="companyAddress" name="companyAddress" 
+                                value={settings.companyAddress} onChange={handleChange} 
                             />
                         </div>
                         <div className="space-y-2">
@@ -101,11 +167,20 @@ export function Settings() {
                             <p className="text-xs text-gray-500">Used for automated fulfillment cost calculations.</p>
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="settlementCycle">Agent Settlement Cycle (Days)</Label>
+                            <Label htmlFor="settlementCycle">Agent Settlement Cycle</Label>
                             <Input 
-                                id="settlementCycle" name="settlementCycle" type="number"
+                                id="settlementCycle" name="settlementCycle" 
                                 value={settings.settlementCycle} onChange={handleChange} 
+                                placeholder="e.g. monthly, weekly"
                             />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="defaultPlatformFee">Default Platform Fee (%)</Label>
+                            <Input 
+                                id="defaultPlatformFee" name="defaultPlatformFee" type="number" step="0.1"
+                                value={settings.defaultPlatformFee} onChange={handleChange} 
+                            />
+                            <p className="text-xs text-gray-500">Default fallback for channel percentage fees.</p>
                         </div>
                     </div>
                 </div>
@@ -123,10 +198,12 @@ export function Settings() {
                         <div className="flex flex-col flex-1">
                             <Label>DuitNow QR Code</Label>
                             <p className="text-xs text-gray-500 mb-4">This QR code will be displayed to agents during manual checkout and on invoices.</p>
-                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 flex flex-col items-center justify-center bg-gray-50 flex-1 min-h-[250px]">
-                                <Upload className="w-8 h-8 text-gray-400 mb-2" />
-                                <span className="text-sm font-medium text-gray-600">Upload DuitNow QR (PNG, JPG)</span>
-                                <Button variant="outline" size="sm" className="mt-4">Choose File</Button>
+                            <div className="flex-1">
+                                <ImageDropzone 
+                                    value={settings.duitNowQRImage} 
+                                    onChange={(val) => setSettings({ ...settings, duitNowQRImage: val })} 
+                                    className="h-64"
+                                />
                             </div>
                         </div>
                     </div>

@@ -61,7 +61,7 @@ function derive3LetterCode(name) {
     if (!cleanStr) return 'XXX';
     
     const words = cleanStr.split(/\s+/).filter(w => w.length > 0);
-    let code = '';
+    let code;
 
     if (words.length === 1) {
         const cons = getConsonants(words[0]);

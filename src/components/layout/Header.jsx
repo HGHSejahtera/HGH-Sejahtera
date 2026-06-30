@@ -1,4 +1,4 @@
-import { Menu, Bell } from 'lucide-react';
+import { Menu, Bell, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSidebar } from './SidebarContext';
 import { useLocation } from 'react-router-dom';
@@ -12,11 +12,11 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useSecretMode } from '@/hooks/useSecretMode';
+import { useAuthStore } from '@/hooks/useAuth';
 
 export function Header() {
     const { toggleSidebar } = useSidebar();
     const location = useLocation();
-
     const { t, language, setLanguage } = useTranslation();
     const { isHGHMode, toggleHGHMode } = useSecretMode();
 
@@ -32,8 +32,8 @@ export function Header() {
         if (path.includes('/products')) return t('header.products');
         if (path.toLowerCase().includes('/inventory')) return t('header.inventory');
         if (path.includes('/agents')) return t('header.agents');
-        if (path.includes('/pricing')) return t('header.pricing');
-        if (path.includes('/settings')) return t('header.settings');
+        if (path.toLowerCase().includes('/price')) return t('header.pricing');
+        if (path.toLowerCase().includes('/settings')) return t('header.settings');
         return t('header.workspace');
     };
 
@@ -76,6 +76,7 @@ export function Header() {
                             <span>Bahasa Melayu</span>
                         </DropdownMenuItem>
                         
+
                         <DropdownMenuSeparator className="my-1" />
                         
                         <DropdownMenuItem 
@@ -92,6 +93,16 @@ export function Header() {
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
+
+                <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="relative hover:bg-gray-100/80 transition-colors"
+                    title="Lock Screen"
+                    onClick={() => useAuthStore.getState().lockApp()}
+                >
+                    <Lock className="h-5 w-5 text-gray-600" />
+                </Button>
 
                 <Button variant="ghost" size="icon" className="relative cursor-not-allowed opacity-40 hover:bg-transparent">
                     <Bell className="h-5 w-5 text-zinc-400" />

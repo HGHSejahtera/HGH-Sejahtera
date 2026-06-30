@@ -12,6 +12,8 @@
     { "source": "/settings(.*)", "destination": "/index.html" },
     { "source": "/login(.*)", "destination": "/index.html" },
     { "source": "/reset-password(.*)", "destination": "/index.html" },
-    { "source": "/activation(.*)", "destination": "/index.html" }
+    { "source": "/activation(.*)", "destination": "/index.html" },
+    { "source": "/pending-approval(.*)", "destination": "/index.html" },
+    { "source": "/HGH(.*)", "destination": "/index.html" }
   ]
 }

@@ -25,8 +25,13 @@ export function usePricingMatrix() {
                     ProductID,
                     ProductName,
                     MasterSKU,
+                    Brand,
                     Variation,
+                    Size,
                     Price,
+                    CostPrice,
+                    FakeCostPrice,
+                    StockistPrice,
                     ProductPricing (
                         PricingModel,
                         BasePrice,
@@ -56,7 +61,12 @@ export function usePricingMatrix() {
                     ProductID: product.ProductID,
                     ProductName: product.ProductName,
                     MasterSKU: product.MasterSKU,
+                    Brand: product.Brand,
                     Variation: product.Variation,
+                    Size: product.Size,
+                    CostPrice: product.CostPrice || 0,
+                    FakeCostPrice: product.FakeCostPrice || 0,
+                    StockistPrice: product.StockistPrice || 0,
                     CurrentRSP: product.Price, // Current RSP in Products table
                     ...pricing,
                     ...finalPrices
@@ -88,6 +98,19 @@ export function useBulkUpdatePricing() {
                 .upsert(recordsToUpsert, { onConflict: 'ProductID' });
 
             if (error) throw error;
+
+            // Update Products table for Price (Retail Price), CostPrice, FakeCostPrice, and StockistPrice
+            const productUpdates = updates.map(update => 
+                supabase.from('Products').update({
+                    Price: update.BasePrice,
+                    CostPrice: update.CostPrice,
+                    FakeCostPrice: update.FakeCostPrice,
+                    StockistPrice: update.StockistPrice
+                }).eq('ProductID', update.ProductID)
+            );
+
+            await Promise.all(productUpdates);
+
             return data;
         },
         onSuccess: () => {

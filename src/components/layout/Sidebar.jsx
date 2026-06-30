@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, ShoppingCart, Users, Settings, FileText, Pickaxe, Boxes, Box, ChevronLeft, X, BarChart3, ScanLine } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, Users, Settings, FileText, Pickaxe, Boxes, Box, ChevronLeft, X, BarChart3, ScanLine, TableProperties } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/hooks/useAuth';
 import { useSidebar } from './SidebarContext';
@@ -117,13 +117,14 @@ export function Sidebar() {
     const role = user?.role || 'Staff';
     
     const links = [
-        { name: t('sidebar.dashboard'), icon: LayoutDashboard, path: '/dashboard', roles: ['Founder', 'Manager', 'Developer', 'Staff'], comingSoon: true },
+        { name: t('sidebar.dashboard'), icon: LayoutDashboard, path: '/Dashboard', roles: ['Founder', 'Manager', 'Developer', 'Staff'] },
         { name: t('sidebar.pos'), icon: ScanLine, path: '/POS', roles: ['Founder', 'Manager', 'Developer', 'Staff'] },
         { name: t('sidebar.pickPack'), icon: Pickaxe, path: '/pick-pack', roles: ['Founder', 'Manager', 'Developer', 'Staff'] },
         { name: t('sidebar.inventory'), icon: Boxes, path: '/Inventory', roles: ['Founder', 'Manager', 'Developer', 'Staff'] },
+        { name: 'Price Setup', icon: TableProperties, path: '/Price/Setup', roles: ['Founder', 'Manager', 'Developer'] },
         { name: t('sidebar.agents'), icon: Users, path: '/agents', roles: ['Founder', 'Manager', 'Developer'] },
-        { name: 'Reports', icon: BarChart3, path: '/reports', roles: ['Founder', 'Manager', 'Developer'], comingSoon: true },
-        { name: t('sidebar.settings'), icon: Settings, path: '/settings', roles: ['Founder', 'Manager', 'Developer'] },
+        { name: 'Reports', icon: BarChart3, path: '/reports', roles: ['Founder', 'Manager', 'Developer'] },
+        { name: t('sidebar.settings'), icon: Settings, path: '/Settings', roles: ['Founder', 'Manager', 'Developer', 'Staff', 'Agent'] },
         { name: 'New Order', icon: ShoppingCart, path: '/agent/orders/new', roles: ['Agent'] },
         { name: 'My Orders', icon: Box, path: '/agent/orders', roles: ['Agent'] },
         { name: 'My Ledger', icon: FileText, path: '/agent/ledger', roles: ['Agent'] },
