@@ -1,19 +1,5 @@
 {
-  "cleanUrls": true,
   "rewrites": [
-    { "source": "/dashboard(.*)", "destination": "/index.html" },
-    { "source": "/inventory(.*)", "destination": "/index.html" },
-    { "source": "/pos(.*)", "destination": "/index.html" },
-    { "source": "/pick-pack(.*)", "destination": "/index.html" },
-    { "source": "/products(.*)", "destination": "/index.html" },
-    { "source": "/barcodes(.*)", "destination": "/index.html" },
-    { "source": "/agents(.*)", "destination": "/index.html" },
-    { "source": "/pricing(.*)", "destination": "/index.html" },
-    { "source": "/settings(.*)", "destination": "/index.html" },
-    { "source": "/login(.*)", "destination": "/index.html" },
-    { "source": "/reset-password(.*)", "destination": "/index.html" },
-    { "source": "/activation(.*)", "destination": "/index.html" },
-    { "source": "/pending-approval(.*)", "destination": "/index.html" },
-    { "source": "/HGH(.*)", "destination": "/index.html" }
+    { "source": "/([^.]*)", "destination": "/index.html" }
   ]
 }
