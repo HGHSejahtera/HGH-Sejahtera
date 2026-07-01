@@ -292,7 +292,6 @@ export function ReportDashboard() {
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between shrink-0">
                 <div>
                     <h2 className="text-2xl md:text-3xl font-bold tracking-tight">System Reports</h2>
-                    <p className="text-gray-500">Analyze inventory health, sales, and audit trails.</p>
                 </div>
                 <div className="flex rounded-lg border bg-gray-100 p-1 w-full md:w-auto h-10 items-center">
                     {[

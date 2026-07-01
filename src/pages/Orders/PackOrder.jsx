@@ -17,15 +17,26 @@ export function PackOrder() {
 
     useEffect(() => {
         if (rawOrder && !order) {
-            // Map the raw order items into the expected format for the UI
-            const formattedItems = rawOrder.ImportedOrderItems.map(item => ({
-                ItemID: item.ItemID,
-                ProductName: item.ProductName,
-                Variation: item.Variation,
-                Barcode: item.Products?.Barcode || 'NO-BARCODE',
-                RequiredQty: item.Quantity,
-                PackedQty: 0
-            }));
+            const formattedItems = rawOrder.ImportedOrderItems.map(item => {
+                let internalName = item.ProductName; // fallback to TikTok name
+                if (item.Products) {
+                    const parts = [];
+                    if (item.Products.Brand) parts.push(item.Products.Brand);
+                    if (item.Products.ProductName) parts.push(item.Products.ProductName);
+                    if (item.Products.Variation) parts.push(item.Products.Variation);
+                    if (item.Products.Size) parts.push(item.Products.Size);
+                    
+                    if (parts.length > 0) internalName = parts.join(' ');
+                }
+
+                return {
+                    ItemID: item.ItemID,
+                    ProductName: internalName,
+                    Barcode: item.Products?.Barcode || 'NO-BARCODE',
+                    RequiredQty: item.Quantity,
+                    PackedQty: 0
+                };
+            });
 
             // eslint-disable-next-line
             setOrder({
@@ -40,22 +51,25 @@ export function PackOrder() {
         if (!order || isComplete) return;
 
         setOrder(prev => {
-            const newOrder = { ...prev };
-            // Find item by barcode that still needs packing
-            const itemIndex = newOrder.Items.findIndex(i => i.Barcode === barcode && i.PackedQty < i.RequiredQty);
+            const itemIndex = prev.Items.findIndex(i => i.Barcode === barcode && i.PackedQty < i.RequiredQty);
             
             if (itemIndex >= 0) {
-                newOrder.Items[itemIndex].PackedQty += 1;
+                const newItems = [...prev.Items];
+                newItems[itemIndex] = {
+                    ...newItems[itemIndex],
+                    PackedQty: newItems[itemIndex].PackedQty + 1
+                };
+                return { ...prev, Items: newItems };
             } else {
                 // Determine why it failed for better UX
-                const isOverpacked = newOrder.Items.some(i => i.Barcode === barcode && i.PackedQty >= i.RequiredQty);
+                const isOverpacked = prev.Items.some(i => i.Barcode === barcode && i.PackedQty >= i.RequiredQty);
                 if (isOverpacked) {
                     alert(`Item already fully packed! (${barcode})`);
                 } else {
                     alert(`Item not in order or wrong barcode! (${barcode})`);
                 }
+                return prev;
             }
-            return newOrder;
         });
     });
 
@@ -72,9 +86,9 @@ export function PackOrder() {
 
     const handleCompleteOrder = async () => {
         try {
-            await packOrder(orderId);
-            alert(`Order ${orderId} marked as packed! Inventory deducted.`);
-            navigate('/pick-queue');
+            await packOrder(order.ImportedOrderID);
+            alert(`Order ${order.PlatformOrderID} marked as packed! Inventory deducted.`);
+            navigate('/Pick-Pack');
         } catch (error) {
             alert(error.message || 'Failed to complete order');
         }
@@ -88,10 +102,10 @@ export function PackOrder() {
     const progress = Math.round((totalPacked / totalRequired) * 100);
 
     return (
-        <div className="max-w-4xl mx-auto space-y-6">
+        <div className="max-w-6xl mx-auto space-y-8">
             <div className="flex items-center space-x-4">
-                <Button variant="ghost" onClick={() => navigate('/pick-queue')} className="p-2">
-                    <ArrowLeft className="h-5 w-5" />
+                <Button variant="ghost" onClick={() => navigate('/Pick-Pack')} className="p-3 h-12 w-12 rounded-full hover:bg-gray-200 transition-colors">
+                    <ArrowLeft className="h-6 w-6" />
                 </Button>
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Pack Order: {order.PlatformOrderID}</h1>
@@ -100,18 +114,18 @@ export function PackOrder() {
             </div>
 
             <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-                <div className="p-6 bg-gray-50 border-b flex items-center justify-between">
+                <div className="p-8 bg-gray-50/80 border-b flex items-center justify-between">
                     <div>
-                        <p className="text-sm font-semibold text-gray-500 uppercase">Packing Progress</p>
+                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Packing Progress</p>
                         <div className="flex items-end space-x-2 mt-1">
-                            <span className="text-3xl font-bold text-indigo-600">{totalPacked}</span>
-                            <span className="text-xl text-gray-400 mb-1">/ {totalRequired} items</span>
+                            <span className="text-4xl font-black text-indigo-600">{totalPacked}</span>
+                            <span className="text-xl text-gray-400 mb-1 font-medium">/ {totalRequired} items</span>
                         </div>
                     </div>
                     <div className="w-1/2">
-                        <div className="h-4 bg-gray-200 rounded-full overflow-hidden">
+                        <div className="h-4 bg-gray-200/80 rounded-full overflow-hidden shadow-inner">
                             <div 
-                                className={`h-full transition-all duration-500 ${isComplete ? 'bg-green-500' : 'bg-indigo-600'}`} 
+                                className={`h-full transition-all duration-700 ease-out ${isComplete ? 'bg-emerald-500' : 'bg-gradient-to-r from-indigo-500 to-purple-500'}`} 
                                 style={{ width: `${progress}%` }}
                             />
                         </div>
@@ -137,9 +151,11 @@ export function PackOrder() {
                         </div>
                     ) : (
                         <div>
-                            <div className="flex items-center mb-6 text-yellow-700 bg-yellow-50 p-4 rounded-lg">
-                                <AlertTriangle className="h-5 w-5 mr-2" />
-                                <p className="font-medium">Scan item barcodes using the hardware scanner to verify packing.</p>
+                            <div className="flex items-center mb-6 text-amber-800 bg-amber-50 p-4 rounded-xl border border-amber-200/60 shadow-sm">
+                                <div className="bg-amber-100/80 p-2 rounded-lg mr-3">
+                                    <AlertTriangle className="h-5 w-5 text-amber-600" />
+                                </div>
+                                <p className="font-medium text-sm">Scan item barcodes using the hardware scanner to verify packing.</p>
                             </div>
                             
                             <ul className="space-y-4">
@@ -148,27 +164,33 @@ export function PackOrder() {
                                     return (
                                         <li 
                                             key={idx} 
-                                            className={`p-4 border rounded-xl flex items-center justify-between transition-colors
-                                                ${isItemComplete ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200'}`}
+                                            className={`p-5 border-2 rounded-2xl flex items-center justify-between transition-all duration-300
+                                                ${isItemComplete ? 'bg-emerald-50/40 border-emerald-200 shadow-sm' : 'bg-white border-gray-100 hover:border-indigo-100 hover:shadow-md'}`}
                                         >
-                                            <div className="flex items-center space-x-4">
+                                            <div className="flex items-center space-x-5">
                                                 {isItemComplete ? (
-                                                    <CheckCircle className="h-6 w-6 text-green-500" />
+                                                    <div className="bg-emerald-100 p-3 rounded-full">
+                                                        <CheckCircle className="h-6 w-6 text-emerald-600" />
+                                                    </div>
                                                 ) : (
-                                                    <Package className="h-6 w-6 text-gray-300" />
+                                                    <div className="bg-gray-50 p-3 rounded-full border border-gray-100">
+                                                        <Package className="h-6 w-6 text-gray-400" />
+                                                    </div>
                                                 )}
-                                                <div>
-                                                    <h3 className={`font-bold ${isItemComplete ? 'text-green-800' : 'text-gray-900'}`}>
+                                                <div className="flex flex-col">
+                                                    <h3 className={`font-bold text-lg leading-snug max-w-2xl ${isItemComplete ? 'text-emerald-900' : 'text-gray-900'}`}>
                                                         {item.ProductName}
                                                     </h3>
-                                                    <p className="text-sm text-gray-500">{item.Variation} • Barcode: {item.Barcode}</p>
+                                                    <div className="flex items-center mt-2">
+                                                        <span className="text-sm font-mono font-medium text-gray-700 bg-gray-100/80 px-2 py-0.5 rounded border border-gray-200">{item.Barcode}</span>
+                                                    </div>
                                                 </div>
                                             </div>
-                                            <div className="text-right flex items-center space-x-3">
+                                            <div className="text-right flex items-center space-x-6">
                                                 <div className="flex flex-col items-end">
-                                                    <span className="text-xs text-gray-500 uppercase font-bold">Packed</span>
-                                                    <span className={`text-2xl font-bold ${isItemComplete ? 'text-green-600' : 'text-indigo-600'}`}>
-                                                        {item.PackedQty} <span className="text-gray-400 text-lg">/ {item.RequiredQty}</span>
+                                                    <span className="text-[10px] text-gray-400 tracking-widest uppercase font-bold mb-1">Packed</span>
+                                                    <span className={`text-3xl font-black tracking-tight ${isItemComplete ? 'text-emerald-600' : 'text-indigo-600'}`}>
+                                                        {item.PackedQty} <span className="text-gray-300 text-xl font-semibold">/ {item.RequiredQty}</span>
                                                     </span>
                                                 </div>
                                                 
@@ -177,16 +199,19 @@ export function PackOrder() {
                                                     <Button 
                                                         variant="outline" 
                                                         size="sm"
-                                                        className="ml-4"
+                                                        className="px-4 py-2 h-auto font-semibold bg-white hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-colors shadow-sm"
                                                         onClick={() => {
                                                             setOrder(prev => {
-                                                                const newOrder = {...prev};
-                                                                newOrder.Items[idx].PackedQty += 1;
-                                                                return newOrder;
+                                                                const newItems = [...prev.Items];
+                                                                newItems[idx] = {
+                                                                    ...newItems[idx],
+                                                                    PackedQty: newItems[idx].PackedQty + 1
+                                                                };
+                                                                return { ...prev, Items: newItems };
                                                             });
                                                         }}
                                                     >
-                                                        Manual +1
+                                                        Manual
                                                     </Button>
                                                 )}
                                             </div>

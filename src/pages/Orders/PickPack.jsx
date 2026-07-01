@@ -1,12 +1,10 @@
-import { useState } from 'react';
-import { Package, Search, Play, CheckCircle } from 'lucide-react';
+import { Package, Play, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { DataTable } from '@/components/common/DataTable';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/hooks/useAuth';
-
 import { useOrders } from '@/hooks/useOrders';
+
 
 export function PickPack() {
     const navigate = useNavigate();
@@ -14,13 +12,13 @@ export function PickPack() {
     const role = user?.role || 'Staff';
     const isAgent = role === 'Agent';
 
-    const [searchQuery, setSearchQuery] = useState('');
+
 
     // Queue State
     const queueColumns = [
         { header: 'Order ID', accessorKey: 'PlatformOrderID' },
         { header: 'Platform', accessorKey: 'Platform' },
-        { header: 'Customer/Agent', accessorKey: 'AccountName' },
+        { header: 'Agent', accessorKey: 'AccountName' },
         { 
             header: 'Items', 
             id: 'itemCount',
@@ -46,9 +44,9 @@ export function PickPack() {
                 <Button 
                     size="sm" 
                     className="flex items-center"
-                    onClick={() => navigate(`/pack-order/${row.original.ImportedOrderID}`)}
+                    onClick={() => navigate(`/Pack-Order/${row.original.PlatformOrderID}`)}
                 >
-                    {row.original.OrderStatus === 'Pending' ? <Play className="w-4 h-4 mr-1" /> : <Package className="w-4 h-4 mr-1" />}
+                    {row.original.OrderStatus === 'Pending' ? null : <Package className="w-4 h-4 mr-1" />}
                     {row.original.OrderStatus === 'Pending' ? 'Start Packing' : 'Continue'}
                 </Button>
             )
@@ -57,12 +55,8 @@ export function PickPack() {
 
     const { activeOrders, isLoadingActive } = useOrders();
 
-    const filteredOrders = activeOrders.filter(order => 
-        (order.PlatformOrderID || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (order.AccountName || '').toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
     const pendingCount = activeOrders.filter(o => o.OrderStatus === 'Pending').length;
+
     const pickingCount = activeOrders.filter(o => o.OrderStatus === 'Picking').length;
     const packedCount = activeOrders.filter(o => o.OrderStatus === 'Packed').length;
 
@@ -78,7 +72,7 @@ export function PickPack() {
     }
 
     return (
-        <div className="space-y-6 max-w-5xl mx-auto">
+        <div className="space-y-6">
             <div className="flex flex-col md:flex-row md:justify-between items-start md:items-center gap-4">
                 <div>
                     <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Pick & Pack</h1>
@@ -86,54 +80,42 @@ export function PickPack() {
             </div>
 
             <div className="space-y-6">
-                <div className="flex flex-wrap gap-4 w-full">
-                    <div className="bg-white p-3 rounded-xl shadow-sm border flex items-center space-x-3 w-48">
-                        <div className="bg-yellow-100 p-2 rounded-full text-yellow-600">
-                            <Package className="h-5 w-5" />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center space-x-5 transition-all hover:shadow-md hover:border-yellow-200">
+                        <div className="bg-yellow-50 p-4 rounded-xl text-yellow-600 border border-yellow-100">
+                            <Package className="h-7 w-7" />
                         </div>
                         <div>
-                            <p className="text-xs text-gray-500 font-semibold uppercase">Pending</p>
-                            <p className="text-xl font-bold text-gray-900">{pendingCount}</p>
+                            <p className="text-sm text-gray-500 font-bold uppercase tracking-wider mb-1">Pending</p>
+                            <p className="text-3xl font-black text-gray-900">{pendingCount}</p>
                         </div>
                     </div>
-                    <div className="bg-white p-3 rounded-xl shadow-sm border flex items-center space-x-3 w-48">
-                        <div className="bg-blue-100 p-2 rounded-full text-blue-600">
-                            <Package className="h-5 w-5" />
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center space-x-5 transition-all hover:shadow-md hover:border-blue-200">
+                        <div className="bg-blue-50 p-4 rounded-xl text-blue-600 border border-blue-100">
+                            <Package className="h-7 w-7" />
                         </div>
                         <div>
-                            <p className="text-xs text-gray-500 font-semibold uppercase">Picking</p>
-                            <p className="text-xl font-bold text-gray-900">{pickingCount}</p>
+                            <p className="text-sm text-gray-500 font-bold uppercase tracking-wider mb-1">Picking</p>
+                            <p className="text-3xl font-black text-gray-900">{pickingCount}</p>
                         </div>
                     </div>
-                    <div className="bg-white p-3 rounded-xl shadow-sm border flex items-center space-x-3 w-48">
-                        <div className="bg-green-100 p-2 rounded-full text-green-600">
-                            <CheckCircle className="h-5 w-5" />
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center space-x-5 transition-all hover:shadow-md hover:border-emerald-200">
+                        <div className="bg-emerald-50 p-4 rounded-xl text-emerald-600 border border-emerald-100">
+                            <CheckCircle className="h-7 w-7" />
                         </div>
                         <div>
-                            <p className="text-xs text-gray-500 font-semibold uppercase">Packed Today</p>
-                            <p className="text-xl font-bold text-gray-900">{packedCount}</p>
+                            <p className="text-sm text-gray-500 font-bold uppercase tracking-wider mb-1">Packed Today</p>
+                            <p className="text-3xl font-black text-gray-900">{packedCount}</p>
                         </div>
                     </div>
                 </div>
 
-                <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-                    <div className="p-4 border-b bg-gray-50">
-                        <div className="relative max-w-sm">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                            <Input 
-                                type="text" 
-                                placeholder="Search Order ID or Customer..." 
-                                className="pl-10"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                            />
-                        </div>
-                    </div>
-                    <div className="p-4">
+                <div className="bg-white rounded-xl shadow-sm border overflow-hidden flex flex-col min-h-0 h-full">
+                    <div className="p-4 flex-1 overflow-hidden flex flex-col min-h-0">
                         <DataTable 
                             columns={queueColumns} 
-                            data={filteredOrders} 
-                            searchable={false}
+                            data={activeOrders} 
+                            searchPlaceholder="Search"
                             isLoading={isLoadingActive}
                         />
                     </div>

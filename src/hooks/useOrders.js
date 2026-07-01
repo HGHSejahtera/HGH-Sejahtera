@@ -18,6 +18,14 @@ export function useOrders() {
                     TrackingID,
                     OrderAmount,
                     CreatedAt,
+                    OrderImports (
+                        AccountName,
+                        AgentID,
+                        Users!OrderImports_AgentID_fkey (
+                            DisplayName,
+                            StaffID
+                        )
+                    ),
                     ImportedOrderItems (
                         ItemID,
                         ProductName,
@@ -29,7 +37,21 @@ export function useOrders() {
                 .order('CreatedAt', { ascending: true });
 
             if (error) throw error;
-            return data;
+            
+            return data.map(order => {
+                const parent = order.OrderImports;
+                let finalName = 'Unknown';
+                if (parent?.Users) {
+                    finalName = `${parent.Users.DisplayName} (${parent.Users.StaffID})`;
+                } else if (parent?.AccountName) {
+                    finalName = parent.AccountName;
+                }
+                
+                return {
+                    ...order,
+                    AccountName: finalName
+                };
+            });
         },
         refetchInterval: 30000 // auto-refresh every 30s for warehouse monitors
     });
@@ -74,20 +96,43 @@ export function useOrderDetails(orderId) {
                 .from('ImportedOrders')
                 .select(`
                     *,
+                    OrderImports (
+                        AccountName,
+                        AgentID,
+                        Users!OrderImports_AgentID_fkey (
+                            DisplayName,
+                            StaffID
+                        )
+                    ),
                     ImportedOrderItems (
                         *,
                         Products (
                             Barcode,
                             MasterSKU,
-                            Brand
+                            Brand,
+                            ProductName,
+                            Variation,
+                            Size
                         )
                     )
                 `)
-                .eq('ImportedOrderID', orderId)
+                .eq('PlatformOrderID', orderId)
                 .single();
 
             if (error) throw error;
-            return data;
+            
+            const parent = data.OrderImports;
+            let finalName = 'Unknown';
+            if (parent?.Users) {
+                finalName = `${parent.Users.DisplayName} (${parent.Users.StaffID})`;
+            } else if (parent?.AccountName) {
+                finalName = parent.AccountName;
+            }
+            
+            return {
+                ...data,
+                AccountName: finalName
+            };
         },
         enabled: !!orderId
     });

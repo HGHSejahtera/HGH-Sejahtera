@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useAgentStatement } from '@/hooks/useAgentManagement';
+import { useAgentStatement, useAgentMutations } from '@/hooks/useAgentManagement';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Printer, FileText } from 'lucide-react';
+import { ArrowLeft, Printer, FileText, CheckCircle2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export function AgentStatement() {
@@ -15,9 +15,32 @@ export function AgentStatement() {
     const [selectedYear, setSelectedYear] = useState(today.getFullYear());
 
     const { data, isLoading } = useAgentStatement(id, selectedMonth, selectedYear);
+    const { addManualPayment } = useAgentMutations();
+    const [isPayoutLoading, setIsPayoutLoading] = useState(false);
 
     const handlePrint = () => {
         window.print();
+    };
+
+    const handleRecordPayout = async () => {
+        if (!data?.statement || data.statement.closingBalance <= 0) return;
+        
+        if (confirm(`Are you sure you want to record a payout of ${formatMYR(data.statement.closingBalance)} to ${data.agent.DisplayName}? This will reset their balance.`)) {
+            setIsPayoutLoading(true);
+            try {
+                await addManualPayment.mutateAsync({
+                    agentId: id,
+                    amount: data.statement.closingBalance,
+                    reference: `Payout for ${months[selectedMonth - 1].label} ${selectedYear}`
+                });
+                alert('Payout recorded successfully!');
+            } catch (error) {
+                console.error(error);
+                alert('Failed to record payout: ' + error.message);
+            } finally {
+                setIsPayoutLoading(false);
+            }
+        }
     };
 
     const formatMYR = (amount) => {
@@ -52,7 +75,7 @@ export function AgentStatement() {
             {/* Control Panel - Hidden when printing */}
             <div className="print:hidden flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-200">
                 <div className="flex items-center gap-4">
-                    <Button variant="ghost" size="icon" onClick={() => navigate(`/agents/${id}`)}>
+                    <Button variant="ghost" size="icon" onClick={() => navigate(`/Agent-Management/${id}`)}>
                         <ArrowLeft className="w-5 h-5" />
                     </Button>
                     <div className="flex items-center space-x-2">
@@ -78,10 +101,21 @@ export function AgentStatement() {
                         </Select>
                     </div>
                 </div>
-                <Button onClick={handlePrint} className="bg-indigo-600 hover:bg-indigo-700">
-                    <Printer className="w-4 h-4 mr-2" />
-                    Print Statement
-                </Button>
+                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto mt-4 sm:mt-0">
+                    <Button 
+                        variant="outline" 
+                        onClick={handleRecordPayout} 
+                        disabled={isPayoutLoading || !statement || statement.closingBalance <= 0}
+                        className="border-green-600 text-green-700 hover:bg-green-50"
+                    >
+                        <CheckCircle2 className="w-4 h-4 mr-2" />
+                        {isPayoutLoading ? 'Recording...' : 'Record Payout'}
+                    </Button>
+                    <Button onClick={handlePrint} className="bg-indigo-600 hover:bg-indigo-700">
+                        <Printer className="w-4 h-4 mr-2" />
+                        Print Statement
+                    </Button>
+                </div>
             </div>
 
             {/* Document View - A4 Format */}
@@ -118,23 +152,25 @@ export function AgentStatement() {
                     </div>
                     
                     {/* Summary Box */}
-                    <div className="bg-gray-50 p-6 rounded-xl border border-gray-200">
+                    <div className="bg-indigo-50 p-6 rounded-xl border border-indigo-100">
                         <div className="space-y-3">
+                            {statement.openingBalance > 0 && (
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-gray-500">Previous Unpaid Balance:</span>
+                                    <span className="font-semibold">{formatMYR(statement.openingBalance)}</span>
+                                </div>
+                            )}
                             <div className="flex justify-between text-sm">
-                                <span className="text-gray-500">Opening Balance:</span>
-                                <span className="font-semibold">{formatMYR(statement.openingBalance)}</span>
+                                <span className="text-gray-500">Commissions Earned (+):</span>
+                                <span className="font-semibold text-green-600">+{formatMYR(statement.totalCharges)}</span>
                             </div>
                             <div className="flex justify-between text-sm">
-                                <span className="text-gray-500">New Charges (Orders):</span>
-                                <span className="font-semibold text-red-600">+{formatMYR(statement.totalCharges)}</span>
+                                <span className="text-gray-500">Payouts / Voids (-):</span>
+                                <span className="font-semibold text-red-600">-{formatMYR(statement.totalPayments)}</span>
                             </div>
-                            <div className="flex justify-between text-sm">
-                                <span className="text-gray-500">Payments/Returns:</span>
-                                <span className="font-semibold text-green-600">-{formatMYR(statement.totalPayments)}</span>
-                            </div>
-                            <div className="pt-3 border-t border-gray-200 mt-3 flex justify-between items-center">
-                                <span className="font-bold text-gray-900">Closing Balance:</span>
-                                <span className="text-xl font-black text-indigo-600">{formatMYR(statement.closingBalance)}</span>
+                            <div className="pt-3 border-t border-indigo-200 mt-3 flex justify-between items-center">
+                                <span className="font-bold text-gray-900">Current Wallet Balance:</span>
+                                <span className="text-xl font-black text-indigo-700">{formatMYR(statement.closingBalance)}</span>
                             </div>
                         </div>
                     </div>
@@ -152,8 +188,8 @@ export function AgentStatement() {
                             <tr>
                                 <th className="px-4 py-3 rounded-tl-lg">Date</th>
                                 <th className="px-4 py-3">Description / Reference</th>
-                                <th className="px-4 py-3 text-right">Charges</th>
-                                <th className="px-4 py-3 text-right">Payments</th>
+                                <th className="px-4 py-3 text-right text-green-700">Commissions (+)</th>
+                                <th className="px-4 py-3 text-right text-red-700">Payouts / Voids (-)</th>
                                 <th className="px-4 py-3 text-right rounded-tr-lg">Balance</th>
                             </tr>
                         </thead>
@@ -187,10 +223,10 @@ export function AgentStatement() {
                                                 <div className="font-medium text-gray-900">{trx.EntryType}</div>
                                                 <div className="text-xs text-gray-500">{trx.Description || trx.ReferenceID || '-'}</div>
                                             </td>
-                                            <td className="px-4 py-3 text-right text-red-600 font-medium">
+                                            <td className="px-4 py-3 text-right text-green-600 font-medium">
                                                 {amt > 0 ? formatMYR(amt) : ''}
                                             </td>
-                                            <td className="px-4 py-3 text-right text-green-600 font-medium">
+                                            <td className="px-4 py-3 text-right text-red-600 font-medium">
                                                 {amt < 0 ? formatMYR(Math.abs(amt)) : ''}
                                             </td>
                                             <td className="px-4 py-3 text-right font-mono text-gray-900">

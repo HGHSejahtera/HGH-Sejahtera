@@ -7,7 +7,7 @@ export const en = {
         products: "Products",
         barcodes: "Barcodes",
         inventory: "Inventory",
-        agents: "Agents",
+        agents: "Agent Management",
         pricing: "Price",
         settings: "Settings",
         myOrders: "My Orders",
@@ -37,6 +37,7 @@ export const en = {
         viewAll: "View All",
         orderId: "Order ID",
         customer: "Customer",
+        agent: "Agent",
         status: "Status",
         amount: "Amount",
         topProducts: "Top Products",
@@ -66,7 +67,8 @@ export const en = {
     errors: {
         uploadFailedPresigned: "Failed to get upload permission (Pre-signed URL failed)",
         uploadFailedR2: "Failed to upload image to Cloudflare R2",
-        uploadFailedGeneric: "Failed to upload image."
+        uploadFailedGeneric: "Failed to upload image.",
+        uploadOrdersFailedR2: "Failed to submit orders: Failed to get secure R2 upload path."
     },
     pricingSetup: {
         saveChanges: "Save",

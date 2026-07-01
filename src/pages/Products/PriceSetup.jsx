@@ -146,9 +146,9 @@ export function PriceSetup() {
                 </div>
             </div>
 
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-x-auto">
-                <table className="w-full text-sm text-left">
-                    <thead className="bg-gray-50 border-b border-gray-200 text-gray-600">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-auto max-h-[calc(100vh-250px)]">
+                <table className="w-full text-sm text-left relative">
+                    <thead className="bg-gray-50 border-b border-gray-200 text-gray-600 sticky top-0 z-10">
                         <tr>
                             <th className="px-4 py-3 font-medium whitespace-nowrap min-w-[200px]">{t('pricingSetup.productName')}</th>
                             {isHGHMode && <th className="px-4 py-3 font-medium text-right text-red-600">{t('pricingSetup.fakeCost')}</th>}

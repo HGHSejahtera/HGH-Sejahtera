@@ -58,7 +58,7 @@ export function useDashboardMetrics(timeframe = 'this_month') {
                     PlatformOrderID,
                     OrderAmount,
                     OrderStatus,
-                    OrderImports ( AccountName ),
+                    OrderImports ( AgentID, Users!OrderImports_AgentID_fkey ( DisplayName ) ),
                     ImportedOrderItems ( Quantity )
                 `)
                 .order('CreatedAt', { ascending: false })
@@ -67,9 +67,13 @@ export function useDashboardMetrics(timeframe = 'this_month') {
 
             const recentOrders = recentOrdersData?.map(order => {
                 const totalItems = order.ImportedOrderItems?.reduce((sum, item) => sum + (item.Quantity || 0), 0) || 0;
+                
+                // For Agent Orders, the name is in OrderImports.Users.DisplayName
+                const agentName = order.OrderImports?.Users?.DisplayName;
+                
                 return {
                     id: order.PlatformOrderID,
-                    customer: order.OrderImports?.AccountName || 'Unknown Agent',
+                    customer: agentName || 'Unknown Agent',
                     items: totalItems,
                     total: `RM ${Number(order.OrderAmount || 0).toFixed(2)}`,
                     status: order.OrderStatus

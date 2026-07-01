@@ -7,7 +7,7 @@ export const my = {
         products: "Produk",
         barcodes: "Kod Bar",
         inventory: "Inventori",
-        agents: "Ejen",
+        agents: "Agent Management",
         pricing: "Harga",
         settings: "Tetapan",
         myOrders: "Pesanan Saya",
@@ -37,6 +37,7 @@ export const my = {
         viewAll: "Lihat Semua",
         orderId: "ID Pesanan",
         customer: "Pelanggan",
+        agent: "Ejen",
         status: "Status",
         amount: "Jumlah",
         topProducts: "Produk Terlaris",
@@ -66,7 +67,8 @@ export const my = {
     errors: {
         uploadFailedPresigned: "Gagal mendapatkan kebenaran upload (Pre-signed URL gagal)",
         uploadFailedR2: "Gagal upload gambar ke Cloudflare R2",
-        uploadFailedGeneric: "Gagal memuat naik gambar."
+        uploadFailedGeneric: "Gagal memuat naik gambar.",
+        uploadOrdersFailedR2: "Gagal memuat naik pesanan: Gagal dapatkan laluan upload R2 yang selamat."
     },
     pricingSetup: {
         saveChanges: "Simpan",

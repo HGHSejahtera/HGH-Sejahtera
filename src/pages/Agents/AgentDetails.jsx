@@ -1,26 +1,29 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Edit3, AlertCircle } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { DataTable } from '@/components/common/DataTable';
 import { Button } from '@/components/ui/button';
 
 import { Input } from '@/components/ui/input';
-import { useAgentDetails, useAgentMutations } from '@/hooks/useAgentManagement';
+import { useAgentDetails, useAgentMutations, useAgentOrderImports } from '@/hooks/useAgentManagement';
+import { Download, Trash2, CheckCircle2 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+import { useQueryClient } from '@tanstack/react-query';
 
 export function AgentDetails() {
     const { id } = useParams();
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('ledger');
-    const { updateCreditLimit, addManualPayment, suspendAgent } = useAgentMutations();
+    const { recordPayout } = useAgentMutations();
     
     const { data: agent, isLoading } = useAgentDetails(id);
+    const { data: imports, isLoading: isImportsLoading } = useAgentOrderImports(id);
+    const queryClient = useQueryClient();
     
-    const [isLimitModalOpen, setIsLimitModalOpen] = useState(false);
-    const [newLimit, setNewLimit] = useState('');
     
-    const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
-    const [paymentAmount, setPaymentAmount] = useState('');
-    const [paymentRef, setPaymentRef] = useState('');
+    const [isPayoutModalOpen, setIsPayoutModalOpen] = useState(false);
+    const [payoutAmount, setPayoutAmount] = useState('');
+    const [payoutRef, setPayoutRef] = useState('');
 
     const ledgerColumns = [
         { header: 'Date', accessorKey: 'CreatedAt', cell: ({ row }) => new Date(row.original.CreatedAt).toLocaleString() },
@@ -33,54 +36,107 @@ export function AgentDetails() {
         { header: 'Running Balance', accessorKey: 'RunningBalance', cell: ({ row }) => <span className="font-bold">{parseFloat(row.original.RunningBalance).toFixed(2)}</span> },
     ];
 
+    const handleDownloadAwb = async (fileName) => {
+        try {
+            const res = await fetch('/api/get-r2-download-url', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fileName })
+            });
+            if (!res.ok) throw new Error('Gagal dapatkan link muat turun');
+            const { url } = await res.json();
+            window.open(url, '_blank');
+        } catch (error) {
+            console.error(error);
+            alert('Gagal muat turun AWB.');
+        }
+    };
+
+    const handleClearCloud = async (fileName, importId) => {
+        if (!confirm('Anda pasti fail ni dah selamat di-download? Ia akan dipadam dari Cloudflare R2 secara kekal.')) return;
+        try {
+            // Delete from Cloudflare R2
+            const res = await fetch('/api/delete-r2-file', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fileName })
+            });
+            if (!res.ok) throw new Error('Gagal padam dari R2');
+
+            // Update database status
+            const { error } = await supabase
+                .from('OrderImports')
+                .update({ IsAwbDeleted: true })
+                .eq('ImportID', importId);
+            
+            if (error) throw error;
+            
+            queryClient.invalidateQueries(['admin', 'agents', 'imports', id]);
+        } catch (error) {
+            console.error(error);
+            alert('Gagal padam AWB dari Cloud.');
+        }
+    };
+
+    const importColumns = [
+        { header: 'Date Scan', accessorKey: 'CreatedAt', cell: ({ row }) => new Date(row.original.CreatedAt).toLocaleString() },
+        { header: 'Platform', accessorKey: 'Platform' },
+        { header: 'Fail AWB', accessorKey: 'FileName', cell: ({ row }) => (
+            <span className="text-gray-600 text-sm font-mono">{row.original.FileName}</span>
+        )},
+        { header: 'Tindakan Storage', id: 'actions', cell: ({ row }) => {
+            const isDeleted = row.original.IsAwbDeleted;
+            if (isDeleted) {
+                return <span className="inline-flex items-center text-green-600 text-sm font-medium"><CheckCircle2 className="w-4 h-4 mr-1" /> Cloud Cleared</span>;
+            }
+            return (
+                <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => handleDownloadAwb(row.original.FileName)}>
+                        <Download className="w-4 h-4 mr-1" /> Download
+                    </Button>
+                    <Button size="sm" variant="destructive" onClick={() => handleClearCloud(row.original.FileName, row.original.ImportID)}>
+                        <Trash2 className="w-4 h-4 mr-1" /> Clear Storage
+                    </Button>
+                </div>
+            );
+        }}
+    ];
+
     return (
         <div className="space-y-6">
-            <Button variant="ghost" className="mb-2 -ml-4" onClick={() => navigate('/agents')}>
-                <ArrowLeft className="w-4 h-4 mr-2" /> Back to Agents
+            <Button variant="ghost" className="mb-2 -ml-4" onClick={() => navigate('/Agent-Management')}>
+                <ArrowLeft className="w-4 h-4 mr-2" /> Back
             </Button>
 
             <div className="bg-white p-6 rounded-xl shadow-sm border flex justify-between items-start">
                 <div>
-                    <div className="flex items-center space-x-3">
-                        <h1 className="text-2xl font-bold">{agent?.DisplayName || 'Loading...'}</h1>
-                        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${agent?.IsActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                            {agent?.IsActive ? 'Active' : 'Suspended'}
-                        </span>
+                    <div className="flex flex-col mb-4">
+                        <div className="flex items-center space-x-3 mb-1">
+                            <h1 className="text-2xl font-bold">{agent?.DisplayName || 'Loading...'}</h1>
+                            <span className="relative flex h-3 w-3" title={agent?.IsActive ? 'Active' : 'Suspended'}>
+                                {agent?.IsActive && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>}
+                                <span className={`relative inline-flex rounded-full h-3 w-3 ${agent?.IsActive ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                            </span>
+                        </div>
+                        <p className="text-gray-600 font-medium">{agent?.StaffID || id}</p>
+                        <p className="text-gray-500">{agent?.Email}</p>
                     </div>
-                    <p className="text-gray-500 mt-1">ID: {id} • {agent?.Email}</p>
                     
                     <div className="mt-6 flex space-x-8">
                         <div>
-                            <p className="text-sm text-gray-500 font-medium">Total Debt</p>
-                            <p className="text-2xl font-bold text-red-600">RM {agent?.ledger?.[0] ? parseFloat(agent.ledger[0].RunningBalance).toFixed(2) : '0.00'}</p>
-                        </div>
-                        <div>
-                            <p className="text-sm text-gray-500 font-medium">Credit Limit</p>
-                            <div className="flex items-center space-x-2">
-                                <p className="text-2xl font-bold text-gray-900">RM {agent?.CreditLimit ? parseFloat(agent.CreditLimit).toFixed(2) : '0.00'}</p>
-                                <button 
-                                    className="text-indigo-600 hover:text-indigo-800"
-                                    onClick={() => { setNewLimit(agent?.CreditLimit || 0); setIsLimitModalOpen(true); }}
-                                >
-                                    <Edit3 className="w-4 h-4" />
-                                </button>
-                            </div>
+                            <p className="text-sm text-gray-500 font-medium">Commission</p>
+                            <p className="text-2xl font-bold text-green-600">RM {agent?.ledger?.[0] ? parseFloat(agent.ledger[0].RunningBalance).toFixed(2) : '0.00'}</p>
                         </div>
                     </div>
                 </div>
 
-                <div className="flex space-x-2 flex-col items-end gap-2">
-                    <div className="flex space-x-2">
-                        <Button 
-                            variant="outline" 
-                            className={agent?.IsActive ? "text-red-600 border-red-200 hover:bg-red-50" : "text-green-600 border-green-200 hover:bg-green-50"}
-                            onClick={() => suspendAgent.mutate({ agentId: id, isActive: !agent?.IsActive })}
-                        >
-                            <AlertCircle className="w-4 h-4 mr-2" /> {agent?.IsActive ? 'Suspend' : 'Activate'}
-                        </Button>
-                        <Button onClick={() => setIsPaymentModalOpen(true)}>Add Manual Payment</Button>
-                    </div>
-                    <Button variant="secondary" className="w-full" onClick={() => navigate(`/agents/${id}/statement`)}>View Statement</Button>
+                <div className="flex space-x-3 items-center">
+                    <Button variant="secondary" onClick={() => navigate(`/Agent-Management/${id}/Statement`)}>
+                        View Statement
+                    </Button>
+                    <Button onClick={() => setIsPayoutModalOpen(true)}>
+                        Record Payout
+                    </Button>
                 </div>
             </div>
 
@@ -99,6 +155,12 @@ export function AgentDetails() {
                     >
                         Recent Orders
                     </button>
+                    <button
+                        onClick={() => setActiveTab('imports')}
+                        className={`whitespace-nowrap pb-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'imports' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+                    >
+                        AWB Imports
+                    </button>
                 </nav>
             </div>
 
@@ -110,60 +172,36 @@ export function AgentDetails() {
                     </div>
                 )}
                 {activeTab === 'orders' && (
-                    <div className="p-12 text-center text-gray-500">
-                        Order history will be displayed here.
-                    </div>
-                )}
-            </div>
-
-            {/* Credit Limit Modal */}
-            {isLimitModalOpen && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-sm overflow-hidden flex flex-col">
-                        <div className="p-6 border-b">
-                            <h2 className="text-lg font-bold">Edit Credit Limit</h2>
-                        </div>
-                        <div className="p-6 space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">New Limit (RM)</label>
-                                <Input 
-                                    type="number" 
-                                    value={newLimit} 
-                                    onChange={(e) => setNewLimit(e.target.value)} 
-                                    autoFocus 
-                                />
-                            </div>
-                        </div>
-                        <div className="p-4 border-t bg-gray-50 flex justify-end gap-2">
-                            <Button variant="ghost" onClick={() => setIsLimitModalOpen(false)}>Cancel</Button>
-                            <Button 
-                                onClick={() => {
-                                    updateCreditLimit.mutate({ agentId: id, newLimit: parseFloat(newLimit) });
-                                    setIsLimitModalOpen(false);
-                                }}
-                                disabled={updateCreditLimit.isPending}
-                            >
-                                Save
-                            </Button>
-                        </div>
-                    </div>
+                <div className="bg-white rounded-xl shadow-sm border p-6 text-center text-gray-500">
+                    Order history will be integrated here
                 </div>
             )}
 
-            {/* Add Manual Payment Modal */}
-            {isPaymentModalOpen && (
+            {activeTab === 'imports' && (
+                <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+                    {isImportsLoading ? (
+                        <div className="p-8 text-center text-gray-500">Loading AWB imports...</div>
+                    ) : (
+                        <DataTable columns={importColumns} data={imports || []} searchPlaceholder="Cari Nama Fail AWB..." />
+                    )}
+                </div>
+            )}
+            </div>
+
+            {/* Record Payout Modal */}
+            {isPayoutModalOpen && (
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden flex flex-col">
                         <div className="p-6 border-b">
-                            <h2 className="text-lg font-bold">Add Manual Payment</h2>
+                            <h2 className="text-lg font-bold">Record Payout</h2>
                         </div>
                         <div className="p-6 space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Amount Received (RM)</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Amount Paid (RM)</label>
                                 <Input 
                                     type="number" 
-                                    value={paymentAmount} 
-                                    onChange={(e) => setPaymentAmount(e.target.value)} 
+                                    value={payoutAmount} 
+                                    onChange={(e) => setPayoutAmount(e.target.value)} 
                                     autoFocus 
                                 />
                             </div>
@@ -172,21 +210,21 @@ export function AgentDetails() {
                                 <Input 
                                     type="text" 
                                     placeholder="e.g. DuitNow Transfer 12/6"
-                                    value={paymentRef} 
-                                    onChange={(e) => setPaymentRef(e.target.value)} 
+                                    value={payoutRef} 
+                                    onChange={(e) => setPayoutRef(e.target.value)} 
                                 />
                             </div>
                         </div>
                         <div className="p-4 border-t bg-gray-50 flex justify-end gap-2">
-                            <Button variant="ghost" onClick={() => setIsPaymentModalOpen(false)}>Cancel</Button>
+                            <Button variant="ghost" onClick={() => setIsPayoutModalOpen(false)}>Cancel</Button>
                             <Button 
                                 onClick={() => {
-                                    addManualPayment.mutate({ agentId: id, amount: parseFloat(paymentAmount), reference: paymentRef });
-                                    setIsPaymentModalOpen(false);
+                                    recordPayout.mutate({ agentId: id, amount: parseFloat(payoutAmount), reference: payoutRef });
+                                    setIsPayoutModalOpen(false);
                                 }}
-                                disabled={!paymentAmount || addManualPayment.isPending}
+                                disabled={!payoutAmount || recordPayout.isPending}
                             >
-                                Submit Payment
+                                Submit Payout
                             </Button>
                         </div>
                     </div>

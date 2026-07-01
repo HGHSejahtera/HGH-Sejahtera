@@ -1,9 +1,10 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, ShoppingCart, Users, Settings, FileText, Pickaxe, Boxes, Box, ChevronLeft, X, BarChart3, ScanLine, TableProperties } from 'lucide-react';
+import { LayoutDashboard, Settings, Pickaxe, ChevronLeft, X, BarChart3, TableProperties, UserRound, Calculator, Package, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/hooks/useAuth';
 import { useSidebar } from './SidebarContext';
 import { useTranslation } from '@/hooks/useTranslation';
+
 
 const SidebarContent = ({ isCollapsed, toggleSidebar, closeMobile, allowedLinks, user, role }) => (
     <aside className={cn(
@@ -39,8 +40,10 @@ const SidebarContent = ({ isCollapsed, toggleSidebar, closeMobile, allowedLinks,
         {/* Nav */}
         <div className="flex-1 overflow-y-auto py-3 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-white/20">
             <nav className={cn("space-y-0.5", isCollapsed ? "px-2" : "px-3")}>
-                {allowedLinks.map((link) => (
-                    link.comingSoon ? (
+                {allowedLinks.map((link, index) => (
+                    link.type === 'divider' ? (
+                        <div key={`divider-${index}`} className="my-2 border-t border-white/[0.06] mx-2" />
+                    ) : link.comingSoon ? (
                         <div
                             key={link.path}
                             title={isCollapsed ? `${link.name} (Coming Soon)` : undefined}
@@ -118,19 +121,17 @@ export function Sidebar() {
     
     const links = [
         { name: t('sidebar.dashboard'), icon: LayoutDashboard, path: '/Dashboard', roles: ['Founder', 'Manager', 'Developer', 'Staff'] },
-        { name: t('sidebar.pos'), icon: ScanLine, path: '/POS', roles: ['Founder', 'Manager', 'Developer', 'Staff'] },
-        { name: t('sidebar.pickPack'), icon: Pickaxe, path: '/pick-pack', roles: ['Founder', 'Manager', 'Developer', 'Staff'] },
-        { name: t('sidebar.inventory'), icon: Boxes, path: '/Inventory', roles: ['Founder', 'Manager', 'Developer', 'Staff'] },
+        { name: 'POS', icon: Calculator, path: '/POS', roles: ['Founder', 'Manager', 'Developer', 'Staff'] },
+        { name: t('sidebar.pickPack'), icon: Pickaxe, path: '/Pick-Pack', roles: ['Founder', 'Manager', 'Developer', 'Staff'] },
         { name: 'Price Setup', icon: TableProperties, path: '/Price/Setup', roles: ['Founder', 'Manager', 'Developer'] },
-        { name: t('sidebar.agents'), icon: Users, path: '/agents', roles: ['Founder', 'Manager', 'Developer'] },
-        { name: 'Reports', icon: BarChart3, path: '/reports', roles: ['Founder', 'Manager', 'Developer'] },
+        { name: t('sidebar.inventory'), icon: Package, path: '/Inventory', roles: ['Founder', 'Manager', 'Developer'] },
+        { name: t('sidebar.agents'), icon: Users, path: '/Agent-Management', roles: ['Founder', 'Manager', 'Developer'] },
+        { name: 'Reports', icon: BarChart3, path: '/Report', roles: ['Founder', 'Manager', 'Developer'] },
+        { name: 'Agent', icon: UserRound, path: '/Agent', roles: ['Agent', 'Founder', 'Manager', 'Developer'] },
         { name: t('sidebar.settings'), icon: Settings, path: '/Settings', roles: ['Founder', 'Manager', 'Developer', 'Staff', 'Agent'] },
-        { name: 'New Order', icon: ShoppingCart, path: '/agent/orders/new', roles: ['Agent'] },
-        { name: 'My Orders', icon: Box, path: '/agent/orders', roles: ['Agent'] },
-        { name: 'My Ledger', icon: FileText, path: '/agent/ledger', roles: ['Agent'] },
     ];
 
-    const allowedLinks = links.filter(link => link.roles.includes(role));
+    const allowedLinks = links.filter(link => link.type === 'divider' || link.roles.includes(role) || role === 'Developer');
 
     return (
         <>

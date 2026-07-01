@@ -22,14 +22,24 @@ export default async function handler(req, res) {
             forcePathStyle: true,
         });
 
-        const { fileName, fileType } = req.body;
+        const { fileName, fileType, isPrivate } = req.body;
 
         if (!fileName || !fileType) {
             return res.status(400).json({ error: 'fileName and fileType are required' });
         }
 
+        const targetBucket = isPrivate ? (process.env.R2_PRIVATE_BUCKET_NAME || 'hgh-awb') : process.env.R2_BUCKET_NAME;
+
+        console.log('--- DEBUG R2 ENV ---');
+        console.log('isPrivate:', isPrivate);
+        console.log('targetBucket:', targetBucket);
+
+        if (!targetBucket) {
+            return res.status(500).json({ error: 'Bucket configuration is missing' });
+        }
+
         const command = new PutObjectCommand({
-            Bucket: process.env.R2_BUCKET_NAME,
+            Bucket: targetBucket,
             Key: fileName,
             ContentType: fileType,
         });
@@ -40,7 +50,7 @@ export default async function handler(req, res) {
         // Also return the final public URL. 
         // We use VITE_R2_PUBLIC_URL from env if available, otherwise it relies on frontend to construct it.
         const publicUrlBase = process.env.VITE_R2_PUBLIC_URL || '';
-        const publicUrl = publicUrlBase ? `${publicUrlBase}/${fileName}` : '';
+        const publicUrl = (!isPrivate && publicUrlBase) ? `${publicUrlBase}/${fileName}` : '';
 
         res.status(200).json({ url: signedUrl, key: fileName, publicUrl });
     } catch (err) {

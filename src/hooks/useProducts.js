@@ -41,7 +41,8 @@ export function useProducts() {
                     *,
                     ProductPricing (
                         RetailRule,
-                        WholesaleRule
+                        WholesaleRule,
+                        AgentMarkup
                     )
                 `)
                 .order('ProductName');
@@ -51,6 +52,7 @@ export function useProducts() {
                 ...p,
                 RetailPrice: p.ProductPricing?.RetailRule || p.Price || 0,
                 WholesalePrice: p.ProductPricing?.WholesaleRule || p.Price || 0,
+                AgentPrice: p.ProductPricing?.AgentMarkup || 0,
             }));
         }
     });

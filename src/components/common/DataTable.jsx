@@ -1,3 +1,4 @@
+import { cn } from "@/lib/utils"
 import {
     flexRender,
     getCoreRowModel,
@@ -14,6 +15,7 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
+
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useState } from "react"
@@ -35,12 +37,13 @@ import {
 export function DataTable({ 
     columns, 
     data, 
-    searchPlaceholder = "Search...", 
+    searchPlaceholder = "Search", 
     actionElement,
     rowSelection = {},
     onRowSelectionChange,
     columnVisibility: externalColumnVisibility,
-    onColumnVisibilityChange: externalOnColumnVisibilityChange
+    onColumnVisibilityChange: externalOnColumnVisibilityChange,
+    tableContainerClassName = "max-h-[calc(100vh-220px)] overflow-auto"
 }) {
     const [globalFilter, setGlobalFilter] = useState("")
     const [internalColumnVisibility, setInternalColumnVisibility] = useState({})
@@ -76,8 +79,8 @@ export function DataTable({
     })
 
     return (
-        <div className="flex flex-col h-full w-full">
-            <div className="flex items-center justify-between pb-4 gap-4 flex-wrap shrink-0">
+        <div className="w-full space-y-4">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
                 <div className="flex items-center gap-4 flex-1 flex-wrap">
                     <Input
                         placeholder={searchPlaceholder}
@@ -141,7 +144,7 @@ export function DataTable({
                     )}
                 </div>
             </div>
-            <Table containerClassName="rounded-md border flex-1 min-h-0 relative">
+            <Table containerClassName={cn("rounded-md border relative", tableContainerClassName)}>
                 <TableHeader>
                         {table.getHeaderGroups().map((headerGroup) => (
                             <TableRow key={headerGroup.id}>
@@ -183,7 +186,7 @@ export function DataTable({
                         )}
                     </TableBody>
             </Table>
-            <div className="flex items-center justify-between px-2 pt-4 shrink-0 mt-auto border-t mt-4">
+            <div className="flex items-center justify-between px-2">
                 <div className="flex-1 text-sm text-muted-foreground">
                     {table.getFilteredSelectedRowModel().rows.length > 0 ? (
                         <span>

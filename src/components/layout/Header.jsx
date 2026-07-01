@@ -13,12 +13,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useSecretMode } from '@/hooks/useSecretMode';
 import { useAuthStore } from '@/hooks/useAuth';
+import { usePreferences } from '@/hooks/usePreferences';
 
 export function Header() {
     const { toggleSidebar } = useSidebar();
     const location = useLocation();
     const { t, language, setLanguage } = useTranslation();
     const { isHGHMode, toggleHGHMode } = useSecretMode();
+    const { user, lockApp } = useAuthStore();
+    const { pinTimeout } = usePreferences();
 
     // Generate dynamic title based on path
     const getPageTitle = () => {
@@ -31,9 +34,10 @@ export function Header() {
         if (path.includes('/products/barcodes')) return t('header.barcodes');
         if (path.includes('/products')) return t('header.products');
         if (path.toLowerCase().includes('/inventory')) return t('header.inventory');
-        if (path.includes('/agents')) return t('header.agents');
+        if (path.includes('/Agent-Management')) return t('header.agents');
         if (path.toLowerCase().includes('/price')) return t('header.pricing');
         if (path.toLowerCase().includes('/settings')) return t('header.settings');
+        if (path.toLowerCase().includes('/agent')) return 'Agent Workspace';
         return t('header.workspace');
     };
 
@@ -94,15 +98,17 @@ export function Header() {
                     </DropdownMenuContent>
                 </DropdownMenu>
 
-                <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="relative hover:bg-gray-100/80 transition-colors"
-                    title="Lock Screen"
-                    onClick={() => useAuthStore.getState().lockApp()}
-                >
-                    <Lock className="h-5 w-5 text-gray-600" />
-                </Button>
+                {user?.hasPin && pinTimeout > 0 && (
+                    <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="relative hover:bg-gray-100/80 transition-colors"
+                        title="Lock Screen"
+                        onClick={lockApp}
+                    >
+                        <Lock className="h-5 w-5 text-gray-600" />
+                    </Button>
+                )}
 
                 <Button variant="ghost" size="icon" className="relative cursor-not-allowed opacity-40 hover:bg-transparent">
                     <Bell className="h-5 w-5 text-zinc-400" />

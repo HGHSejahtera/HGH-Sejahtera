@@ -4,14 +4,19 @@ import { useAuthStore } from './useAuth';
 
 export const useAgentSummaries = () => {
     const user = useAuthStore(state => state.user);
-    const isAuthorized = user && ['Founder', 'Manager', 'Staff'].includes(user.Role);
+    const isAuthorized = user && ['Founder', 'Manager', 'Staff', 'Developer'].includes(user.role);
 
     return useQuery({
         queryKey: ['admin', 'agents', 'summaries'],
         queryFn: async () => {
             const { data, error } = await supabase.rpc('get_agent_summaries');
             if (error) throw error;
-            return data;
+            
+            return data.sort((a, b) => {
+                const idA = a.StaffID || a.AgentID || '';
+                const idB = b.StaffID || b.AgentID || '';
+                return idA.localeCompare(idB);
+            });
         },
         enabled: isAuthorized,
     });
@@ -19,24 +24,30 @@ export const useAgentSummaries = () => {
 
 export const useAgentDetails = (agentId) => {
     const user = useAuthStore(state => state.user);
-    const isAuthorized = user && ['Founder', 'Manager', 'Staff'].includes(user.Role);
+    const isAuthorized = user && ['Founder', 'Manager', 'Staff', 'Developer'].includes(user.role);
 
     return useQuery({
         queryKey: ['admin', 'agents', 'details', agentId],
         queryFn: async () => {
+            const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(agentId);
+            let query = supabase.from('Users').select('*');
+            if (isUUID) {
+                query = query.eq('UserID', agentId);
+            } else {
+                query = query.eq('StaffID', agentId);
+            }
+
             // Fetch user info
-            const { data: userData, error: userError } = await supabase
-                .from('Users')
-                .select('*')
-                .eq('UserID', agentId)
-                .single();
+            const { data: userData, error: userError } = await query.single();
             if (userError) throw userError;
+
+            const actualAgentId = userData.UserID;
 
             // Fetch ledger history
             const { data: ledgerData, error: ledgerError } = await supabase
                 .from('AgentLedger')
                 .select('*')
-                .eq('AgentID', agentId)
+                .eq('AgentID', actualAgentId)
                 .order('CreatedAt', { ascending: false });
             if (ledgerError) throw ledgerError;
 
@@ -49,9 +60,35 @@ export const useAgentDetails = (agentId) => {
     });
 };
 
+export const useAgentOrderImports = (agentId) => {
+    const user = useAuthStore(state => state.user);
+    const isAuthorized = user && ['Founder', 'Manager', 'Staff', 'Developer'].includes(user.role);
+
+    return useQuery({
+        queryKey: ['admin', 'agents', 'imports', agentId],
+        queryFn: async () => {
+            const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(agentId);
+            let resolvedId = agentId;
+            if (!isUUID) {
+                const { data: user } = await supabase.from('Users').select('UserID').eq('StaffID', agentId).single();
+                if (user) resolvedId = user.UserID;
+            }
+
+            const { data, error } = await supabase
+                .from('OrderImports')
+                .select('*')
+                .eq('AgentID', resolvedId)
+                .order('CreatedAt', { ascending: false });
+            if (error) throw error;
+            return data;
+        },
+        enabled: !!agentId && isAuthorized,
+    });
+};
+
 export const useAgentStatement = (agentId, month, year) => {
     const user = useAuthStore(state => state.user);
-    const isAuthorized = user && ['Founder', 'Manager', 'Staff'].includes(user.Role);
+    const isAuthorized = user && ['Founder', 'Manager', 'Staff', 'Developer'].includes(user.role);
 
     return useQuery({
         queryKey: ['admin', 'agents', 'statement', agentId, month, year],
@@ -60,18 +97,25 @@ export const useAgentStatement = (agentId, month, year) => {
             const endDate = new Date(year, month, 0, 23, 59, 59, 999).toISOString();
 
             // 1. Fetch user info
-            const { data: userData, error: userError } = await supabase
-                .from('Users')
-                .select('*')
-                .eq('UserID', agentId)
-                .single();
+            const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(agentId);
+            let query = supabase.from('Users').select('*');
+            if (isUUID) {
+                query = query.eq('UserID', agentId);
+            } else {
+                query = query.eq('StaffID', agentId);
+            }
+
+            const { data: userData, error: userError } = await query.single();
+            if (userError) throw userError;
+
+            const actualAgentId = userData.UserID;
             if (userError) throw userError;
 
             // 2. Fetch all previous ledger entries to calculate Opening Balance
             const { data: previousEntries, error: prevError } = await supabase
                 .from('AgentLedger')
                 .select('Amount')
-                .eq('AgentID', agentId)
+                .eq('AgentID', actualAgentId)
                 .lt('CreatedAt', startDate);
             if (prevError) throw prevError;
             
@@ -81,7 +125,7 @@ export const useAgentStatement = (agentId, month, year) => {
             const { data: currentEntries, error: currentError } = await supabase
                 .from('AgentLedger')
                 .select('*')
-                .eq('AgentID', agentId)
+                .eq('AgentID', actualAgentId)
                 .gte('CreatedAt', startDate)
                 .lte('CreatedAt', endDate)
                 .order('CreatedAt', { ascending: true });
@@ -113,27 +157,12 @@ export const useAgentStatement = (agentId, month, year) => {
 export const useAgentMutations = () => {
     const queryClient = useQueryClient();
 
-    const updateCreditLimit = useMutation({
-        mutationFn: async ({ agentId, newLimit }) => {
-            const { data, error } = await supabase.rpc('update_agent_credit_limit', {
-                p_agent_id: agentId,
-                p_new_limit: newLimit
-            });
-            if (error) throw error;
-            return data;
-        },
-        onSuccess: (_, variables) => {
-            queryClient.invalidateQueries({ queryKey: ['admin', 'agents', 'summaries'] });
-            queryClient.invalidateQueries({ queryKey: ['admin', 'agents', 'details', variables.agentId] });
-        }
-    });
-
-    const addManualPayment = useMutation({
+    const recordPayout = useMutation({
         mutationFn: async ({ agentId, amount, reference }) => {
-            const { data, error } = await supabase.rpc('add_agent_manual_payment', {
+            const { data, error } = await supabase.rpc('record_agent_payout', {
                 p_agent_id: agentId,
                 p_amount: amount,
-                p_reference: reference || `Manual payment on ${new Date().toISOString().split('T')[0]}`
+                p_reference: reference || `Payout on ${new Date().toISOString().split('T')[0]}`
             });
             if (error) throw error;
             return data;
@@ -161,8 +190,7 @@ export const useAgentMutations = () => {
     });
 
     return {
-        updateCreditLimit,
-        addManualPayment,
+        recordPayout,
         suspendAgent
     };
 };

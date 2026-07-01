@@ -220,7 +220,7 @@ export function UserManagement() {
                             <DataTable 
                                 columns={columns} 
                                 data={ActiveUsers} 
-                                searchPlaceholder="Search by name, email, or role..." 
+                                searchPlaceholder="Search" 
                             />
                         </div>
                     </div>

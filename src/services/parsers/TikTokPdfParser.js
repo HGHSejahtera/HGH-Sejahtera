@@ -55,11 +55,20 @@ export const TikTokPdfParser = {
                     const yTop = headerItem.y;
                     const yBottom = footerItem.y;
 
+                    // Dynamic column boundaries based on headers
+                    const headerSKU = items.find(i => i.y === yTop && i.text === 'SKU');
+                    const headerSellerSKU = items.find(i => i.y === yTop && i.text === 'Seller SKU');
+                    const headerQty = items.find(i => i.y === yTop && i.text.includes('Qty'));
+
+                    const boundSku = headerSKU ? headerSKU.x - 20 : 220;
+                    const boundSellerSku = headerSellerSKU ? headerSellerSKU.x - 20 : 350;
+                    const boundQty = headerQty ? headerQty.x - 20 : 500;
+
                     // Filter items in the table body
                     const tableItems = items.filter(i => i.y < yTop && i.y > yBottom);
 
-                    // Find all Qty items (X > 500)
-                    const qtyItems = tableItems.filter(i => i.x > 500 && /^\d+$/.test(i.text))
+                    // Find all Qty items (X > boundQty)
+                    const qtyItems = tableItems.filter(i => i.x > boundQty && /^\d+$/.test(i.text))
                         .sort((a, b) => b.y - a.y); // Sort top to bottom (highest Y first)
 
                     for (let i = 0; i < qtyItems.length; i++) {
@@ -69,16 +78,17 @@ export const TikTokPdfParser = {
                         // Get all items belonging to this product row
                         const rowItems = tableItems.filter(item => item.y <= currentQty.y && item.y > nextY);
 
-                        // Seller SKU is the item in the middle columns (200 < X < 450) with the LOWEST Y
-                        const skuItems = rowItems.filter(item => item.x > 200 && item.x < 450);
+                        // Seller SKU is between boundSellerSku and boundQty
+                        const sellerSkuItems = rowItems.filter(item => item.x >= boundSellerSku && item.x < boundQty)
+                            .sort((a, b) => b.y - a.y);
+                        
                         let sellerSKU = '-';
-                        if (skuItems.length > 0) {
-                            skuItems.sort((a, b) => a.y - b.y);
-                            sellerSKU = skuItems[0].text;
+                        if (sellerSkuItems.length > 0) {
+                            sellerSKU = sellerSkuItems.map(s => s.text).join(' ');
                         }
 
-                        // Product Name is items on the left (X < 200), sorted top to bottom
-                        const nameItems = rowItems.filter(item => item.x < 200)
+                        // Product Name is items on the left (X < boundSku), sorted top to bottom
+                        const nameItems = rowItems.filter(item => item.x < boundSku)
                             .sort((a, b) => b.y - a.y);
                         const productName = nameItems.map(n => n.text).join(' ');
 

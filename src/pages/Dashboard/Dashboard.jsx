@@ -21,9 +21,9 @@ export function Dashboard() {
     ];
 
     const quickActions = [
-        { title: t('dashboard.startPOS'), desc: t('dashboard.startPOSDesc'), icon: ShoppingCart, action: () => navigate('/pos') },
-        { title: 'Manage Inventory', desc: t('dashboard.addProductDesc'), icon: Package, action: () => navigate('/Inventory') },
-        { title: t('dashboard.agentList'), desc: t('dashboard.agentListDesc'), icon: Users, action: () => navigate('/agents') },
+        { title: t('dashboard.startPOS'), icon: ShoppingCart, action: () => navigate('/POS') },
+        { title: 'Manage Inventory', icon: Package, action: () => navigate('/Inventory') },
+        { title: t('dashboard.agentList'), icon: Users, action: () => navigate('/Agent-Management') },
     ];
 
     const recentOrders = metrics?.recentOrders || [];
@@ -83,7 +83,7 @@ export function Dashboard() {
                             <thead className="bg-gray-50/50 text-gray-500 font-medium">
                                 <tr>
                                     <th className="px-6 py-4">{t('dashboard.orderId')}</th>
-                                    <th className="px-6 py-4">{t('dashboard.customer')}</th>
+                                    <th className="px-6 py-4">{t('dashboard.agent')}</th>
                                     <th className="px-6 py-4 text-center">Items</th>
                                     <th className="px-6 py-4 text-right">{t('dashboard.amount')}</th>
                                     <th className="px-6 py-4 text-center">{t('dashboard.status')}</th>
@@ -127,14 +127,13 @@ export function Dashboard() {
                             <div 
                                 key={i}
                                 onClick={action.action}
-                                className="group p-4 rounded-xl border border-gray-100 hover:border-indigo-200 hover:bg-indigo-50/50 cursor-pointer transition-all flex items-start"
+                                className="group p-4 rounded-xl border border-gray-100 hover:border-indigo-200 hover:bg-indigo-50/50 cursor-pointer transition-all flex items-center"
                             >
                                 <div className="p-2.5 rounded-lg bg-gray-50 group-hover:bg-indigo-100 group-hover:text-indigo-600 text-gray-500 transition-colors mr-4">
                                     <action.icon className="w-5 h-5" />
                                 </div>
                                 <div>
                                     <h4 className="font-semibold text-gray-900 group-hover:text-indigo-700 transition-colors">{action.title}</h4>
-                                    <p className="text-xs text-gray-500 mt-0.5">{action.desc}</p>
                                 </div>
                             </div>
                         ))}
