@@ -144,6 +144,7 @@ export function Registration() {
     
     // State for initial form
     const [name, setName] = useState('');
+    const [nickname, setNickname] = useState('');
     const [username, setUsername] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -284,8 +285,8 @@ export function Registration() {
         e.preventDefault();
         setErrorMsg('');
 
-        if (!name || !username || !email || !password) {
-            setErrorMsg('Sila isi semua ruangan (Nama, Username, Email, Password).');
+        if (!name || !nickname || !username || !email || !password) {
+            setErrorMsg('Sila isi semua ruangan (Nama, Nickname, Username, Email, Password).');
             return;
         }
 
@@ -313,6 +314,7 @@ export function Registration() {
                 options: {
                     data: {
                         full_name: name,
+                        nickname: nickname.trim(),
                         username: username,
                         role: 'Pending'
                     }
@@ -357,6 +359,7 @@ export function Registration() {
                 options: {
                     data: {
                         full_name: name,
+                        nickname: nickname.trim(),
                         username: username,
                         role: determinedRole
                     }
@@ -656,6 +659,21 @@ export function Registration() {
                             </div>
 
                             <div className="space-y-2">
+                                <Label htmlFor="nickname" className="text-sm font-medium text-zinc-300">Nickname (Nama Panggilan)</Label>
+                                <Input
+                                    id="nickname"
+                                    type="text"
+                                    required
+                                    value={nickname}
+                                    onFocus={() => setIsTyping(true)}
+                                    onBlur={() => setIsTyping(false)}
+                                    onChange={(e) => setNickname(toTitleCase(e.target.value))}
+                                    className="h-12 bg-zinc-900 border-zinc-800 text-white focus:border-indigo-500 focus:ring-indigo-500"
+                                    placeholder="Contoh: Riz / Fariz"
+                                />
+                            </div>
+
+                            <div className="space-y-2">
                                 <Label htmlFor="username" className="text-sm font-medium text-zinc-300">Username</Label>
                                 <Input
                                     id="username"
@@ -721,6 +739,13 @@ export function Registration() {
                                 <Label className="text-sm font-medium text-zinc-500">Full Name</Label>
                                 <div className="flex items-center px-3 h-12 bg-zinc-900/50 border border-zinc-800 text-zinc-400 rounded-md cursor-not-allowed">
                                     {name}
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label className="text-sm font-medium text-zinc-500">Nickname</Label>
+                                <div className="flex items-center px-3 h-12 bg-zinc-900/50 border border-zinc-800 text-zinc-400 rounded-md cursor-not-allowed">
+                                    {nickname}
                                 </div>
                             </div>
 

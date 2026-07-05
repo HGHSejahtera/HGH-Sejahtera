@@ -15,7 +15,10 @@ function PendingUserCard({ user, onApprove, onReject }) {
     return (
         <div className="bg-white p-4 rounded-lg shadow-sm border border-orange-100 flex flex-col md:flex-row justify-between items-center gap-4">
             <div>
-                <p className="font-bold text-gray-900">{user.DisplayName}</p>
+                <div className="flex items-center gap-2">
+                    <p className="font-bold text-gray-900">{user.DisplayName}</p>
+                    {user.Nickname && <span className="text-xs font-semibold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-100">{user.Nickname}</span>}
+                </div>
                 <p className="text-sm text-gray-500">{user.Email} | @{user.Username}</p>
             </div>
             <div className="flex items-center gap-3 w-full md:w-auto">
@@ -139,7 +142,16 @@ export function UserManagement() {
 
     const columns = [
         { header: 'ID', accessorKey: 'StaffID', cell: ({row}) => <span className="text-gray-500 font-mono text-xs">{row.original.StaffID}</span> },
-        { header: 'Name', accessorKey: 'DisplayName', cell: ({ row }) => <span className="font-bold text-gray-900">{row.original.DisplayName}</span> },
+        { 
+            header: 'Name', 
+            accessorKey: 'DisplayName', 
+            cell: ({ row }) => (
+                <div className="flex items-center gap-2">
+                    <span className="font-bold text-gray-900">{row.original.DisplayName}</span>
+                    {row.original.Nickname && <span className="text-xs font-semibold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-100">{row.original.Nickname}</span>}
+                </div>
+            ) 
+        },
         { header: 'Username', accessorKey: 'Username', cell: ({row}) => <span className="text-gray-500">@{row.original.Username}</span> },
         { header: 'Email', accessorKey: 'Email' },
         { 

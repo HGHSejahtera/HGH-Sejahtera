@@ -211,7 +211,7 @@ export function POS() {
                                     <div className="flex-1">
                                         <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider mb-1">{product.Brand || 'No Brand'}</p>
                                         <h3 className="font-semibold text-gray-900 line-clamp-2 leading-tight">{product.ProductName}</h3>
-                                        <p className="text-sm text-gray-500 mt-1">{product.Variation}</p>
+                                        <p className="text-sm text-gray-500 mt-1">{`${product.Variation || ''} ${product.Size || ''}`.trim()}</p>
                                         <p className="text-lg font-bold text-indigo-600 mt-2">RM {getPrice(product).toFixed(2)}</p>
                                     </div>
                                     {product.ImageURL && (
@@ -284,7 +284,7 @@ export function POS() {
                                     <div className="flex-1">
                                         <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider mb-1">{item.Brand || 'No Brand'}</p>
                                         <h4 className="font-medium text-sm line-clamp-2 leading-tight">{item.ProductName}</h4>
-                                        <p className="text-xs text-gray-500 mt-0.5">{item.Variation}</p>
+                                        <p className="text-xs text-gray-500 mt-0.5">{`${item.Variation || ''} ${item.Size || ''}`.trim()}</p>
                                         <div className="flex items-center mt-1 h-6">
                                             {editingPriceItemId === item.ProductID ? (
                                                 <div className="flex items-center">

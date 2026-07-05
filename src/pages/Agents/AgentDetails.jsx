@@ -3,12 +3,17 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { DataTable } from '@/components/common/DataTable';
 import { Button } from '@/components/ui/button';
-
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { useAgentDetails, useAgentMutations, useAgentOrderImports } from '@/hooks/useAgentManagement';
-import { Download, Trash2, CheckCircle2 } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
-import { useQueryClient } from '@tanstack/react-query';
+import { useAgentDetails, useAgentMutations, useAgentRecentOrders } from '@/hooks/useAgentManagement';
+import { MoreHorizontal, Download as DownloadIcon, ChevronRight } from 'lucide-react';
+import { AwbPdfViewer } from '@/components/common/AwbPdfViewer';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 export function AgentDetails() {
     const { id } = useParams();
@@ -17,89 +22,178 @@ export function AgentDetails() {
     const { recordPayout } = useAgentMutations();
     
     const { data: agent, isLoading } = useAgentDetails(id);
-    const { data: imports, isLoading: isImportsLoading } = useAgentOrderImports(id);
-    const queryClient = useQueryClient();
+    const { data: recentOrders, isLoading: isOrdersLoading } = useAgentRecentOrders(id);
     
     
     const [isPayoutModalOpen, setIsPayoutModalOpen] = useState(false);
     const [payoutAmount, setPayoutAmount] = useState('');
     const [payoutRef, setPayoutRef] = useState('');
+    const [viewAwbUrl, setViewAwbUrl] = useState(null);
 
     const ledgerColumns = [
-        { header: 'Date', accessorKey: 'CreatedAt', cell: ({ row }) => new Date(row.original.CreatedAt).toLocaleString() },
-        { header: 'Type', accessorKey: 'EntryType' },
-        { header: 'Reference', accessorKey: 'Description' },
-        { header: 'Amount (RM)', accessorKey: 'Amount', cell: ({ row }) => {
-            const amount = parseFloat(row.original.Amount);
-            return <span className={amount > 0 ? "text-red-600" : "text-green-600"}>{amount > 0 ? '+' : ''}{amount.toFixed(2)}</span>;
-        } },
-        { header: 'Running Balance', accessorKey: 'RunningBalance', cell: ({ row }) => <span className="font-bold">{parseFloat(row.original.RunningBalance).toFixed(2)}</span> },
+        { 
+            header: 'Date', 
+            accessorKey: 'CreatedAt', 
+            cell: ({ row }) => {
+                const date = new Date(row.original.CreatedAt);
+                return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+            } 
+        },
+        { 
+            header: 'Time', 
+            id: 'time', 
+            cell: ({ row }) => {
+                const date = new Date(row.original.CreatedAt);
+                return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+            } 
+        },
+        { 
+            header: () => <div className="text-center">Type</div>, 
+            accessorKey: 'EntryType',
+            cell: ({ row }) => (
+                <div className="flex justify-center">
+                    <Badge variant="outline" className="bg-white rounded-md font-medium text-xs border-gray-200 px-2.5 py-0.5 shadow-xs">
+                        {row.original.EntryType || 'Payout'}
+                    </Badge>
+                </div>
+            )
+        },
+        { 
+            header: 'Reference', 
+            accessorKey: 'Description',
+            cell: ({ row }) => <span className="font-medium text-gray-900">{row.original.Description || '—'}</span>
+        },
+        { 
+            header: () => <div className="text-right">Amount Paid</div>, 
+            accessorKey: 'Amount', 
+            cell: ({ row }) => {
+                const amount = Math.abs(parseFloat(row.original.Amount || 0));
+                return <div className="text-right font-medium text-emerald-600">RM {amount.toFixed(2)}</div>;
+            } 
+        },
     ];
 
-    const handleDownloadAwb = async (fileName) => {
+    const handleDirectDownload = async (url, orderId, createdAt, platform) => {
         try {
-            const res = await fetch('/api/get-r2-download-url', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ fileName })
-            });
-            if (!res.ok) throw new Error('Gagal dapatkan link muat turun');
-            const { url } = await res.json();
-            window.open(url, '_blank');
-        } catch (error) {
-            console.error(error);
-            alert('Gagal muat turun AWB.');
-        }
-    };
-
-    const handleClearCloud = async (fileName, importId) => {
-        if (!confirm('Anda pasti fail ni dah selamat di-download? Ia akan dipadam dari Cloudflare R2 secara kekal.')) return;
-        try {
-            // Delete from Cloudflare R2
-            const res = await fetch('/api/delete-r2-file', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ fileName })
-            });
-            if (!res.ok) throw new Error('Gagal padam dari R2');
-
-            // Update database status
-            const { error } = await supabase
-                .from('OrderImports')
-                .update({ IsAwbDeleted: true })
-                .eq('ImportID', importId);
+            const res = await fetch(`/api/proxy-pdf?url=${encodeURIComponent(url)}`);
+            if (!res.ok) throw new Error('Failed to fetch file for download');
+            const blob = await res.blob();
+            const blobUrl = window.URL.createObjectURL(blob);
             
-            if (error) throw error;
-            
-            queryClient.invalidateQueries(['admin', 'agents', 'imports', id]);
-        } catch (error) {
-            console.error(error);
-            alert('Gagal padam AWB dari Cloud.');
-        }
-    };
-
-    const importColumns = [
-        { header: 'Date Scan', accessorKey: 'CreatedAt', cell: ({ row }) => new Date(row.original.CreatedAt).toLocaleString() },
-        { header: 'Platform', accessorKey: 'Platform' },
-        { header: 'Fail AWB', accessorKey: 'FileName', cell: ({ row }) => (
-            <span className="text-gray-600 text-sm font-mono">{row.original.FileName}</span>
-        )},
-        { header: 'Tindakan Storage', id: 'actions', cell: ({ row }) => {
-            const isDeleted = row.original.IsAwbDeleted;
-            if (isDeleted) {
-                return <span className="inline-flex items-center text-green-600 text-sm font-medium"><CheckCircle2 className="w-4 h-4 mr-1" /> Cloud Cleared</span>;
+            let fileName = '';
+            const dateObj = createdAt ? new Date(createdAt) : null;
+            if (dateObj && !isNaN(dateObj.getTime())) {
+                const year = dateObj.getFullYear();
+                const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+                const day = String(dateObj.getDate()).padStart(2, '0');
+                const hours = String(dateObj.getHours()).padStart(2, '0');
+                const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+                const dateStr = `${year}${month}${day}`;
+                const timeStr = `${hours}${minutes}`;
+                const staffId = agent?.StaffID || agent?.staffId || id || 'Agent';
+                const prefix = (platform && platform !== 'TikTok' && platform !== 'TikTokShop') ? platform : 'TikTokSeller';
+                fileName = `${prefix}-${staffId}-${orderId || 'Order'}-${dateStr}-${timeStr}.pdf`;
+            } else if (url) {
+                const urlName = decodeURIComponent(url.split('/').pop().split('?')[0]);
+                if (urlName.endsWith('.pdf')) {
+                    fileName = urlName;
+                }
             }
-            return (
-                <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => handleDownloadAwb(row.original.FileName)}>
-                        <Download className="w-4 h-4 mr-1" /> Download
-                    </Button>
-                    <Button size="sm" variant="destructive" onClick={() => handleClearCloud(row.original.FileName, row.original.ImportID)}>
-                        <Trash2 className="w-4 h-4 mr-1" /> Clear Storage
+            if (!fileName) {
+                fileName = `Order-${orderId || 'AWB'}.pdf`;
+            }
+
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = blobUrl;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(blobUrl);
+            document.body.removeChild(a);
+        } catch (error) {
+            console.error('Download error:', error);
+            setViewAwbUrl(url);
+        }
+    };
+
+    const orderColumns = [
+        { 
+            header: 'Date', 
+            accessorKey: 'CreatedAt', 
+            cell: ({ row }) => {
+                const date = new Date(row.original.CreatedAt);
+                return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+            } 
+        },
+        { 
+            header: 'Time', 
+            id: 'time', 
+            cell: ({ row }) => {
+                const date = new Date(row.original.CreatedAt);
+                return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+            } 
+        },
+        { 
+            header: 'Order ID', 
+            accessorKey: 'PlatformOrderID', 
+            cell: ({ row }) => <span className="font-semibold text-gray-900">{row.original.PlatformOrderID}</span> 
+        },
+        { 
+            header: () => <div className="text-center">Platform</div>, 
+            accessorKey: 'Platform',
+            cell: ({ row }) => (
+                <div className="flex justify-center">
+                    <Badge variant="outline" className="bg-white rounded-md font-medium text-xs border-gray-200 px-2.5 py-0.5 shadow-xs">
+                        {row.original.Platform || 'TikTok'}
+                    </Badge>
+                </div>
+            )
+        },
+        { 
+            header: () => <div className="text-right">Amount</div>, 
+            accessorKey: 'OrderAmount', 
+            cell: ({ row }) => (
+                <div className="text-right font-medium text-emerald-600">
+                    RM {parseFloat(row.original.OrderAmount || 0).toFixed(2)}
+                </div>
+            )
+        },
+        {
+            header: () => <div className="text-center">Download</div>,
+            id: 'download',
+            cell: ({ row }) => (
+                <div className="flex justify-center">
+                    <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => handleDirectDownload(row.original.AwbUrl, row.original.PlatformOrderID, row.original.CreatedAt, row.original.Platform)}
+                        disabled={!row.original.AwbUrl}
+                        className="h-7 px-3 border-gray-200 bg-white hover:bg-indigo-50 text-gray-700 hover:text-indigo-600 hover:border-indigo-200 font-medium text-xs rounded-md shadow-xs transition-all cursor-pointer"
+                    >
+                        <DownloadIcon className="w-3.5 h-3.5 mr-1 text-indigo-600" />
+                        Download
                     </Button>
                 </div>
-            );
-        }}
+            )
+        },
+        {
+            header: () => <div className="text-center">Action</div>,
+            id: 'actions',
+            cell: ({ row }) => (
+                <div className="flex justify-center">
+                    <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => setViewAwbUrl(row.original.AwbUrl)}
+                        disabled={!row.original.AwbUrl}
+                        className="h-7 px-3 border-gray-200 bg-white hover:bg-gray-50 text-gray-700 hover:border-gray-300 font-medium text-xs rounded-md shadow-xs transition-all cursor-pointer"
+                    >
+                        View <ChevronRight className="w-3.5 h-3.5 ml-1 text-gray-400" />
+                    </Button>
+                </div>
+            )
+        }
     ];
 
     return (
@@ -119,13 +213,12 @@ export function AgentDetails() {
                             </span>
                         </div>
                         <p className="text-gray-600 font-medium">{agent?.StaffID || id}</p>
-                        <p className="text-gray-500">{agent?.Email}</p>
                     </div>
                     
                     <div className="mt-6 flex space-x-8">
                         <div>
-                            <p className="text-sm text-gray-500 font-medium">Commission</p>
-                            <p className="text-2xl font-bold text-green-600">RM {agent?.ledger?.[0] ? parseFloat(agent.ledger[0].RunningBalance).toFixed(2) : '0.00'}</p>
+                            <p className="text-sm text-gray-500 font-medium">Total Sales</p>
+                            <p className="text-2xl font-bold text-green-600">RM {agent?.totalSales !== undefined ? agent.totalSales.toFixed(2) : '0.00'}</p>
                         </div>
                     </div>
                 </div>
@@ -147,19 +240,13 @@ export function AgentDetails() {
                         onClick={() => setActiveTab('ledger')}
                         className={`whitespace-nowrap pb-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'ledger' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
                     >
-                        Ledger History
+                        Payout
                     </button>
                     <button
                         onClick={() => setActiveTab('orders')}
                         className={`whitespace-nowrap pb-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'orders' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
                     >
-                        Recent Orders
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('imports')}
-                        className={`whitespace-nowrap pb-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'imports' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
-                    >
-                        AWB Imports
+                        Orders
                     </button>
                 </nav>
             </div>
@@ -172,20 +259,18 @@ export function AgentDetails() {
                     </div>
                 )}
                 {activeTab === 'orders' && (
-                <div className="bg-white rounded-xl shadow-sm border p-6 text-center text-gray-500">
-                    Order history will be integrated here
-                </div>
-            )}
-
-            {activeTab === 'imports' && (
-                <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-                    {isImportsLoading ? (
-                        <div className="p-8 text-center text-gray-500">Loading AWB imports...</div>
-                    ) : (
-                        <DataTable columns={importColumns} data={imports || []} searchPlaceholder="Cari Nama Fail AWB..." />
-                    )}
-                </div>
-            )}
+                    <div className="p-4">
+                        {isOrdersLoading ? (
+                            <div className="p-8 text-center text-gray-500">Loading recent orders...</div>
+                        ) : (
+                            <DataTable 
+                                columns={orderColumns} 
+                                data={recentOrders || []} 
+                                searchPlaceholder="Search" 
+                            />
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Record Payout Modal */}
@@ -230,6 +315,14 @@ export function AgentDetails() {
                     </div>
                 </div>
             )}
+
+            <AwbPdfViewer 
+                url={viewAwbUrl} 
+                open={!!viewAwbUrl} 
+                onOpenChange={(open) => {
+                    if (!open) setViewAwbUrl(null);
+                }} 
+            />
         </div>
     );
 }

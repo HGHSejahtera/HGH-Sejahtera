@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Settings, Pickaxe, ChevronLeft, X, BarChart3, TableProperties, UserRound, Calculator, Package, Users } from 'lucide-react';
+import { LayoutDashboard, Settings, ChevronLeft, X, TableProperties, UserRound, Package, Users, ScanLine, List } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/hooks/useAuth';
 import { useSidebar } from './SidebarContext';
@@ -121,17 +121,16 @@ export function Sidebar() {
     
     const links = [
         { name: t('sidebar.dashboard'), icon: LayoutDashboard, path: '/Dashboard', roles: ['Founder', 'Manager', 'Developer', 'Staff'] },
-        { name: 'POS', icon: Calculator, path: '/POS', roles: ['Founder', 'Manager', 'Developer', 'Staff'] },
-        { name: t('sidebar.pickPack'), icon: Pickaxe, path: '/Pick-Pack', roles: ['Founder', 'Manager', 'Developer', 'Staff'] },
+        { name: 'POS', icon: ScanLine, path: '/POS', roles: ['Founder', 'Manager', 'Developer', 'Staff'] },
+        { name: 'Orders', icon: List, path: '/Orders', roles: ['Founder', 'Manager', 'Developer'] },
         { name: 'Price Setup', icon: TableProperties, path: '/Price/Setup', roles: ['Founder', 'Manager', 'Developer'] },
         { name: t('sidebar.inventory'), icon: Package, path: '/Inventory', roles: ['Founder', 'Manager', 'Developer'] },
         { name: t('sidebar.agents'), icon: Users, path: '/Agent-Management', roles: ['Founder', 'Manager', 'Developer'] },
-        { name: 'Reports', icon: BarChart3, path: '/Report', roles: ['Founder', 'Manager', 'Developer'] },
-        { name: 'Agent', icon: UserRound, path: '/Agent', roles: ['Agent', 'Founder', 'Manager', 'Developer'] },
+        { name: 'Agent', icon: UserRound, path: '/Agent', roles: ['Agent'] },
         { name: t('sidebar.settings'), icon: Settings, path: '/Settings', roles: ['Founder', 'Manager', 'Developer', 'Staff', 'Agent'] },
     ];
 
-    const allowedLinks = links.filter(link => link.type === 'divider' || link.roles.includes(role) || role === 'Developer');
+    const allowedLinks = links.filter(link => link.type === 'divider' || link.roles.includes(role) || (role === 'Developer' && link.path !== '/Agent'));
 
     return (
         <>

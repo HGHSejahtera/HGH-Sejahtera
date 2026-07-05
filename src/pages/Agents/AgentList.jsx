@@ -14,15 +14,15 @@ export function AgentList() {
         { header: 'Name', accessorKey: 'Name', cell: ({ row }) => <span className="font-bold text-gray-900">{row.original.Name}</span> },
         { header: 'Email', accessorKey: 'Email' },
         { 
-            header: 'Commission', 
-            id: 'commission',
+            header: 'Total Sales', 
+            id: 'totalsales',
             meta: { className: 'text-center' },
             cell: ({ row }) => {
-                const commission = row.original.TotalDebt || 0;
+                const sales = row.original.TotalSales || 0;
                 return (
                     <div>
                         <span className="font-bold text-gray-900">
-                            RM {commission.toFixed(2)}
+                            RM {sales.toFixed(2)}
                         </span>
                     </div>
                 );
@@ -46,7 +46,7 @@ export function AgentList() {
             id: 'actions',
             meta: { className: 'text-center' },
             cell: ({ row }) => (
-                <Button variant="secondary" size="sm" className="bg-indigo-50 text-indigo-700 hover:bg-indigo-100" onClick={() => navigate(`/Agent-Management/${row.original.StaffID || row.original.AgentID}`)}>
+                <Button size="sm" className="bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm transition-all" onClick={() => navigate(`/Agent-Management/${row.original.StaffID || row.original.AgentID}`)}>
                     Manage
                 </Button>
             )

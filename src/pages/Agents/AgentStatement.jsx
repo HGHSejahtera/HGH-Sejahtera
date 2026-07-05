@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAgentStatement, useAgentMutations } from '@/hooks/useAgentManagement';
+import { useSettings } from '@/hooks/useSettings';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Printer, FileText, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Printer, FileText, CheckCircle2, Calculator } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 
 export function AgentStatement() {
     const { id } = useParams();
@@ -15,28 +17,39 @@ export function AgentStatement() {
     const [selectedYear, setSelectedYear] = useState(today.getFullYear());
 
     const { data, isLoading } = useAgentStatement(id, selectedMonth, selectedYear);
-    const { addManualPayment } = useAgentMutations();
+    const { data: settings = {} } = useSettings();
+    const { closeMonthlyStatement } = useAgentMutations();
     const [isPayoutLoading, setIsPayoutLoading] = useState(false);
+    const [totalPayoutInput, setTotalPayoutInput] = useState('');
+    const [totalCOGSInput, setTotalCOGSInput] = useState('');
 
     const handlePrint = () => {
         window.print();
     };
 
-    const handleRecordPayout = async () => {
-        if (!data?.statement || data.statement.closingBalance <= 0) return;
+    const handleSettleMonth = async () => {
+        if (!totalPayoutInput || !totalCOGSInput) return;
         
-        if (confirm(`Are you sure you want to record a payout of ${formatMYR(data.statement.closingBalance)} to ${data.agent.DisplayName}? This will reset their balance.`)) {
+        const salesVal = parseFloat(totalPayoutInput);
+        const billVal = parseFloat(totalCOGSInput);
+        const netProfit = salesVal - billVal;
+        
+        if (confirm(`Confirm settlement for ${months[selectedMonth - 1].label} ${selectedYear}?\n\nPlatform Sales: ${formatMYR(salesVal)}\nHQ Bill: ${formatMYR(billVal)}\nNet Profit: ${formatMYR(netProfit)}\n\nThis will record the Net Profit to ${data.agent.DisplayName}'s ledger.`)) {
             setIsPayoutLoading(true);
             try {
-                await addManualPayment.mutateAsync({
+                await closeMonthlyStatement.mutateAsync({
                     agentId: id,
-                    amount: data.statement.closingBalance,
-                    reference: `Payout for ${months[selectedMonth - 1].label} ${selectedYear}`
+                    month: selectedMonth,
+                    year: selectedYear,
+                    totalPayout: salesVal,
+                    totalCOGS: billVal
                 });
-                alert('Payout recorded successfully!');
+                alert('Monthly settlement recorded successfully!');
+                setTotalPayoutInput('');
+                setTotalCOGSInput('');
             } catch (error) {
                 console.error(error);
-                alert('Failed to record payout: ' + error.message);
+                alert('Failed to settle month: ' + error.message);
             } finally {
                 setIsPayoutLoading(false);
             }
@@ -71,186 +84,258 @@ export function AgentStatement() {
     const { agent, statement } = data;
 
     return (
-        <div className="space-y-6 max-w-4xl mx-auto pb-12">
-            {/* Control Panel - Hidden when printing */}
-            <div className="print:hidden flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-                <div className="flex items-center gap-4">
-                    <Button variant="ghost" size="icon" onClick={() => navigate(`/Agent-Management/${id}`)}>
-                        <ArrowLeft className="w-5 h-5" />
-                    </Button>
-                    <div className="flex items-center space-x-2">
-                        <Select value={selectedMonth.toString()} onValueChange={(v) => setSelectedMonth(parseInt(v))}>
-                            <SelectTrigger className="w-[140px]">
-                                <SelectValue placeholder="Month" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {months.map(m => (
-                                    <SelectItem key={m.value} value={m.value.toString()}>{m.label}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                        <Select value={selectedYear.toString()} onValueChange={(v) => setSelectedYear(parseInt(v))}>
-                            <SelectTrigger className="w-[100px]">
-                                <SelectValue placeholder="Year" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {years.map(y => (
-                                    <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                </div>
-                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto mt-4 sm:mt-0">
-                    <Button 
-                        variant="outline" 
-                        onClick={handleRecordPayout} 
-                        disabled={isPayoutLoading || !statement || statement.closingBalance <= 0}
-                        className="border-green-600 text-green-700 hover:bg-green-50"
-                    >
-                        <CheckCircle2 className="w-4 h-4 mr-2" />
-                        {isPayoutLoading ? 'Recording...' : 'Record Payout'}
-                    </Button>
-                    <Button onClick={handlePrint} className="bg-indigo-600 hover:bg-indigo-700">
-                        <Printer className="w-4 h-4 mr-2" />
-                        Print Statement
-                    </Button>
-                </div>
-            </div>
-
-            {/* Document View - A4 Format */}
-            <div className="bg-white rounded-xl shadow-lg print:shadow-none print:p-0 p-8 border border-gray-200 print:border-none min-h-[1056px]">
+        <div className="max-w-7xl mx-auto pb-12 px-4">
+            <div className="flex flex-col lg:flex-row gap-8 items-start justify-center">
                 
-                {/* Header */}
-                <div className="flex justify-between items-start border-b-2 border-gray-900 pb-6 mb-8">
-                    <div>
-                        <h1 className="text-3xl font-bold tracking-tight text-gray-900">HGH SEJAHTERA</h1>
-                        <p className="text-gray-500 text-sm mt-1">No. 123, Jalan Niaga, Pusat Bandar</p>
-                        <p className="text-gray-500 text-sm">50000 Kuala Lumpur, Malaysia</p>
-                        <p className="text-gray-500 text-sm mt-1">Email: billing@hghsejahtera.com</p>
-                        <p className="text-gray-500 text-sm">Tel: +603-1234 5678</p>
+                {/* Main Document Area (Centered, visible without scroll) */}
+                <div className="w-full max-w-[800px] flex-1 bg-white shadow-md print:shadow-none print:p-0 p-8 md:p-10 border border-gray-200 print:border-none min-h-[1056px] rounded-none">
+                    
+                    {/* Header */}
+                    <div className="flex justify-between items-start border-b-2 border-gray-900 pb-6 mb-8">
+                        <div>
+                            <h1 className="text-2xl font-black tracking-tight text-gray-900 uppercase">
+                                {settings.CompanyName || 'HGH SEJAHTERA'}
+                            </h1>
+                            {settings.CompanySSM && (
+                                <p className="text-gray-500 text-xs mt-0.5 font-medium">({settings.CompanySSM})</p>
+                            )}
+                            <p className="text-gray-600 text-xs mt-2 whitespace-pre-line leading-relaxed max-w-xs">
+                                {settings.CompanyAddress || 'No. 123, Jalan Niaga, Pusat Bandar\n50000 Kuala Lumpur, Malaysia'}
+                            </p>
+                            {settings.SupportEmail && (
+                                <p className="text-gray-600 text-xs mt-1">Email: {settings.SupportEmail}</p>
+                            )}
+                        </div>
+                        <div className="text-right">
+                            <h2 className="text-4xl font-black text-gray-900 tracking-tighter uppercase">STATEMENT</h2>
+                            <div className="mt-4 border border-gray-300 p-3 px-4 rounded-none inline-block text-left bg-gray-50/50">
+                                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Statement Period</p>
+                                <p className="text-base font-bold text-gray-900 mt-0.5">
+                                    {new Date(statement.year, statement.month - 1).toLocaleString('en-US', { month: 'long', year: 'numeric' })}
+                                </p>
+                            </div>
+                        </div>
                     </div>
-                    <div className="text-right">
-                        <h2 className="text-4xl font-black text-indigo-900 tracking-tighter uppercase">STATEMENT</h2>
-                        <div className="mt-4 bg-indigo-50 p-3 rounded-lg border border-indigo-100 inline-block text-left">
-                            <p className="text-xs font-semibold text-indigo-800 uppercase tracking-wider">Statement Period</p>
-                            <p className="text-lg font-bold text-gray-900">
-                                {new Date(statement.year, statement.month - 1).toLocaleString('en-US', { month: 'long', year: 'numeric' })}
+
+                    {/* Bill To & Summary */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8 items-start">
+                        <div>
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Prepared For</p>
+                            <h3 className="text-2xl font-bold text-gray-900 tracking-tight">{agent.DisplayName}</h3>
+                            {agent.StaffID && (
+                                <p className="text-xs text-gray-600 font-mono mt-1 font-medium">{agent.StaffID}</p>
+                            )}
+                        </div>
+                        
+                        {/* Summary Box */}
+                        <div className="border border-gray-200 p-5 rounded-none bg-gray-50/40">
+                            <div className="space-y-2.5">
+                                <div className="flex justify-between text-xs">
+                                    <span className="text-gray-600">Total Orders (Month):</span>
+                                    <span className="font-semibold text-gray-900">{statement.totalOrders || 0}</span>
+                                </div>
+                                <div className="flex justify-between text-xs">
+                                    <span className="text-gray-600">Total COGS (Month):</span>
+                                    <span className="font-semibold text-gray-900">{formatMYR(statement.totalCOGS || 0)}</span>
+                                </div>
+                                <div className="border-t border-gray-200 my-2 pt-2"></div>
+                                {statement.openingBalance > 0 && (
+                                    <div className="flex justify-between text-xs">
+                                        <span className="text-gray-600">Previous Unpaid Balance:</span>
+                                        <span className="font-semibold text-gray-900">{formatMYR(statement.openingBalance)}</span>
+                                    </div>
+                                )}
+                                <div className="flex justify-between text-xs">
+                                    <span className="text-gray-600">Total Sales (+):</span>
+                                    <span className="font-semibold text-emerald-600 font-mono">+{formatMYR(statement.totalCharges)}</span>
+                                </div>
+                                <div className="flex justify-between text-xs">
+                                    <span className="text-gray-600">Payouts / Voids (-):</span>
+                                    <span className="font-semibold text-red-600 font-mono">-{formatMYR(statement.totalPayments)}</span>
+                                </div>
+                                <div className="pt-3 border-t border-gray-300 mt-3 flex justify-between items-center">
+                                    <span className="text-xs font-bold text-gray-900 uppercase tracking-wider">Current Balance:</span>
+                                    <span className="text-lg font-black text-gray-900 font-mono">{formatMYR(statement.closingBalance)}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Transactions */}
+                    <div className="mt-10">
+                        <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3 flex items-center border-b pb-2 border-gray-900">
+                            <FileText className="w-4 h-4 mr-2 text-gray-700" />
+                            Transaction Activity
+                        </h3>
+                        
+                        <table className="w-full text-xs text-left border-collapse">
+                            <thead className="bg-gray-100 text-gray-800 font-bold border-y border-gray-300">
+                                <tr>
+                                    <th className="px-3 py-2.5 rounded-none">Date</th>
+                                    <th className="px-3 py-2.5 rounded-none">Description / Reference</th>
+                                    <th className="px-3 py-2.5 text-right rounded-none">Total Sales (+)</th>
+                                    <th className="px-3 py-2.5 text-right rounded-none">Payouts / Voids (-)</th>
+                                    <th className="px-3 py-2.5 text-right rounded-none">Balance</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200">
+                                {/* Opening Balance Row */}
+                                <tr className="bg-gray-50/60">
+                                    <td className="px-3 py-2.5 text-gray-500 italic whitespace-nowrap">
+                                        {new Date(statement.year, statement.month - 1, 1).toLocaleDateString('en-MY')}
+                                    </td>
+                                    <td className="px-3 py-2.5 text-gray-900 font-medium italic">Opening Balance</td>
+                                    <td className="px-3 py-2.5 text-right font-mono"></td>
+                                    <td className="px-3 py-2.5 text-right font-mono"></td>
+                                    <td className="px-3 py-2.5 text-right font-bold font-mono text-gray-900 whitespace-nowrap">{formatMYR(statement.openingBalance)}</td>
+                                </tr>
+                                
+                                {statement.transactions.length === 0 ? (
+                                    <tr>
+                                        <td colSpan="5" className="px-3 py-8 text-center text-gray-500 italic">
+                                            No transactions recorded during this period.
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    statement.transactions.map((trx) => {
+                                        const amt = parseFloat(trx.Amount);
+                                        return (
+                                            <tr key={trx.LedgerEntryID} className="hover:bg-gray-50 transition-colors">
+                                                <td className="px-3 py-2.5 text-gray-600 whitespace-nowrap">
+                                                    {new Date(trx.CreatedAt).toLocaleDateString('en-MY')}
+                                                </td>
+                                                <td className="px-3 py-2.5">
+                                                    <div className="font-semibold text-gray-900">{trx.EntryType}</div>
+                                                    <div className="text-[11px] text-gray-500 mt-0.5">{trx.Description || trx.ReferenceID || '-'}</div>
+                                                </td>
+                                                <td className="px-3 py-2.5 text-right text-emerald-600 font-medium font-mono whitespace-nowrap">
+                                                    {amt > 0 ? formatMYR(amt) : ''}
+                                                </td>
+                                                <td className="px-3 py-2.5 text-right text-red-600 font-medium font-mono whitespace-nowrap">
+                                                    {amt < 0 ? formatMYR(Math.abs(amt)) : ''}
+                                                </td>
+                                                <td className="px-3 py-2.5 text-right font-mono font-medium text-gray-900 whitespace-nowrap">
+                                                    {formatMYR(parseFloat(trx.RunningBalance))}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
+                                )}
+                                
+                                {/* Closing Balance Row */}
+                                <tr className="bg-gray-100 font-bold border-t-2 border-gray-900">
+                                    <td className="px-3 py-3 text-gray-900" colSpan="4">Closing Balance</td>
+                                    <td className="px-3 py-3 text-right text-gray-900 font-mono text-sm whitespace-nowrap">{formatMYR(statement.closingBalance)}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Footer Message */}
+                    <div className="mt-12 text-center text-xs text-gray-500 border-t border-gray-200 pt-6">
+                        <p>Thank you for your business. Please ensure all outstanding balances are cleared promptly.</p>
+                        <p className="mt-1 text-[10px] text-gray-400 font-mono">Generated on {today.toLocaleString('en-MY')}</p>
+                    </div>
+                </div>
+
+                {/* Right Sidebar Control Panels (Hidden on Print) */}
+                <div className="w-full lg:w-80 shrink-0 space-y-6 print:hidden lg:sticky lg:top-6 order-first lg:order-last">
+                    {/* Box 1: Statement Controls */}
+                    <div className="bg-white p-5 rounded-none shadow-sm border border-gray-200 space-y-4">
+                        <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                            <Button variant="ghost" size="sm" onClick={() => navigate(`/Agent-Management/${id}`)} className="text-gray-600 hover:text-gray-900 -ml-2 h-8 px-2">
+                                <ArrowLeft className="w-4 h-4 mr-1.5" /> Back to Agent
+                            </Button>
+                        </div>
+                        
+                        <div>
+                            <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block mb-2">Statement Period</label>
+                            <div className="grid grid-cols-2 gap-2">
+                                <Select value={selectedMonth.toString()} onValueChange={(v) => setSelectedMonth(parseInt(v))}>
+                                    <SelectTrigger className="w-full rounded-none h-9 text-xs">
+                                        <SelectValue placeholder="Month" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {months.map(m => (
+                                            <SelectItem key={m.value} value={m.value.toString()} className="text-xs">{m.label}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <Select value={selectedYear.toString()} onValueChange={(v) => setSelectedYear(parseInt(v))}>
+                                    <SelectTrigger className="w-full rounded-none h-9 text-xs">
+                                        <SelectValue placeholder="Year" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {years.map(y => (
+                                            <SelectItem key={y} value={y.toString()} className="text-xs">{y}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+
+                        <Button onClick={handlePrint} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-none shadow-xs font-medium h-9 text-xs">
+                            <Printer className="w-3.5 h-3.5 mr-2" />
+                            Print Statement
+                        </Button>
+                    </div>
+
+                    {/* Box 2: Profit Settlement */}
+                    <div className="bg-white p-5 rounded-none shadow-sm border border-gray-200 space-y-4">
+                        <div className="border-b border-gray-100 pb-3">
+                            <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center">
+                                <Calculator className="w-4 h-4 mr-2 text-indigo-600" />
+                                Profit Settlement
+                            </h3>
+                            <p className="text-[11px] text-gray-500 mt-1 leading-relaxed">
+                                Calculate net profit based on manual bill and sales for this month.
                             </p>
                         </div>
-                    </div>
-                </div>
-
-                {/* Bill To */}
-                <div className="grid grid-cols-2 gap-8 mb-8">
-                    <div>
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Account Summary For</p>
-                        <h3 className="text-xl font-bold text-gray-900">{agent.DisplayName}</h3>
-                        <p className="text-gray-600">ID: {agent.UserID.substring(0, 8).toUpperCase()}</p>
-                        <p className="text-gray-600">{agent.Email}</p>
-                        <p className="text-gray-600 mt-2">Status: <span className="font-medium text-gray-900">{agent.IsActive ? 'Active' : 'Suspended'}</span></p>
-                    </div>
-                    
-                    {/* Summary Box */}
-                    <div className="bg-indigo-50 p-6 rounded-xl border border-indigo-100">
+                        
                         <div className="space-y-3">
-                            {statement.openingBalance > 0 && (
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-gray-500">Previous Unpaid Balance:</span>
-                                    <span className="font-semibold">{formatMYR(statement.openingBalance)}</span>
-                                </div>
-                            )}
-                            <div className="flex justify-between text-sm">
-                                <span className="text-gray-500">Commissions Earned (+):</span>
-                                <span className="font-semibold text-green-600">+{formatMYR(statement.totalCharges)}</span>
+                            <div>
+                                <label className="text-[11px] font-semibold text-gray-600 uppercase tracking-wider block mb-1">HQ Bill (-)</label>
+                                <Input 
+                                    type="number" 
+                                    step="0.01" 
+                                    placeholder="0.00" 
+                                    value={totalCOGSInput || ''}
+                                    onChange={(e) => setTotalCOGSInput(e.target.value)}
+                                    className="h-8 font-mono font-medium text-gray-900 rounded-none text-xs"
+                                />
                             </div>
-                            <div className="flex justify-between text-sm">
-                                <span className="text-gray-500">Payouts / Voids (-):</span>
-                                <span className="font-semibold text-red-600">-{formatMYR(statement.totalPayments)}</span>
+                            <div>
+                                <label className="text-[11px] font-semibold text-gray-600 uppercase tracking-wider block mb-1">Platform Sales (+)</label>
+                                <Input 
+                                    type="number" 
+                                    step="0.01" 
+                                    placeholder="0.00" 
+                                    value={totalPayoutInput || ''}
+                                    onChange={(e) => setTotalPayoutInput(e.target.value)}
+                                    className="h-8 font-mono font-medium text-gray-900 rounded-none text-xs"
+                                />
                             </div>
-                            <div className="pt-3 border-t border-indigo-200 mt-3 flex justify-between items-center">
-                                <span className="font-bold text-gray-900">Current Wallet Balance:</span>
-                                <span className="text-xl font-black text-indigo-700">{formatMYR(statement.closingBalance)}</span>
+
+                            <div className="bg-gray-50 p-3 border border-gray-200 flex justify-between items-center mt-2">
+                                <span className="text-[11px] font-bold text-gray-600 uppercase tracking-wider">Net Profit</span>
+                                <span className={`text-sm font-bold font-mono ${(parseFloat(totalPayoutInput || 0) - parseFloat(totalCOGSInput || 0)) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                    {formatMYR((parseFloat(totalPayoutInput || 0) - parseFloat(totalCOGSInput || 0)))}
+                                </span>
                             </div>
                         </div>
+
+                        <Button 
+                            variant="default" 
+                            onClick={handleSettleMonth} 
+                            disabled={isPayoutLoading || !totalPayoutInput || !totalCOGSInput}
+                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-none shadow-xs font-medium h-9 text-xs"
+                        >
+                            <CheckCircle2 className="w-3.5 h-3.5 mr-2" />
+                            {isPayoutLoading ? 'Recording...' : 'Settle & Record'}
+                        </Button>
                     </div>
                 </div>
 
-                {/* Transactions */}
-                <div>
-                    <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
-                        <FileText className="w-5 h-5 mr-2 text-indigo-500" />
-                        Transaction Activity
-                    </h3>
-                    
-                    <table className="w-full text-sm text-left">
-                        <thead className="bg-gray-100 text-gray-700 font-bold">
-                            <tr>
-                                <th className="px-4 py-3 rounded-tl-lg">Date</th>
-                                <th className="px-4 py-3">Description / Reference</th>
-                                <th className="px-4 py-3 text-right text-green-700">Commissions (+)</th>
-                                <th className="px-4 py-3 text-right text-red-700">Payouts / Voids (-)</th>
-                                <th className="px-4 py-3 text-right rounded-tr-lg">Balance</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                            {/* Opening Balance Row */}
-                            <tr className="bg-gray-50">
-                                <td className="px-4 py-3 text-gray-500 italic">
-                                    {new Date(statement.year, statement.month - 1, 1).toLocaleDateString('en-MY')}
-                                </td>
-                                <td className="px-4 py-3 text-gray-900 font-medium italic">Opening Balance</td>
-                                <td className="px-4 py-3 text-right"></td>
-                                <td className="px-4 py-3 text-right"></td>
-                                <td className="px-4 py-3 text-right font-bold">{formatMYR(statement.openingBalance)}</td>
-                            </tr>
-                            
-                            {statement.transactions.length === 0 ? (
-                                <tr>
-                                    <td colSpan="5" className="px-4 py-8 text-center text-gray-500">
-                                        No transactions recorded during this period.
-                                    </td>
-                                </tr>
-                            ) : (
-                                statement.transactions.map((trx) => {
-                                    const amt = parseFloat(trx.Amount);
-                                    return (
-                                        <tr key={trx.LedgerEntryID} className="hover:bg-gray-50/50">
-                                            <td className="px-4 py-3 text-gray-600">
-                                                {new Date(trx.CreatedAt).toLocaleDateString('en-MY')}
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <div className="font-medium text-gray-900">{trx.EntryType}</div>
-                                                <div className="text-xs text-gray-500">{trx.Description || trx.ReferenceID || '-'}</div>
-                                            </td>
-                                            <td className="px-4 py-3 text-right text-green-600 font-medium">
-                                                {amt > 0 ? formatMYR(amt) : ''}
-                                            </td>
-                                            <td className="px-4 py-3 text-right text-red-600 font-medium">
-                                                {amt < 0 ? formatMYR(Math.abs(amt)) : ''}
-                                            </td>
-                                            <td className="px-4 py-3 text-right font-mono text-gray-900">
-                                                {formatMYR(parseFloat(trx.RunningBalance))}
-                                            </td>
-                                        </tr>
-                                    );
-                                })
-                            )}
-                            
-                            {/* Closing Balance Row */}
-                            <tr className="bg-gray-100 font-bold border-t-2 border-gray-200">
-                                <td className="px-4 py-4 text-gray-900" colSpan="4">Closing Balance</td>
-                                <td className="px-4 py-4 text-right text-indigo-700 text-lg">{formatMYR(statement.closingBalance)}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                {/* Footer Message */}
-                <div className="mt-12 text-center text-sm text-gray-500 border-t border-gray-200 pt-6">
-                    <p>Thank you for your business. Please ensure all outstanding balances are cleared promptly.</p>
-                    <p className="mt-1 text-xs text-gray-400">Generated on {today.toLocaleString('en-MY')}</p>
-                </div>
             </div>
         </div>
     );

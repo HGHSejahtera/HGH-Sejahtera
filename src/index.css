@@ -189,3 +189,56 @@ input[type=number] {
     -moz-appearance: textfield;
     appearance: textfield;
 }
+
+/* Custom Drawer Animations */
+@keyframes drawerSlideIn {
+    from {
+        transform: translateX(100%);
+    }
+    to {
+        transform: translateX(0);
+    }
+}
+
+@keyframes backdropFadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.animate-drawer-slide {
+    animation: drawerSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-backdrop-fade {
+    animation: backdropFadeIn 0.25s ease-out forwards;
+}
+
+@keyframes drawerSlideOut {
+    from {
+        transform: translateX(0);
+    }
+    to {
+        transform: translateX(100%);
+    }
+}
+
+@keyframes backdropFadeOut {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
+}
+
+.animate-drawer-slide-out {
+    animation: drawerSlideOut 0.25s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+.animate-backdrop-fade-out {
+    animation: backdropFadeOut 0.2s ease-in forwards;
+}

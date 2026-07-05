@@ -60,7 +60,7 @@ export const useAuthStore = create((set, get) => ({
         // Fetch custom role and display name from public.Users
         const { data: profile } = await supabase
             .from('Users')
-            .select('Role, DisplayName, IsActive, PINHash')
+            .select('Role, DisplayName, Nickname, IsActive, PINHash, StaffID')
             .eq('UserID', session.user.id)
             .maybeSingle();
 
@@ -79,7 +79,11 @@ export const useAuthStore = create((set, get) => ({
             set({ 
                 user: { 
                     id: session.user.id, 
-                    name: profile.DisplayName || session.user.email, 
+                    staffId: profile.StaffID || null,
+                    StaffID: profile.StaffID || null,
+                    name: profile.Nickname || profile.DisplayName || session.user.email,
+                    displayName: profile.DisplayName || session.user.email,
+                    nickname: profile.Nickname || null,
                     role: 'Pending',
                     email: session.user.email
                 }, 
@@ -92,7 +96,11 @@ export const useAuthStore = create((set, get) => ({
         set({ 
             user: { 
                 id: session.user.id, 
-                name: profile.DisplayName || session.user.email, 
+                staffId: profile.StaffID || null,
+                StaffID: profile.StaffID || null,
+                name: profile.Nickname || profile.DisplayName || session.user.email,
+                displayName: profile.DisplayName || session.user.email,
+                nickname: profile.Nickname || null,
                 role: profile.Role,
                 email: session.user.email,
                 hasPin: typeof profile.PINHash === 'string' 

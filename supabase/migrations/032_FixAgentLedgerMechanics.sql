@@ -166,7 +166,7 @@ BEGIN
         INSERT INTO public."InventoryLedger" (
             "ProductID", "MovementType", "Quantity", "Channel", "ReferenceID", "ReferenceType", "CreatedBy"
         ) VALUES (
-            item."ProductID", 'PackOrder', -item."Quantity", v_platform, v_log_id, 'InventoryLogs', v_user_id
+            item."ProductID", 'ImportedOrder', -item."Quantity", v_platform, v_log_id, 'InventoryLogs', v_user_id
         );
 
         -- 2e. Calculate Agent Price if this is an AgentOrder

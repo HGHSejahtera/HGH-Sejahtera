@@ -12,16 +12,13 @@ import { PendingApproval } from './pages/Auth/PendingApproval';
 import ResetPassword from './pages/Auth/ResetPassword';
 import { PINUnlock } from './pages/Auth/PINUnlock';
 import { POS } from './pages/POS/POS';
-import { PickPack } from './pages/Orders/PickPack';
-import { PackOrder } from './pages/Orders/PackOrder';
+import { ProductMatcher } from './pages/Orders/ProductMatcher';
+import { AllOrders } from './pages/Orders/AllOrders';
 import { useIdleTimeout } from './hooks/useIdleTimeout';
 import { usePreferences } from './hooks/usePreferences';
 
 import { AgentOrderCreate } from './pages/AgentPortal/AgentOrderCreate';
 import { AgentMyOrders } from './pages/AgentPortal/AgentMyOrders';
-import { AgentMyLedger } from './pages/AgentPortal/AgentMyLedger';
-import { TikTokCatalogSync } from './pages/AgentPortal/TikTokCatalogSync';
-import { AgentTikTokShop } from './pages/AgentPortal/AgentTikTokShop';
 import { AgentList } from './pages/Agents/AgentList';
 import { AgentDetails } from './pages/Agents/AgentDetails';
 import { AgentStatement } from './pages/Agents/AgentStatement';
@@ -33,9 +30,9 @@ import { StockIn } from './pages/Inventory/StockIn';
 import { PriceSetup } from './pages/Products/PriceSetup';
 
 import { Dashboard } from './pages/Dashboard/Dashboard';
-import { ReportDashboard } from './pages/Reports/ReportDashboard';
 export default function App() {
     const { user, isAuthenticated, isLoading, lockApp } = useAuthStore();
+    const isAgent = user?.role === 'Agent';
     const { pinTimeout } = usePreferences();
 
     // Auto-lock the POS when idle based on pinTimeout
@@ -58,7 +55,7 @@ export default function App() {
             <PINUnlock />
             <Routes>
                 {/* Public Routes */}
-                <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/Dashboard" />} />
+                <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to={isAgent ? "/Agent/Orders" : "/Dashboard"} replace />} />
                 <Route path="/HGH/Registration" element={<Registration />} />
                 <Route path="/activation" element={<AccountActivation />} />
                 <Route path="/pending-approval" element={<PendingApproval />} />
@@ -68,30 +65,38 @@ export default function App() {
                 {isAuthenticated ? (
                     <>
                         <Route element={<PageLayout />}>
-                            <Route path="/" element={<Navigate to="/Dashboard" replace />} />
-                            <Route path="/Dashboard" element={<Dashboard />} />
-                            <Route path="/POS" element={<POS />} />
-                            <Route path="/Pick-Pack" element={<PickPack />} />
-                            <Route path="/Pack-Order/:orderId" element={<PackOrder />} />
-                            <Route path="/inventory/import" element={<ProductBulkImport />} />
-                            <Route path="/barcode" element={<BarcodeGenerator />} />
-                            <Route path="/Price/Setup" element={<PriceSetup />} />
-                            <Route path="/Inventory" element={<InventoryDashboard />} />
-                            <Route path="/inventory/stock-in" element={<StockIn />} />
-                            <Route path="/Report" element={<ReportDashboard />} />
-                            <Route path="/Agent-Management" element={<AgentList />} />
-                            <Route path="/Agent-Management/:id" element={<AgentDetails />} />
-                            <Route path="/Agent-Management/:id/Statement" element={<AgentStatement />} />
-                            <Route path="/Settings/General" element={<Settings />} />
-                            <Route path="/Settings/Users" element={<UserManagement />} />
-                            <Route path="/Settings/Account" element={<AccountSettings />} />
-                            <Route path="/Settings" element={<Navigate to="/Settings/Account" replace />} />
-                            <Route path="/Agent" element={<Navigate to="/Agent/Orders" replace />} />
-                            <Route path="/Agent/Upload" element={<AgentOrderCreate />} />
-                            <Route path="/Agent/Orders" element={<AgentMyOrders />} />
-                            <Route path="/Agent/Commissions" element={<AgentMyLedger />} />
-                            <Route path="/Agent/TikTok-Shop" element={<AgentTikTokShop />} />
-                            <Route path="/Agent/TikTok-Shop/TikTok-Sync" element={<TikTokCatalogSync />} />
+                            {isAgent ? (
+                                <>
+                                    <Route path="/" element={<Navigate to="/Agent/Orders" replace />} />
+                                    <Route path="/Agent" element={<Navigate to="/Agent/Orders" replace />} />
+                                    <Route path="/Agent/Upload" element={<AgentOrderCreate />} />
+                                    <Route path="/Agent/Orders" element={<AgentMyOrders />} />
+                                    <Route path="/Settings/Account" element={<AccountSettings />} />
+                                    <Route path="/Settings" element={<Navigate to="/Settings/Account" replace />} />
+                                    <Route path="*" element={<Navigate to="/Agent/Orders" replace />} />
+                                </>
+                            ) : (
+                                <>
+                                    <Route path="/" element={<Navigate to="/Dashboard" replace />} />
+                                    <Route path="/Dashboard" element={<Dashboard />} />
+                                    <Route path="/POS" element={<POS />} />
+                                    <Route path="/Orders" element={<AllOrders />} />
+                                    <Route path="/Orders/Product-Matcher" element={<ProductMatcher />} />
+                                    <Route path="/inventory/import" element={<ProductBulkImport />} />
+                                    <Route path="/barcode" element={<BarcodeGenerator />} />
+                                    <Route path="/Price/Setup" element={<PriceSetup />} />
+                                    <Route path="/Inventory" element={<InventoryDashboard />} />
+                                    <Route path="/inventory/stock-in" element={<StockIn />} />
+                                    <Route path="/Agent-Management" element={<AgentList />} />
+                                    <Route path="/Agent-Management/:id" element={<AgentDetails />} />
+                                    <Route path="/Agent-Management/:id/Statement" element={<AgentStatement />} />
+                                    <Route path="/Settings/General" element={<Settings />} />
+                                    <Route path="/Settings/Users" element={<UserManagement />} />
+                                    <Route path="/Settings/Account" element={<AccountSettings />} />
+                                    <Route path="/Settings" element={<Navigate to="/Settings/Account" replace />} />
+                                    <Route path="*" element={<Navigate to="/Dashboard" replace />} />
+                                </>
+                            )}
                         </Route>
                     </>
                 ) : (

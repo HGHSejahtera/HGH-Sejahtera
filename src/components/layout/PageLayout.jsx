@@ -9,7 +9,7 @@ export function PageLayout() {
 
     return (
         <SidebarProvider>
-            <div className="flex h-full bg-background overflow-hidden">
+            <div className="fixed inset-0 flex bg-background overflow-hidden">
                 <Sidebar />
                 <div className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
                     <Header />

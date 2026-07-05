@@ -61,6 +61,7 @@ export const XLSXParserService = {
             const variation = getVal(['Variation Name']);
             const quantity = parseInt(getVal(['Quantity']) || '1', 10);
             const status = getVal(['Order Status']);
+            const createdTime = getVal(['Order Creation Date', 'Order Created Time', 'Order Creation Time', 'Creation Date', 'Order Date', 'Created Date']);
 
             if (!orderId || !sku) {
                 console.warn('Skipping invalid row:', row);
@@ -75,6 +76,8 @@ export const XLSXParserService = {
                 Variation: variation,
                 Quantity: quantity,
                 Status: status,
+                CreatedTime: createdTime || new Date().toISOString(),
+                CreatedAt: createdTime || new Date().toISOString(),
                 RawData: row
             };
         }).filter(item => item !== null);

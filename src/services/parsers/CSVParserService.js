@@ -43,6 +43,7 @@ export const CSVParserService = {
             const variation = getVal(['Variation', 'SKU Name']);
             const quantity = parseInt(getVal(['Quantity', 'Quantity']) || '1', 10);
             const status = getVal(['Order Status', 'Order Status']);
+            const createdTime = getVal(['Created Time', 'Order Created Time', 'Created time', 'Order Created time', 'Order Date', 'Created Date']);
 
             if (!orderId || !sku) {
                 console.warn('Skipping invalid row:', row);
@@ -57,6 +58,8 @@ export const CSVParserService = {
                 Variation: variation,
                 Quantity: quantity,
                 Status: status,
+                CreatedTime: createdTime || new Date().toISOString(),
+                CreatedAt: createdTime || new Date().toISOString(),
                 RawData: row
             };
         }).filter(item => item !== null);

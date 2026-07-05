@@ -86,9 +86,9 @@ export function DataTable({
                         placeholder={searchPlaceholder}
                         value={globalFilter ?? ""}
                         onChange={(event) => setGlobalFilter(String(event.target.value))}
-                        className="max-w-sm"
+                        className="max-w-sm h-8 text-xs rounded-md border-gray-200 shadow-xs focus:border-indigo-500"
                     />
-                    <div className="flex items-center space-x-2 text-sm text-gray-500">
+                    <div className="flex items-center space-x-1.5 text-xs text-gray-500">
                         <span className="font-medium whitespace-nowrap">Show</span>
                         <Select
                             value={`${table.getState().pagination.pageSize}`}
@@ -96,10 +96,10 @@ export function DataTable({
                                 table.setPageSize(Number(value))
                             }}
                         >
-                            <SelectTrigger className="h-9 w-[85px] bg-white">
+                            <SelectTrigger className="h-8 w-[80px] bg-white text-xs font-medium rounded-md border-gray-200 shadow-xs">
                                 <SelectValue placeholder={table.getState().pagination.pageSize === 999999 ? 'All' : table.getState().pagination.pageSize} />
                             </SelectTrigger>
-                            <SelectContent side="bottom">
+                            <SelectContent side="bottom" className="rounded-md shadow-lg border-gray-200 text-xs">
                                 {[10, 30, 50, 100].map((pageSize) => (
                                     <SelectItem key={pageSize} value={`${pageSize}`}>
                                         {pageSize}
@@ -111,10 +111,15 @@ export function DataTable({
                     </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
+                    {actionElement && (
+                        <div>
+                            {actionElement}
+                        </div>
+                    )}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm" className="ml-auto hidden h-9 lg:flex">
-                                <Settings2 className="mr-2 h-4 w-4" />
+                            <Button variant="outline" size="sm" className="ml-auto hidden h-8 px-3 text-xs font-medium rounded-md border-gray-200 lg:flex shadow-xs text-gray-700 hover:bg-gray-50 cursor-pointer">
+                                <Settings2 className="mr-1.5 h-3.5 w-3.5 text-gray-500" />
                                 View
                             </Button>
                         </DropdownMenuTrigger>
@@ -137,11 +142,6 @@ export function DataTable({
                                 })}
                         </DropdownMenuContent>
                     </DropdownMenu>
-                    {actionElement && (
-                        <div>
-                            {actionElement}
-                        </div>
-                    )}
                 </div>
             </div>
             <Table containerClassName={cn("rounded-md border relative", tableContainerClassName)}>

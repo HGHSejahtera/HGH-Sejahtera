@@ -57,7 +57,6 @@ export function useDashboardMetrics(timeframe = 'this_month') {
                     ImportedOrderID,
                     PlatformOrderID,
                     OrderAmount,
-                    OrderStatus,
                     OrderImports ( AgentID, Users!OrderImports_AgentID_fkey ( DisplayName ) ),
                     ImportedOrderItems ( Quantity )
                 `)
@@ -75,8 +74,7 @@ export function useDashboardMetrics(timeframe = 'this_month') {
                     id: order.PlatformOrderID,
                     customer: agentName || 'Unknown Agent',
                     items: totalItems,
-                    total: `RM ${Number(order.OrderAmount || 0).toFixed(2)}`,
-                    status: order.OrderStatus
+                    total: `RM ${Number(order.OrderAmount || 0).toFixed(2)}`
                 };
             }) || [];
 

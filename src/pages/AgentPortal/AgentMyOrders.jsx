@@ -1,15 +1,16 @@
 import { useState, useMemo } from 'react';
 import { DataTable } from '@/components/common/DataTable';
 import { Button } from '@/components/ui/button';
+import { ExternalLink } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-
 import { useAgentPortal } from '@/hooks/useAgentPortal';
 import { AgentTabs } from './AgentTabs';
+import { AwbPdfViewer } from '@/components/common/AwbPdfViewer';
 
 export function AgentMyOrders() {
-    const { myOrders, isLoadingOrders, cancelOrder } = useAgentPortal();
-    const [isCancelling, setIsCancelling] = useState(false);
-    const [timeFilter, setTimeFilter] = useState('day');
+    const { myOrders, isLoadingOrders } = useAgentPortal();
+    const [timeFilter, setTimeFilter] = useState('all');
+    const [viewAwbUrl, setViewAwbUrl] = useState(null);
 
     const currentYear = new Date().getFullYear();
 
@@ -49,71 +50,37 @@ export function AgentMyOrders() {
         });
     }, [myOrders, timeFilter, currentYear]);
 
-    const handleCancel = async (dbId, platformId) => {
-        if (confirm(`Are you sure you want to cancel order ${platformId}? This will void the commission and return stock if shipped.`)) {
-            setIsCancelling(true);
-            try {
-                await cancelOrder(dbId);
-                alert('Order cancelled successfully.');
-            } catch (err) {
-                alert('Failed to cancel order: ' + err.message);
-            } finally {
-                setIsCancelling(false);
-            }
-        }
-    };
+
 
     const columns = [
         { header: 'Order ID', accessorKey: 'OrderID' },
         { header: 'Date', accessorKey: 'Date' },
+        { 
+            header: 'Time', 
+            id: 'Time',
+            cell: ({ row }) => {
+                const dateObj = new Date(row.original.RawDate);
+                return dateObj.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+            }
+        },
         { header: 'Total Items', accessorKey: 'TotalItems' },
         { 
-            header: 'Total Amount', 
-            accessorKey: 'TotalAmount',
-            cell: ({ row }) => {
-                const amount = row.original.TotalAmount;
-                const status = row.original.Status;
-                if (amount === 0 && status === 'Pending') {
-                    return <span className="font-semibold text-yellow-600">TBC (Unmatched)</span>;
-                }
-                return <span className="font-semibold">RM {amount.toFixed(2)}</span>;
-            }
-        },
-        { 
-            header: 'Status', 
-            accessorKey: 'Status',
-            cell: ({ row }) => {
-                const statusColors = {
-                    'Pending': 'bg-yellow-100 text-yellow-800',
-                    'Packing': 'bg-blue-100 text-blue-800',
-                    'Ready': 'bg-green-100 text-green-800',
-                    'Shipped': 'bg-indigo-100 text-indigo-800',
-                    'Delivered': 'bg-gray-100 text-gray-800',
-                };
-                const color = statusColors[row.original.Status] || 'bg-gray-100 text-gray-800';
-                return <span className={`px-2 py-1 rounded-full text-xs font-semibold ${color}`}>{row.original.Status}</span>;
-            }
-        },
-        { 
-            header: 'Action', 
+            header: 'AWB', 
             id: 'actions',
             cell: ({ row }) => {
-                const isCancellable = row.original.Status === 'Pending' || row.original.Status === 'Shipped';
+                const url = row.original.AwbUrl;
+                if (!url) return <span className="text-gray-400 text-sm">No AWB</span>;
+                
                 return (
-                    <div className="flex space-x-2">
-
-                        {isCancellable && (
-                            <Button 
-                                variant="outline" 
-                                size="sm" 
-                                disabled={isCancelling}
-                                className="flex items-center text-red-600 border-red-200 hover:bg-red-50"
-                                onClick={() => handleCancel(row.original.ID, row.original.OrderID)}
-                            >
-                                {isCancelling ? 'Cancelling...' : 'Cancel Order'}
-                            </Button>
-                        )}
-                    </div>
+                    <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="flex items-center text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                        onClick={() => setViewAwbUrl(url)}
+                    >
+                        <ExternalLink className="w-4 h-4 mr-1" />
+                        View
+                    </Button>
                 );
             }
         }
@@ -121,12 +88,6 @@ export function AgentMyOrders() {
 
     return (
         <div className="space-y-6 max-w-7xl mx-auto">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-gray-900">Orders</h1>
-                </div>
-            </div>
-
             <AgentTabs />
 
             <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
@@ -163,6 +124,14 @@ export function AgentMyOrders() {
                     <DataTable columns={columns} data={filteredOrders} isLoading={isLoadingOrders} />
                 </div>
             </div>
+
+            <AwbPdfViewer 
+                url={viewAwbUrl} 
+                open={!!viewAwbUrl} 
+                onOpenChange={(open) => {
+                    if (!open) setViewAwbUrl(null);
+                }} 
+            />
         </div>
     );
 }

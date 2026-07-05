@@ -51,9 +51,15 @@ export const useAgentDetails = (agentId) => {
                 .order('CreatedAt', { ascending: false });
             if (ledgerError) throw ledgerError;
 
+            // Fetch total sales from summaries for consistency
+            const { data: summariesData } = await supabase.rpc('get_agent_summaries');
+            const agentSummary = (summariesData || []).find(a => a.AgentID === actualAgentId || a.StaffID === agentId);
+            const totalSales = agentSummary ? parseFloat(agentSummary.TotalSales || 0) : 0;
+
             return {
                 ...userData,
-                ledger: ledgerData
+                ledger: ledgerData,
+                totalSales: totalSales
             };
         },
         enabled: !!agentId && isAuthorized,
@@ -70,7 +76,8 @@ export const useAgentOrderImports = (agentId) => {
             const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(agentId);
             let resolvedId = agentId;
             if (!isUUID) {
-                const { data: user } = await supabase.from('Users').select('UserID').eq('StaffID', agentId).single();
+                const { data: user, error: userError } = await supabase.from('Users').select('UserID').eq('StaffID', agentId).single();
+                if (userError) throw userError;
                 if (user) resolvedId = user.UserID;
             }
 
@@ -78,7 +85,41 @@ export const useAgentOrderImports = (agentId) => {
                 .from('OrderImports')
                 .select('*')
                 .eq('AgentID', resolvedId)
-                .order('CreatedAt', { ascending: false });
+                .order('ImportedAt', { ascending: false });
+                
+            console.log("useAgentOrderImports query for", resolvedId, data, error);
+            if (error) throw error;
+            return data;
+        },
+        enabled: !!agentId && isAuthorized,
+    });
+};
+
+export const useAgentRecentOrders = (agentId) => {
+    const user = useAuthStore(state => state.user);
+    const isAuthorized = user && ['Founder', 'Manager', 'Staff', 'Developer'].includes(user.role);
+
+    return useQuery({
+        queryKey: ['admin', 'agents', 'orders', agentId],
+        queryFn: async () => {
+            const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(agentId);
+            let resolvedId = agentId;
+            if (!isUUID) {
+                const { data: user, error: userError } = await supabase.from('Users').select('UserID').eq('StaffID', agentId).single();
+                if (userError) throw userError;
+                if (user) resolvedId = user.UserID;
+            }
+
+            const { data, error } = await supabase
+                .from('ImportedOrders')
+                .select(`
+                    *,
+                    OrderImports!inner(AgentID)
+                `)
+                .eq('OrderImports.AgentID', resolvedId)
+                .order('CreatedAt', { ascending: false })
+                .limit(50);
+                
             if (error) throw error;
             return data;
         },
@@ -131,6 +172,19 @@ export const useAgentStatement = (agentId, month, year) => {
                 .order('CreatedAt', { ascending: true });
             if (currentError) throw currentError;
 
+            // 4. Fetch Total COGS from ImportedOrders for the month
+            const { data: cogsData, error: cogsError } = await supabase
+                .from('ImportedOrders')
+                .select('OrderAmount, OrderImports!inner(AgentID)')
+                .eq('OrderImports.AgentID', actualAgentId)
+                .gte('CreatedAt', startDate)
+                .lte('CreatedAt', endDate);
+            
+            if (cogsError) throw cogsError;
+            
+            const totalCOGS = cogsData.reduce((sum, order) => sum + parseFloat(order.OrderAmount || 0), 0);
+            const totalOrders = cogsData.length;
+
             // Calculate totals
             const totalCharges = currentEntries.filter(e => parseFloat(e.Amount) > 0).reduce((sum, e) => sum + parseFloat(e.Amount), 0);
             const totalPayments = currentEntries.filter(e => parseFloat(e.Amount) < 0).reduce((sum, e) => sum + Math.abs(parseFloat(e.Amount)), 0);
@@ -146,6 +200,8 @@ export const useAgentStatement = (agentId, month, year) => {
                     totalCharges,
                     totalPayments,
                     closingBalance,
+                    totalCOGS,
+                    totalOrders,
                     transactions: currentEntries
                 }
             };
@@ -189,8 +245,27 @@ export const useAgentMutations = () => {
         }
     });
 
+    const closeMonthlyStatement = useMutation({
+        mutationFn: async ({ agentId, month, year, totalPayout }) => {
+            const { data, error } = await supabase.rpc('close_agent_monthly_statement', {
+                p_agent_id: agentId,
+                p_month: month,
+                p_year: year,
+                p_total_payout: totalPayout
+            });
+            if (error) throw error;
+            return data;
+        },
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['admin', 'agents', 'summaries'] });
+            queryClient.invalidateQueries({ queryKey: ['admin', 'agents', 'details', variables.agentId] });
+            queryClient.invalidateQueries({ queryKey: ['admin', 'agents', 'statement', variables.agentId, variables.month, variables.year] });
+        }
+    });
+
     return {
         recordPayout,
-        suspendAgent
+        suspendAgent,
+        closeMonthlyStatement
     };
 };

@@ -1,6 +1,12 @@
 import { useState, useCallback } from 'react';
-import { CheckCircle, UploadCloud, AlertTriangle } from 'lucide-react';
+import { CheckCircle, UploadCloud, AlertTriangle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogTitle,
+    DialogFooter,
+} from "@/components/ui/dialog";
 import { DataTable } from '@/components/common/DataTable';
 import { useDropzone } from 'react-dropzone';
 import { TikTokPdfParser } from '@/services/parsers/TikTokPdfParser';
@@ -10,12 +16,10 @@ import { useProducts } from '@/hooks/useProducts';
 import { useTranslation } from '@/hooks/useTranslation';
 import { AgentTabs } from './AgentTabs';
 import { useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 
 export function AgentOrderCreate() {
-    const navigate = useNavigate();
     const { user } = useAuthStore();
-    const { uploadOrders, hasSyncedTikTok, isLoadingSyncStatus } = useAgentPortal();
+    const { uploadOrders } = useAgentPortal();
     const { data: products } = useProducts();
     const { t } = useTranslation();
     // Assuming this component is strictly used by agents
@@ -26,12 +30,26 @@ export function AgentOrderCreate() {
     const [OrderList, setOrderList] = useState([]);
     const [Payloads, setPayloads] = useState([]);
     const [ErrorMessage, setErrorMessage] = useState('');
+    const [UploadResult, setUploadResult] = useState(null);
+    const [SkipPrintQueue, SetSkipPrintQueue] = useState(false);
+
+    const cleanSku = (str) => {
+        if (!str || str === '-') return '-';
+        return String(str)
+            .replace(/Order ID:?\s*\d*/gi, '')
+            .replace(/Tracking No:?\s*\S*/gi, '')
+            .replace(/Page \d+(?: of \d+)?/gi, '')
+            .replace(/TikTok Shop/gi, '')
+            .replace(/\s+/g, ' ')
+            .trim() || '-';
+    };
 
     const productMap = useMemo(() => {
         const map = new Map();
         if (products) {
             products.forEach(p => {
-                if (p.SellerSKU) map.set(p.SellerSKU, p);
+                if (p.SellerSKU) map.set(p.SellerSKU.trim(), p);
+                if (p.Barcode && p.Barcode !== p.SellerSKU) map.set(p.Barcode.trim(), p);
             });
         }
         return map;
@@ -42,13 +60,12 @@ export function AgentOrderCreate() {
         const aggregated = {};
 
         for (const item of allItems) {
-            // Group by Barcode if available, otherwise fallback to ProductName
-            const key = item.Barcode && item.Barcode !== '-' ? item.Barcode : item.ProductName;
+            const cleanedBarcode = cleanSku(item.Barcode);
+            const key = cleanedBarcode && cleanedBarcode !== '-' ? cleanedBarcode : item.ProductName;
             
             if (!aggregated[key]) {
-                aggregated[key] = { ...item };
+                aggregated[key] = { ...item, Barcode: cleanedBarcode };
             } else {
-                // Parse integer just in case string '1' was passed
                 aggregated[key].Quantity = parseInt(aggregated[key].Quantity, 10) + parseInt(item.Quantity, 10);
             }
         }
@@ -75,13 +92,13 @@ export function AgentOrderCreate() {
                 now.setSeconds(now.getSeconds() + fileCount);
                 fileCount++;
                 
-                const options = { timeZone: 'Asia/Kuala_Lumpur', year: '2-digit', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
+                const options = { timeZone: 'Asia/Kuala_Lumpur', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
                 const formatter = new Intl.DateTimeFormat('en-GB', options);
                 const parts = formatter.formatToParts(now);
                 const p = {};
                 parts.forEach(({ type, value }) => { p[type] = value; });
                 
-                const dateStr = `${p.day}${p.month}${p.year}`;
+                const dateStr = `${p.year}${p.month}${p.day}`;
                 const timeStr = `${p.hour}${p.minute}${p.second}`;
                 const newFileName = `TikTokSeller-${dateStr}-${timeStr}.pdf`;
 
@@ -91,6 +108,11 @@ export function AgentOrderCreate() {
                     ExtractedData.forEach(Order => {
                         Order.SubmittedBy = user?.id || null;
                         Order.Items.forEach(item => {
+                            if (item.Barcode) {
+                                item.Barcode = cleanSku(item.Barcode);
+                            }
+                            if (!item.Barcode || item.Barcode === '') item.Barcode = '-';
+
                             if (item.Barcode === '-' || !item.Barcode) {
                                 totalMissingSKUs++;
                             }
@@ -110,7 +132,7 @@ export function AgentOrderCreate() {
             }
 
             setSummary({
-                FileName: generatedPayloads.map(p => p.FileName).join(', '),
+                FileName: acceptedFiles.length > 2 ? `${acceptedFiles.length} PDF files` : acceptedFiles.map(f => f.name).join(', '),
                 TotalOrders: totalOrders,
                 MissingSKUs: totalMissingSKUs
             });
@@ -129,47 +151,101 @@ export function AgentOrderCreate() {
     const handleConfirmSave = async () => {
         setFileStatus('Upload');
         setErrorMessage('');
+        setUploadResult(null);
         try {
+            let totalSkipped = 0;
+            let totalUpdated = 0;
+
             for (const payload of Payloads) {
-                const fileToUpload = payload._rawFile;
-                
-                // 1. Generate Presigned URL for Private Bucket
-                const resUrl = await fetch('/api/generate-r2-url', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        fileName: payload.FileName, 
-                        fileType: 'application/pdf',
-                        isPrivate: true 
-                    })
-                });
+                const newOrderList = [];
 
-                if (!resUrl.ok) {
-                    throw new Error(t('errors.uploadOrdersFailedR2'));
+                for (const order of payload.OrderList) {
+                    if (!order.PdfBlob) {
+                        newOrderList.push({ ...order });
+                        continue;
+                    }
+                    
+                    const orderDateStr = order.CreatedTime || order.CreatedAt || order.OrderCreatedTime || order.Date;
+                    let orderDate = orderDateStr ? new Date(orderDateStr) : new Date();
+                    if (isNaN(orderDate.getTime())) {
+                        orderDate = new Date();
+                    }
+                    
+                    const year = orderDate.getFullYear();
+                    const month = String(orderDate.getMonth() + 1).padStart(2, '0');
+                    const day = String(orderDate.getDate()).padStart(2, '0');
+                    const staffId = user?.staffId || user?.StaffID || user?.id || 'Unknown';
+                    const hours = String(orderDate.getHours()).padStart(2, '0');
+                    const minutes = String(orderDate.getMinutes()).padStart(2, '0');
+                    
+                    const dateStr = `${year}${month}${day}`;
+                    const timeStr = `${hours}${minutes}`;
+                    const fileName = `TikTokSeller-${staffId}-${order.OrderID}-${dateStr}-${timeStr}.pdf`;
+                    
+                    // Folder structure: Order Archive/[Platform]/[STAFFID]/[YEAR]/[MONTH]/
+                    const folderPath = `Order Archive/TikTok/${staffId}/${year}/${month}/${fileName}`;
+                    
+                    // 1. Generate Presigned URL
+                    const resUrl = await fetch('/api/generate-r2-url', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            fileName: folderPath, 
+                            fileType: 'application/pdf',
+                            isPrivate: true 
+                        })
+                    });
+
+                    if (!resUrl.ok) {
+                        throw new Error(t('errors.uploadOrdersFailedR2'));
+                    }
+
+                    const { url } = await resUrl.json();
+
+                    // 2. Upload file securely to Cloudflare R2
+                    const uploadRes = await fetch(url, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/pdf',
+                        },
+                        body: order.PdfBlob
+                    });
+
+                    if (!uploadRes.ok) {
+                        throw new Error('Failed to upload file to Cloudflare R2.');
+                    }
+
+                    // 3. Construct new order object without mutating state
+                    const orderWithoutBlob = { ...order };
+                    delete orderWithoutBlob.PdfBlob;
+                    
+                    newOrderList.push({
+                        ...orderWithoutBlob,
+                        AwbUrl: folderPath
+                    });
                 }
-
-                const { url } = await resUrl.json();
-
-                // 2. Upload file securely to Cloudflare R2
-                const uploadRes = await fetch(url, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/pdf',
-                    },
-                    body: fileToUpload
-                });
-
-                if (!uploadRes.ok) {
-                    throw new Error('Gagal muat naik fail ke Cloudflare R2.');
-                }
-
-                // 3. Remove _rawFile before sending to DB
-                const dbPayload = { ...payload };
-                delete dbPayload._rawFile;
 
                 // 4. Save to Database
-                await uploadOrders(dbPayload);
+                const dbPayload = {
+                    Platform: payload.Platform,
+                    FileType: payload.FileType,
+                    FileName: payload.FileName,
+                    OrderList: newOrderList,
+                    SkipPrintQueue: SkipPrintQueue
+                };
+                
+                const response = await uploadOrders(dbPayload);
+                if (response) {
+                    totalSkipped += (response.skipped_orders || 0);
+                    totalUpdated += (response.awb_updated || 0);
+                }
             }
+            
+            setUploadResult({
+                skipped: totalSkipped,
+                updated: totalUpdated
+            });
+            
             setFileStatus('Complete');
         } catch (ErrorObj) {
             console.error('Save error:', ErrorObj);
@@ -187,29 +263,11 @@ export function AgentOrderCreate() {
 
     return (
         <div className="space-y-6 max-w-7xl mx-auto">
-            <div className="flex flex-col md:flex-row md:justify-between items-start md:items-center gap-4">
-                <div>
-                    <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Upload AWB</h1>
-                </div>
-            </div>
-
             <AgentTabs />
 
             <div className="space-y-6">
                 {/* Dropzone */}
-                {isLoadingSyncStatus ? (
-                    <div className="border-2 border-dashed border-gray-300 rounded-xl p-16 text-center bg-gray-50">
-                        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-                        <h3 className="text-lg font-semibold text-gray-900">Checking requirements...</h3>
-                    </div>
-                ) : !hasSyncedTikTok ? (
-                    <div className="border-2 border-dashed border-red-300 rounded-xl p-10 md:p-16 text-center bg-red-50">
-                        <AlertTriangle className="mx-auto h-12 w-12 md:h-16 md:w-16 text-red-500 mb-4" />
-                        <h3 className="text-xl font-bold text-red-700 mb-2">Sync Required</h3>
-                        <p className="text-gray-600 mb-6 max-w-lg mx-auto">You must upload your TikTok Catalog Excel file first to sync your selling prices before you can upload AWB files.</p>
-                        <Button onClick={() => navigate('/Agent/TikTok-Shop/TikTok-Sync')}>Go to TikTok Sync</Button>
-                    </div>
-                ) : FileStatus === 'Idle' || FileStatus === 'Error' ? (
+                {FileStatus === 'Idle' || FileStatus === 'Error' ? (
                     <div 
                         {...getRootProps()} 
                         className={`border-2 border-dashed rounded-xl p-8 md:p-16 text-center cursor-pointer transition-colors
@@ -271,17 +329,26 @@ export function AgentOrderCreate() {
                                         {Summary?.MissingSKUs > 0 && (
                                             <div className="mt-2 flex items-center text-amber-700 bg-amber-50 p-2 rounded-md text-sm border border-amber-200">
                                                 <AlertTriangle className="h-4 w-4 mr-2 shrink-0" />
-                                                Warning: {Summary.MissingSKUs} products have missing Seller SKUs. Commission will not be calculated for them.
+                                                Warning: {Summary.MissingSKUs} products have missing Seller SKUs (Unmatched). Please ensure you manually register these products in the Inventory.
                                             </div>
                                         )}
                                     </div>
                                 </div>
-                                <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-                                    <Button variant="outline" onClick={() => { setFileStatus('Idle'); setOrderList([]); setPayloads([]); }} className="w-full sm:w-auto">
+                                <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+                                    <label className="flex items-center space-x-2 text-sm font-medium text-gray-700 cursor-pointer bg-gray-50 px-3 py-2 rounded-none border border-gray-300 hover:bg-gray-100 transition-colors">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={SkipPrintQueue} 
+                                            onChange={(e) => SetSkipPrintQueue(e.target.checked)} 
+                                            className="rounded-none border-gray-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer" 
+                                        />
+                                        <span>Skip Queue (Already Printed Direct)</span>
+                                    </label>
+                                    <Button variant="outline" onClick={() => { setFileStatus('Idle'); setOrderList([]); setPayloads([]); SetSkipPrintQueue(false); }} className="w-full sm:w-auto rounded-none">
                                         Upload Another
                                     </Button>
                                     {FileStatus === 'Success' && (
-                                        <Button onClick={handleConfirmSave} className="bg-indigo-600 hover:bg-indigo-700 text-white w-full sm:w-auto">
+                                        <Button onClick={handleConfirmSave} className="bg-indigo-600 hover:bg-indigo-700 text-white w-full sm:w-auto rounded-none shadow-xs">
                                             Submit AWB
                                         </Button>
                                     )}
@@ -298,14 +365,14 @@ export function AgentOrderCreate() {
                                 <DataTable 
                                     columns={[
                                         { accessorKey: 'Barcode', header: 'Seller SKU', cell: ({ row }) => (
-                                            <span className="font-mono text-indigo-600">{row.original.Barcode || '-'}</span>
+                                            <span className="font-mono text-indigo-600">{cleanSku(row.original.Barcode) || '-'}</span>
                                         )},
                                         { 
                                             id: 'Products', 
                                             header: 'Products', 
                                             cell: ({ row }) => {
                                                 const item = row.original;
-                                                const sysProduct = productMap.get(item.Barcode);
+                                                const sysProduct = productMap.get(cleanSku(item.Barcode));
                                                 const systemName = sysProduct ? [sysProduct.Brand, sysProduct.ProductName, sysProduct.Variation, sysProduct.Size].filter(Boolean).join(' ') : item.ProductName;
                                                 
                                                 return (
@@ -330,24 +397,52 @@ export function AgentOrderCreate() {
                     </div>
                 )}
 
-                {FileStatus === 'Upload' && (
-                    <div className="bg-white rounded-xl shadow-sm border p-12 text-center">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-                        <h3 className="text-xl font-bold text-gray-900">Upload to Database...</h3>
-                    </div>
-                )}
+                <Dialog open={FileStatus === 'Upload'} onOpenChange={() => {}}>
+                    <DialogContent className="sm:max-w-md [&>button]:hidden">
+                        <div className="flex flex-col items-center justify-center p-8 space-y-4">
+                            <Loader2 className="h-12 w-12 text-indigo-600 animate-spin" />
+                            <h3 className="text-xl font-bold text-gray-900">Processing Upload...</h3>
+                            <p className="text-gray-500 text-center text-sm">Please do not close this window or navigate away.</p>
+                        </div>
+                    </DialogContent>
+                </Dialog>
 
-                {FileStatus === 'Complete' && (
-                    <div className="bg-green-50 border border-green-200 rounded-xl p-8 text-center">
-                        <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
-                        <h3 className="text-2xl font-bold text-gray-900">Upload Success!</h3>
-                        <p className="text-gray-600 mt-2">The extract order success upload to database.</p>
-                        <Button className="mt-6 bg-green-600 hover:bg-green-700 text-white" onClick={() => { setFileStatus('Idle'); setOrderList([]); setPayloads([]); }}>
-                            Upload More Order
-                        </Button>
-                    </div>
-                )}
-
+                <Dialog open={FileStatus === 'Complete'} onOpenChange={(open) => { if(!open) { setFileStatus('Idle'); setOrderList([]); setPayloads([]); setUploadResult(null); } }}>
+                    <DialogContent className="sm:max-w-md [&>button]:hidden rounded-none p-0 overflow-hidden border-0 shadow-xl">
+                        <div className="p-8 pb-4 text-center">
+                            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-none bg-emerald-100 mb-4">
+                                <CheckCircle className="h-6 w-6 text-emerald-600" />
+                            </div>
+                            <DialogTitle className="text-xl font-bold text-gray-900">
+                                Upload Complete
+                            </DialogTitle>
+                            <p className="text-gray-500 mt-2 text-sm">Your AWB has been successfully processed.</p>
+                        </div>
+                        
+                        <div className="px-8 pb-8">
+                            {UploadResult?.skipped > 0 && (
+                                <div className="bg-amber-50 border-l-4 border-amber-500 p-4 text-sm text-amber-900 space-y-2 mt-2 mb-6 rounded-none">
+                                    <div className="flex items-start gap-2">
+                                        <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5 text-amber-600" />
+                                        <p><strong>Duplicates Detected:</strong> {UploadResult.skipped} orders were skipped because they already exist.</p>
+                                    </div>
+                                    {UploadResult.updated > 0 && (
+                                        <p className="ml-7 text-amber-700">AWB links for {UploadResult.updated} of these orders have been attached.</p>
+                                    )}
+                                </div>
+                            )}
+                            
+                            <DialogFooter className="sm:justify-center">
+                                <Button 
+                                    onClick={() => { setFileStatus('Idle'); setOrderList([]); setPayloads([]); setUploadResult(null); }} 
+                                    className="w-full rounded-none bg-indigo-600 hover:bg-indigo-700 text-white shadow-none font-medium h-11"
+                                >
+                                    Done
+                                </Button>
+                            </DialogFooter>
+                        </div>
+                    </DialogContent>
+                </Dialog>
             </div>
         </div>
     );
