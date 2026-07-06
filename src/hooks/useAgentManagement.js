@@ -160,7 +160,7 @@ export const useAgentStatement = (agentId, month, year) => {
                 .lt('CreatedAt', startDate);
             if (prevError) throw prevError;
             
-            const openingBalance = previousEntries.reduce((sum, entry) => sum + parseFloat(entry.Amount), 0);
+            const openingBalance = Number(previousEntries.reduce((sum, entry) => sum + parseFloat(entry.Amount), 0).toFixed(2));
 
             // 3. Fetch current month's ledger entries
             const { data: currentEntries, error: currentError } = await supabase
@@ -182,14 +182,14 @@ export const useAgentStatement = (agentId, month, year) => {
             
             if (cogsError) throw cogsError;
             
-            const totalCOGS = cogsData.reduce((sum, order) => sum + parseFloat(order.OrderAmount || 0), 0);
+            const totalCOGS = Number(cogsData.reduce((sum, order) => sum + parseFloat(order.OrderAmount || 0), 0).toFixed(2));
             const totalOrders = cogsData.length;
 
             // Calculate totals
-            const totalCharges = currentEntries.filter(e => parseFloat(e.Amount) > 0).reduce((sum, e) => sum + parseFloat(e.Amount), 0);
-            const totalPayments = currentEntries.filter(e => parseFloat(e.Amount) < 0).reduce((sum, e) => sum + Math.abs(parseFloat(e.Amount)), 0);
+            const totalCharges = Number(currentEntries.filter(e => parseFloat(e.Amount) > 0).reduce((sum, e) => sum + parseFloat(e.Amount), 0).toFixed(2));
+            const totalPayments = Number(currentEntries.filter(e => parseFloat(e.Amount) < 0).reduce((sum, e) => sum + Math.abs(parseFloat(e.Amount)), 0).toFixed(2));
             
-            const closingBalance = openingBalance + totalCharges - totalPayments;
+            const closingBalance = Number((openingBalance + totalCharges - totalPayments).toFixed(2));
 
             return {
                 agent: userData,
@@ -246,12 +246,13 @@ export const useAgentMutations = () => {
     });
 
     const closeMonthlyStatement = useMutation({
-        mutationFn: async ({ agentId, month, year, totalPayout }) => {
+        mutationFn: async ({ agentId, month, year, totalPayout, totalCOGS }) => {
             const { data, error } = await supabase.rpc('close_agent_monthly_statement', {
                 p_agent_id: agentId,
                 p_month: month,
                 p_year: year,
-                p_total_payout: totalPayout
+                p_total_payout: totalPayout,
+                p_total_cogs: totalCOGS !== undefined && totalCOGS !== null && totalCOGS !== '' ? parseFloat(totalCOGS) : null
             });
             if (error) throw error;
             return data;

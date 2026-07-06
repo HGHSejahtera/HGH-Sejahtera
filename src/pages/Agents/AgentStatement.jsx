@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAgentStatement, useAgentMutations } from '@/hooks/useAgentManagement';
 import { useSettings } from '@/hooks/useSettings';
@@ -23,6 +23,15 @@ export function AgentStatement() {
     const [totalPayoutInput, setTotalPayoutInput] = useState('');
     const [totalCOGSInput, setTotalCOGSInput] = useState('');
 
+    useEffect(() => {
+        if (data?.statement?.totalCOGS !== undefined && data?.statement?.totalCOGS !== null) {
+            const formatted = Number(data.statement.totalCOGS).toFixed(2);
+            queueMicrotask(() => {
+                setTotalCOGSInput(formatted);
+            });
+        }
+    }, [data?.statement?.totalCOGS, selectedMonth, selectedYear]);
+
     const handlePrint = () => {
         window.print();
     };
@@ -32,9 +41,9 @@ export function AgentStatement() {
         
         const salesVal = parseFloat(totalPayoutInput);
         const billVal = parseFloat(totalCOGSInput);
-        const netProfit = salesVal - billVal;
+        const netProfit = Number((salesVal - billVal).toFixed(2));
         
-        if (confirm(`Confirm settlement for ${months[selectedMonth - 1].label} ${selectedYear}?\n\nPlatform Sales: ${formatMYR(salesVal)}\nHQ Bill: ${formatMYR(billVal)}\nNet Profit: ${formatMYR(netProfit)}\n\nThis will record the Net Profit to ${data.agent.DisplayName}'s ledger.`)) {
+        if (confirm(`Confirm settlement for ${months[selectedMonth - 1].label} ${selectedYear}?\n\nPlatform GMV / Sales: ${formatMYR(salesVal)}\nHQ Bill / COGS: ${formatMYR(billVal)}\nNet Profit (Commission): ${formatMYR(netProfit)}\n\nThis will record the Commission to ${data.agent.DisplayName}'s ledger.`)) {
             setIsPayoutLoading(true);
             try {
                 await closeMonthlyStatement.mutateAsync({
@@ -146,7 +155,7 @@ export function AgentStatement() {
                                     </div>
                                 )}
                                 <div className="flex justify-between text-xs">
-                                    <span className="text-gray-600">Total Sales (+):</span>
+                                    <span className="text-gray-600">Commission Earned (+):</span>
                                     <span className="font-semibold text-emerald-600 font-mono">+{formatMYR(statement.totalCharges)}</span>
                                 </div>
                                 <div className="flex justify-between text-xs">
@@ -173,7 +182,7 @@ export function AgentStatement() {
                                 <tr>
                                     <th className="px-3 py-2.5 rounded-none">Date</th>
                                     <th className="px-3 py-2.5 rounded-none">Description / Reference</th>
-                                    <th className="px-3 py-2.5 text-right rounded-none">Total Sales (+)</th>
+                                    <th className="px-3 py-2.5 text-right rounded-none">Commission Earned (+)</th>
                                     <th className="px-3 py-2.5 text-right rounded-none">Payouts / Voids (-)</th>
                                     <th className="px-3 py-2.5 text-right rounded-none">Balance</th>
                                 </tr>
@@ -294,7 +303,7 @@ export function AgentStatement() {
                         
                         <div className="space-y-3">
                             <div>
-                                <label className="text-[11px] font-semibold text-gray-600 uppercase tracking-wider block mb-1">HQ Bill (-)</label>
+                                <label className="text-[11px] font-semibold text-gray-600 uppercase tracking-wider block mb-1">HQ Bill / COGS (-)</label>
                                 <Input 
                                     type="number" 
                                     step="0.01" 
@@ -305,7 +314,7 @@ export function AgentStatement() {
                                 />
                             </div>
                             <div>
-                                <label className="text-[11px] font-semibold text-gray-600 uppercase tracking-wider block mb-1">Platform Sales (+)</label>
+                                <label className="text-[11px] font-semibold text-gray-600 uppercase tracking-wider block mb-1">Platform GMV / Sales (+)</label>
                                 <Input 
                                     type="number" 
                                     step="0.01" 
@@ -317,7 +326,7 @@ export function AgentStatement() {
                             </div>
 
                             <div className="bg-gray-50 p-3 border border-gray-200 flex justify-between items-center mt-2">
-                                <span className="text-[11px] font-bold text-gray-600 uppercase tracking-wider">Net Profit</span>
+                                <span className="text-[11px] font-bold text-gray-600 uppercase tracking-wider">Net Profit (Commission)</span>
                                 <span className={`text-sm font-bold font-mono ${(parseFloat(totalPayoutInput || 0) - parseFloat(totalCOGSInput || 0)) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                                     {formatMYR((parseFloat(totalPayoutInput || 0) - parseFloat(totalCOGSInput || 0)))}
                                 </span>

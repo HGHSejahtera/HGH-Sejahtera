@@ -6,14 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useAgentDetails, useAgentMutations, useAgentRecentOrders } from '@/hooks/useAgentManagement';
-import { MoreHorizontal, Download as DownloadIcon, ChevronRight } from 'lucide-react';
+import { Download as DownloadIcon, ChevronRight } from 'lucide-react';
 import { AwbPdfViewer } from '@/components/common/AwbPdfViewer';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+
 
 export function AgentDetails() {
     const { id } = useParams();
