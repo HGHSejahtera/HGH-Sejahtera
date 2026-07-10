@@ -15,7 +15,9 @@ import { useAgentPortal } from '@/hooks/useAgentPortal';
 import { useProducts } from '@/hooks/useProducts';
 import { useTranslation } from '@/hooks/useTranslation';
 import { AgentTabs } from './AgentTabs';
+import { IOSShortcutDialog } from '@/components/AgentPortal/IOSShortcutDialog';
 import { getAndClearSharedFile } from '@/utils/sharedFileStorage';
+import { fetchPendingServerUploads } from '@/services/api/pendingUploads';
 
 export function AgentOrderCreate() {
     const { user } = useAuthStore();
@@ -151,14 +153,25 @@ export function AgentOrderCreate() {
     useEffect(() => {
         let isMounted = true;
         const checkSharedFile = async () => {
+            // 1. Check for Android PWA Web Share Target uploads (Local)
             const sharedFile = await getAndClearSharedFile();
-            if (sharedFile && isMounted) {
-                onDrop([sharedFile]);
+            
+            // 2. Check for iOS Shortcut uploads (Server)
+            const serverFiles = await fetchPendingServerUploads(user?.id);
+
+            if (isMounted) {
+                const allFilesToProcess = [];
+                if (sharedFile) allFilesToProcess.push(sharedFile);
+                if (serverFiles && serverFiles.length > 0) allFilesToProcess.push(...serverFiles);
+
+                if (allFilesToProcess.length > 0) {
+                    onDrop(allFilesToProcess);
+                }
             }
         };
         checkSharedFile();
         return () => { isMounted = false; };
-    }, [onDrop]);
+    }, [onDrop, user?.id]);
 
     const handleConfirmSave = async () => {
         setFileStatus('Upload');
@@ -277,18 +290,7 @@ export function AgentOrderCreate() {
         <div className="space-y-6 max-w-7xl mx-auto">
             <AgentTabs />
 
-            {/* PWA Direct Share Tip */}
-            <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 rounded-xl p-4 flex items-center justify-between text-sm text-indigo-950 shadow-sm">
-                <div className="flex items-center space-x-3.5">
-                    <div className="bg-indigo-600 text-white p-2.5 rounded-lg shrink-0 shadow-sm">
-                        <UploadCloud className="h-5 w-5" />
-                    </div>
-                    <div>
-                        <p className="font-semibold text-gray-900">Direct Share AWB ke Sistem</p>
-                        <p className="text-gray-600 text-xs mt-0.5">Pasang aplikasi HGH Sejahtera ke telefon bimbit (Add to Home Screen) supaya ikon HGH muncul di menu Share TikTok Seller!</p>
-                    </div>
-                </div>
-            </div>
+            <IOSShortcutDialog />
 
             <div className="space-y-6">
                 {/* Dropzone */}
