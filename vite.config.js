@@ -14,8 +14,11 @@ export default defineConfig({
     react(), 
     tailwindcss(),
     VitePWA({
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.js',
       registerType: 'autoUpdate',
-      workbox: {
+      injectManifest: {
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024 // 5MB
       },
       devOptions: {
@@ -28,6 +31,19 @@ export default defineConfig({
         theme_color: '#09090b',
         background_color: '#09090b',
         display: 'standalone',
+        share_target: {
+          action: '/share-target',
+          method: 'POST',
+          enctype: 'multipart/form-data',
+          params: {
+            files: [
+              {
+                name: 'awb_file',
+                accept: ['application/pdf', '.pdf']
+              }
+            ]
+          }
+        },
         icons: [
           {
             src: 'pwa-icon.svg',

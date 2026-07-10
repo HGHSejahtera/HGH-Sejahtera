@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { CheckCircle, UploadCloud, AlertTriangle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,7 +15,7 @@ import { useAgentPortal } from '@/hooks/useAgentPortal';
 import { useProducts } from '@/hooks/useProducts';
 import { useTranslation } from '@/hooks/useTranslation';
 import { AgentTabs } from './AgentTabs';
-import { useMemo } from 'react';
+import { getAndClearSharedFile } from '@/utils/sharedFileStorage';
 
 export function AgentOrderCreate() {
     const { user } = useAuthStore();
@@ -148,6 +148,18 @@ export function AgentOrderCreate() {
         }
     }, [isAgent, user?.id]);
 
+    useEffect(() => {
+        let isMounted = true;
+        const checkSharedFile = async () => {
+            const sharedFile = await getAndClearSharedFile();
+            if (sharedFile && isMounted) {
+                onDrop([sharedFile]);
+            }
+        };
+        checkSharedFile();
+        return () => { isMounted = false; };
+    }, [onDrop]);
+
     const handleConfirmSave = async () => {
         setFileStatus('Upload');
         setErrorMessage('');
@@ -264,6 +276,19 @@ export function AgentOrderCreate() {
     return (
         <div className="space-y-6 max-w-7xl mx-auto">
             <AgentTabs />
+
+            {/* PWA Direct Share Tip */}
+            <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 rounded-xl p-4 flex items-center justify-between text-sm text-indigo-950 shadow-sm">
+                <div className="flex items-center space-x-3.5">
+                    <div className="bg-indigo-600 text-white p-2.5 rounded-lg shrink-0 shadow-sm">
+                        <UploadCloud className="h-5 w-5" />
+                    </div>
+                    <div>
+                        <p className="font-semibold text-gray-900">Direct Share AWB ke Sistem</p>
+                        <p className="text-gray-600 text-xs mt-0.5">Pasang aplikasi HGH Sejahtera ke telefon bimbit (Add to Home Screen) supaya ikon HGH muncul di menu Share TikTok Seller!</p>
+                    </div>
+                </div>
+            </div>
 
             <div className="space-y-6">
                 {/* Dropzone */}
