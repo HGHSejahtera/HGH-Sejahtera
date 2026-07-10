@@ -37,11 +37,11 @@ export default async function handler(req, res) {
 
         // Parse multipart form data manually
         const parts = parseMultipart(body, boundary);
-        const token = parts.find(p => p.name === 'token')?.value;
+        const staffId = parts.find(p => p.name === 'staff_id')?.value;
         const filePart = parts.find(p => p.name === 'awb_file');
 
-        if (!token) {
-            return res.status(401).json({ error: 'Missing upload token.' });
+        if (!staffId) {
+            return res.status(401).json({ error: 'Missing Staff ID.' });
         }
         if (!filePart || !filePart.data) {
             return res.status(400).json({ error: 'Missing PDF file.' });
@@ -53,20 +53,23 @@ export default async function handler(req, res) {
             process.env.SUPABASE_SERVICE_ROLE_KEY
         );
 
-        // Validate token
-        const { data: agentData, error: tokenError } = await supabase
-            .rpc('validate_upload_token', { p_token: token });
+        // Validate Staff ID — look up active agent by StaffID
+        const { data: agentData, error: lookupError } = await supabase
+            .from('Users')
+            .select('StaffID, UserID, DisplayName')
+            .eq('StaffID', staffId.trim().toUpperCase())
+            .eq('Role', 'Agent')
+            .eq('IsActive', true)
+            .single();
 
-        if (tokenError || !agentData || agentData.length === 0) {
-            return res.status(401).json({ error: 'Invalid or expired token.' });
+        if (lookupError || !agentData) {
+            return res.status(401).json({ error: 'Invalid Staff ID.' });
         }
-
-        const agent = agentData[0];
 
         // Generate unique filename
         const now = new Date();
         const dateStr = now.toISOString().replace(/[-:T]/g, '').slice(0, 14);
-        const fileName = `${agent.StaffID}/TikTokSeller-${dateStr}.pdf`;
+        const fileName = `${agentData.StaffID}/TikTokSeller-${dateStr}.pdf`;
 
         // Upload PDF to Supabase Storage
         const { error: uploadError } = await supabase.storage
@@ -85,8 +88,8 @@ export default async function handler(req, res) {
         const { error: insertError } = await supabase
             .from('PendingAWBUploads')
             .insert({
-                StaffID: agent.StaffID,
-                UserID: agent.UserID,
+                StaffID: agentData.StaffID,
+                UserID: agentData.UserID,
                 FileName: filePart.filename || 'AWB.pdf',
                 FilePath: fileName,
                 Status: 'Pending'
@@ -99,8 +102,8 @@ export default async function handler(req, res) {
 
         return res.status(200).json({
             success: true,
-            message: `AWB uploaded successfully. ${agent.DisplayName}, your file will be processed when you open the app.`,
-            agent: agent.DisplayName
+            message: `AWB uploaded. ${agentData.DisplayName}, open the app to process it.`,
+            agent: agentData.DisplayName
         });
 
     } catch (err) {
