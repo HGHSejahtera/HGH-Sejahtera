@@ -1,7 +1,8 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useProductMatcher } from '@/hooks/useProductMatcher';
 import { useProducts } from '@/hooks/useProducts';
-import { AlertTriangle, CheckCircle, Search, Save, Plus } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Search, Save, Plus, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ProductModal } from '../Inventory/ProductModal';
 import { DataTable } from '@/components/common/DataTable';
@@ -20,6 +21,7 @@ import {
 } from "@/components/ui/popover";
 
 export function ProductMatcher() {
+    const navigate = useNavigate();
     const { unmatchedItems, isLoading, resolveItem, isResolving } = useProductMatcher();
     const { products } = useProducts();
     
@@ -62,12 +64,12 @@ export function ProductMatcher() {
         { header: 'Order ID', accessorKey: 'PlatformOrderID' },
         { header: 'Agent', accessorKey: 'AgentName' },
         { 
-            header: 'Unmatched Item (From AWB)', 
+            header: 'Unmatched Item', 
             accessorKey: 'ProductName',
             cell: ({ row }) => (
                 <div>
                     <p className="font-semibold text-gray-900">{row.original.ProductName}</p>
-                    <p className="text-xs text-gray-500">SKU/Barcode: {row.original.PlatformSKU || 'N/A'} • Qty: {row.original.Quantity}</p>
+                    <p className="text-xs text-gray-500">SKU/Barcode: {row.original.PlatformSKU || 'N/A'} • Quantity: {row.original.Quantity}</p>
                 </div>
             )
         },
@@ -167,11 +169,22 @@ export function ProductMatcher() {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col md:flex-row md:justify-between items-start md:items-center gap-4">
-                <div>
-                    <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Product Matcher</h1>
-                    <p className="text-gray-500 mt-1">Manually match products that failed auto-detection during AWB upload.</p>
-                </div>
+            <div>
+                <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => {
+                        if (window.history.state && window.history.state.idx > 0) {
+                            navigate(-1);
+                        } else {
+                            navigate('/orders');
+                        }
+                    }}
+                    className="-ml-2 text-gray-600 hover:text-gray-900 font-medium"
+                >
+                    <ArrowLeft className="mr-1.5 h-4 w-4" />
+                    Back
+                </Button>
             </div>
 
             {activeUnmatched.length === 0 && !isLoading ? (
@@ -198,7 +211,7 @@ export function ProductMatcher() {
                             <DataTable 
                                 columns={columns} 
                                 data={activeUnmatched} 
-                                searchPlaceholder="Search by Agent or Order ID"
+                                searchPlaceholder="Search"
                                 isLoading={isLoading}
                             />
                         </div>

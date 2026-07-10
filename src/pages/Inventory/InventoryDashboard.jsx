@@ -10,6 +10,7 @@ import { useInventoryLogs, useInventoryProducts } from '@/hooks/useInventory';
 import { calculateFinalPrices } from '@/hooks/usePricing';
 import { useProducts } from '@/hooks/useProducts';
 import { useSecretMode } from '@/hooks/useSecretMode';
+import { useProductMatcher } from '@/hooks/useProductMatcher';
 import { ProductModal } from './ProductModal';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -151,8 +152,15 @@ export function InventoryDashboard() {
 
     const { data: Products, isLoading, error, refetch, isRefetching } = useInventoryProducts();
     const { data: RecentLogs } = useInventoryLogs(null);
+    const { unmatchedItems } = useProductMatcher();
 
     const InventoryProducts = useMemo(() => Products || [], [Products]);
+
+    const hasProductMatcherIssue = useMemo(() => {
+        const hasUnmatchedOrders = (unmatchedItems || []).length > 0;
+        const hasMissingSKU = InventoryProducts.some(p => !p.SellerSKU || p.SellerSKU === '-');
+        return hasUnmatchedOrders || hasMissingSKU;
+    }, [unmatchedItems, InventoryProducts]);
 
     const selectedProductIds = useMemo(() => {
         return Object.keys(rowSelection)
@@ -762,6 +770,19 @@ export function InventoryDashboard() {
                     </Button>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
+                    {hasProductMatcherIssue && (
+                        <Button variant="outline" asChild className="h-10 px-4 border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 font-semibold shadow-xs transition-all">
+                            <Link to="/Orders/Product-Matcher">
+                                <AlertTriangle className="mr-2 h-4 w-4 text-amber-600 shrink-0" />
+                                <span>Product Matcher</span>
+                                {unmatchedItems?.length > 0 && (
+                                    <Badge className="ml-2 bg-amber-600 hover:bg-amber-700 text-white text-[10px] px-1.5 py-0.5 font-bold">
+                                        {unmatchedItems.length}
+                                    </Badge>
+                                )}
+                            </Link>
+                        </Button>
+                    )}
                     <Button variant="outline" asChild className="h-10 w-36">
                         <Link to="/barcode">
                             <Barcode className="mr-2 h-4 w-4" />

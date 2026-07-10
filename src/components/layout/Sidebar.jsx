@@ -158,7 +158,7 @@ export function Sidebar() {
                             <X className="h-5 w-5" />
                         </button>
                         <SidebarContent 
-                            isCollapsed={isCollapsed} 
+                            isCollapsed={false} 
                             toggleSidebar={toggleSidebar} 
                             closeMobile={closeMobile} 
                             allowedLinks={allowedLinks} 

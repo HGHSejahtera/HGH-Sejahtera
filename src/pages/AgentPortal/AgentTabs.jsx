@@ -1,8 +1,8 @@
 import { NavLink } from 'react-router-dom';
 import { Package, FileUp, Wallet } from 'lucide-react';
 const AGENT_TABS = [
-    { name: 'Orders', path: '/Agent/Orders', icon: Package },
-    { name: 'Upload AWB', path: '/Agent/Upload', icon: FileUp }
+    { name: 'Upload AWB', path: '/Agent/Upload', icon: FileUp },
+    { name: 'Orders', path: '/Agent/Orders', icon: Package }
 ];
 
 export function AgentTabs() {

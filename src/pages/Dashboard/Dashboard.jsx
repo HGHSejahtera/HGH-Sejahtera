@@ -26,7 +26,7 @@ export function Dashboard() {
         { title: t('dashboard.agentList'), icon: Users, action: () => navigate('/Agent-Management') },
     ];
 
-    const recentOrders = metrics?.recentOrders || [];
+    const inventoryAlerts = metrics?.inventoryAlerts || [];
 
     return (
         <div className="space-y-6 max-w-7xl mx-auto">
@@ -70,46 +70,86 @@ export function Dashboard() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Recent Orders Table */}
-                <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                    <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-                        <h2 className="text-lg font-bold text-gray-900">{t('dashboard.recentOrders')}</h2>
-                        <Button variant="ghost" size="sm" onClick={() => navigate('/pick-queue')} className="text-indigo-600 hover:text-indigo-700">
-                            {t('dashboard.viewAll')} <ArrowRight className="ml-2 w-4 h-4" />
+                {/* Inventory Health & Low Stock Alerts Table */}
+                <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
+                    <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <h2 className="text-lg font-bold text-gray-900">Inventory Health & Low Stock Alerts</h2>
+                                {(metrics?.lowStockItems > 0 || metrics?.outOfStockItems > 0) && (
+                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800">
+                                        Action Needed
+                                    </span>
+                                )}
+                            </div>
+                            <p className="text-xs text-gray-500 mt-0.5">Products closest to critical stock levels requiring attention</p>
+                        </div>
+                        <Button variant="ghost" size="sm" onClick={() => navigate('/Inventory')} className="text-indigo-600 hover:text-indigo-700 font-semibold self-start sm:self-auto">
+                            Manage Inventory <ArrowRight className="ml-1.5 w-4 h-4" />
                         </Button>
                     </div>
-                    <div className="overflow-x-auto">
+
+                    <div className="overflow-x-auto flex-1">
                         <table className="w-full text-sm text-left">
-                            <thead className="bg-gray-50/50 text-gray-500 font-medium">
+                            <thead className="bg-gray-50/70 text-gray-500 font-semibold text-xs uppercase tracking-wider">
                                 <tr>
-                                    <th className="px-6 py-4">{t('dashboard.orderId')}</th>
-                                    <th className="px-6 py-4">{t('dashboard.agent')}</th>
-                                    <th className="px-6 py-4 text-center">Items</th>
-                                    <th className="px-6 py-4 text-right">{t('dashboard.amount')}</th>
-                                    <th className="px-6 py-4 text-center">{t('dashboard.status')}</th>
+                                    <th className="px-6 py-3.5">Product Name</th>
+                                    <th className="px-6 py-3.5">SKU / Barcode</th>
+                                    <th className="px-6 py-3.5 text-center">Stock Level</th>
+                                    <th className="px-6 py-3.5 text-center">Status</th>
+                                    <th className="px-6 py-3.5 text-right">Action</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                                {recentOrders.length === 0 ? (
+                                {isLoading ? (
                                     <tr>
-                                        <td colSpan="5" className="px-6 py-8 text-center text-gray-500">
-                                            No recent orders found.
+                                        <td colSpan="5" className="px-6 py-12 text-center text-gray-400">
+                                            <div className="flex items-center justify-center gap-2">
+                                                <Loader2 className="w-5 h-5 animate-spin text-indigo-600" />
+                                                <span>Loading stock alerts...</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ) : inventoryAlerts.length === 0 ? (
+                                    <tr>
+                                        <td colSpan="5" className="px-6 py-12 text-center text-gray-500">
+                                            All product stock levels are adequate.
                                         </td>
                                     </tr>
                                 ) : (
-                                    recentOrders.map((order, i) => (
-                                        <tr key={i} className="hover:bg-gray-50/50 transition-colors">
-                                            <td className="px-6 py-4 font-medium text-gray-900">{order.id}</td>
-                                            <td className="px-6 py-4 text-gray-600">{order.customer}</td>
-                                            <td className="px-6 py-4 text-center text-gray-600">{order.items}</td>
-                                            <td className="px-6 py-4 text-right font-medium text-gray-900">{order.total}</td>
+                                    inventoryAlerts.map((item) => (
+                                        <tr key={item.id} className="hover:bg-gray-50/60 transition-colors">
+                                            <td className="px-6 py-4 font-semibold text-gray-900 max-w-[240px] truncate" title={item.name}>
+                                                {item.name}
+                                            </td>
+                                            <td className="px-6 py-4 font-mono text-xs text-gray-600">
+                                                {item.sku}
+                                            </td>
                                             <td className="px-6 py-4 text-center">
-                                                <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold
-                                                    ${order.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' : 
-                                                    order.status === 'Packing' ? 'bg-blue-100 text-blue-700' : 
-                                                    'bg-amber-100 text-amber-700'}`}>
-                                                    {order.status}
+                                                <span className={`inline-flex px-3 py-1 rounded-lg text-xs font-bold font-mono
+                                                    ${item.stock <= 0 ? 'bg-red-100 text-red-700 border border-red-200' :
+                                                    item.stock <= 10 ? 'bg-amber-100 text-amber-800 border border-amber-200' :
+                                                    'bg-emerald-100 text-emerald-800 border border-emerald-200'}`}>
+                                                    {item.stock} units
                                                 </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-center">
+                                                <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold
+                                                    ${item.status === 'Out of Stock' ? 'bg-red-50 text-red-700 border border-red-200/60' :
+                                                    item.status === 'Critical Low' ? 'bg-amber-50 text-amber-700 border border-amber-200/60' :
+                                                    'bg-emerald-50 text-emerald-700 border border-emerald-200/60'}`}>
+                                                    {item.status}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => navigate('/Inventory')}
+                                                    className="h-8 text-xs font-semibold hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200"
+                                                >
+                                                    Restock
+                                                </Button>
                                             </td>
                                         </tr>
                                     ))

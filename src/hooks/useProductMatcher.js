@@ -17,6 +17,7 @@ export function useProductMatcher() {
                         OrderImports (
                             AccountName,
                             Users!OrderImports_AgentID_fkey (
+                                Nickname,
                                 DisplayName,
                                 StaffID
                             )
@@ -32,7 +33,7 @@ export function useProductMatcher() {
                 const parent = item.ImportedOrders?.OrderImports;
                 let agentName = 'Direct Sale';
                 if (parent?.Users) {
-                    agentName = `${parent.Users.DisplayName} (${parent.Users.StaffID})`;
+                    agentName = parent.Users.Nickname || parent.Users.DisplayName || parent.Users.StaffID;
                 } else if (parent?.AccountName) {
                     agentName = parent.AccountName;
                 }
@@ -59,11 +60,12 @@ export function useProductMatcher() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['unmatched_items'] });
-            // Invalidate active_orders so PickQueue reflects any potential changes 
             queryClient.invalidateQueries({ queryKey: ['active_orders'] });
-            // Invalidate agent portal data just in case this was their order
+            queryClient.invalidateQueries({ queryKey: ['order_history'] });
+            queryClient.invalidateQueries({ queryKey: ['all_orders'] });
             queryClient.invalidateQueries({ queryKey: ['agent_orders'] });
             queryClient.invalidateQueries({ queryKey: ['agent_ledger'] });
+            queryClient.invalidateQueries({ queryKey: ['agent_summaries'] });
         }
     });
 

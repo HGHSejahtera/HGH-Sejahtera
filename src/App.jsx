@@ -22,6 +22,7 @@ import { AgentMyOrders } from './pages/AgentPortal/AgentMyOrders';
 import { AgentList } from './pages/Agents/AgentList';
 import { AgentDetails } from './pages/Agents/AgentDetails';
 import { AgentStatement } from './pages/Agents/AgentStatement';
+import { AgentRecords } from './pages/Agents/AgentRecords';
 import { Settings } from './pages/Settings/Settings';
 import { UserManagement } from './pages/Settings/UserManagement';
 import { AccountSettings } from './pages/Settings/AccountSettings';
@@ -55,7 +56,7 @@ export default function App() {
             <PINUnlock />
             <Routes>
                 {/* Public Routes */}
-                <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to={isAgent ? "/Agent/Orders" : "/Dashboard"} replace />} />
+                <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to={isAgent ? "/Agent/Upload" : "/Dashboard"} replace />} />
                 <Route path="/HGH/Registration" element={<Registration />} />
                 <Route path="/activation" element={<AccountActivation />} />
                 <Route path="/pending-approval" element={<PendingApproval />} />
@@ -67,13 +68,13 @@ export default function App() {
                         <Route element={<PageLayout />}>
                             {isAgent ? (
                                 <>
-                                    <Route path="/" element={<Navigate to="/Agent/Orders" replace />} />
-                                    <Route path="/Agent" element={<Navigate to="/Agent/Orders" replace />} />
+                                    <Route path="/" element={<Navigate to="/Agent/Upload" replace />} />
+                                    <Route path="/Agent" element={<Navigate to="/Agent/Upload" replace />} />
                                     <Route path="/Agent/Upload" element={<AgentOrderCreate />} />
                                     <Route path="/Agent/Orders" element={<AgentMyOrders />} />
                                     <Route path="/Settings/Account" element={<AccountSettings />} />
                                     <Route path="/Settings" element={<Navigate to="/Settings/Account" replace />} />
-                                    <Route path="*" element={<Navigate to="/Agent/Orders" replace />} />
+                                    <Route path="*" element={<Navigate to="/Agent/Upload" replace />} />
                                 </>
                             ) : (
                                 <>
@@ -90,6 +91,7 @@ export default function App() {
                                     <Route path="/Agent-Management" element={<AgentList />} />
                                     <Route path="/Agent-Management/:id" element={<AgentDetails />} />
                                     <Route path="/Agent-Management/:id/Statement" element={<AgentStatement />} />
+                                    <Route path="/Agent-Management/:id/Records" element={<AgentRecords />} />
                                     <Route path="/Settings/General" element={<Settings />} />
                                     <Route path="/Settings/Users" element={<UserManagement />} />
                                     <Route path="/Settings/Account" element={<AccountSettings />} />

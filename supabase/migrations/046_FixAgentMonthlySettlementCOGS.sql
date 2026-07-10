@@ -34,6 +34,15 @@ BEGIN
     -- Calculate Net Profit
     v_net_profit := p_total_payout - v_total_cogs;
 
+    -- Determine month name
+    v_month_name := to_char(to_date(p_month::text, 'MM'), 'Month');
+
+    -- Remove any existing Commission Settlement for the same month & year to prevent duplicate entries
+    DELETE FROM public."AgentLedger"
+    WHERE "AgentID" = p_agent_id
+      AND "EntryType" = 'Commission'
+      AND "Description" = 'Commission Settlement for ' || TRIM(v_month_name) || ' ' || p_year;
+
     -- Get current running balance for ledger
     SELECT COALESCE("RunningBalance", 0.00) INTO v_running_balance
     FROM public."AgentLedger"
@@ -43,9 +52,6 @@ BEGIN
 
     -- Add the Net Profit to the agent's balance
     v_running_balance := v_running_balance + v_net_profit;
-
-    -- Determine month name
-    v_month_name := to_char(to_date(p_month::text, 'MM'), 'Month');
 
     -- Insert into AgentLedger
     INSERT INTO public."AgentLedger" (

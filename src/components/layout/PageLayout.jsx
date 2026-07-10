@@ -9,11 +9,15 @@ export function PageLayout() {
 
     return (
         <SidebarProvider>
-            <div className="fixed inset-0 flex bg-background overflow-hidden">
-                <Sidebar />
-                <div className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
-                    <Header />
-                    <main className={`flex-1 ${isPOS ? 'p-0 overflow-hidden flex flex-col' : 'overflow-y-auto p-4 md:p-6'}`}>
+            <div className="fixed inset-0 flex bg-background overflow-hidden print:static print:inset-auto print:overflow-visible print:h-auto print:block print:bg-white">
+                <div className="print:hidden">
+                    <Sidebar />
+                </div>
+                <div className="flex-1 flex flex-col h-full overflow-hidden min-w-0 print:h-auto print:overflow-visible print:block">
+                    <div className="print:hidden">
+                        <Header />
+                    </div>
+                    <main className={`flex-1 ${isPOS ? 'p-0 overflow-hidden flex flex-col' : 'overflow-y-auto p-4 md:p-6'} print:p-0 print:m-0 print:overflow-visible print:h-auto print:block`}>
                         <Outlet />
                     </main>
                 </div>

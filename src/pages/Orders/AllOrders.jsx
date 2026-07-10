@@ -3,14 +3,14 @@ import { useOrderHistory } from '@/hooks/useOrderHistory';
 import { AwbPdfViewer } from '@/components/common/AwbPdfViewer';
 import { SortOrders, MergeAndPrintAwbs } from '@/services/pdf/AwbMergeService';
 
-import { Clock, ChevronRight, Package, X, Printer, CheckCircle2 } from 'lucide-react';
+import { Clock, ChevronRight, Package, X, Printer, CheckCircle2, AlertTriangle, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/common/DataTable';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/hooks/useAuth';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 
 const formatCurrency = (value) => new Intl.NumberFormat('ms-MY', {
     style: 'currency',
@@ -18,6 +18,7 @@ const formatCurrency = (value) => new Intl.NumberFormat('ms-MY', {
 }).format(Number(value || 0));
 
 export function AllOrders() {
+    const navigate = useNavigate();
     const { user } = useAuthStore();
     const role = user?.role || 'Staff';
     const isAgent = role === 'Agent';
@@ -153,31 +154,42 @@ export function AllOrders() {
         {
             header: () => <div className="text-center">Status</div>,
             id: 'status_action',
-            cell: ({ row }) => (
-                <div className="flex justify-center">
-                    {!row.original.IsPrinted ? (
-                        <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                MarkAsPrinted({ orderIds: [row.original.ImportedOrderID], isPrinted: true });
-                            }}
-                            disabled={IsMarkingPrinted}
-                            title="Mark Order as Complete"
-                            className="border-emerald-200 bg-emerald-50/50 hover:bg-emerald-50 text-emerald-700 hover:border-emerald-300 font-medium text-xs rounded-md h-7 px-3 shadow-xs transition-all cursor-pointer"
-                        >
-                            <CheckCircle2 className="w-3.5 h-3.5 mr-1 text-emerald-600" />
-                            Complete
-                        </Button>
-                    ) : (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-200 shadow-xs">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                            Completed
-                        </span>
-                    )}
-                </div>
-            )
+            cell: ({ row }) => {
+                const hasUnmatched = (row.original.Items || row.original.ImportedOrderItems)?.some(
+                    i => !i.ProductID || i.PlatformSKU === '-' || i.MatchStatus === 'Unmatched'
+                ) || (Number(row.original.DisplayAmount || 0) === 0 && (row.original.Items?.length > 0 || row.original.ImportedOrderItems?.length > 0));
+
+                return (
+                    <div className="flex justify-center">
+                        {hasUnmatched ? (
+                            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-800 bg-amber-100/90 px-2.5 py-1 rounded-md border border-amber-300 shadow-xs">
+                                <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                SKU Review
+                            </span>
+                        ) : !row.original.IsPrinted ? (
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    MarkAsPrinted({ orderIds: [row.original.ImportedOrderID], isPrinted: true });
+                                }}
+                                disabled={IsMarkingPrinted}
+                                title="Mark Order as Complete"
+                                className="border-emerald-200 bg-emerald-50/50 hover:bg-emerald-50 text-emerald-700 hover:border-emerald-300 font-medium text-xs rounded-md h-7 px-3 shadow-xs transition-all cursor-pointer"
+                            >
+                                <CheckCircle2 className="w-3.5 h-3.5 mr-1 text-emerald-600" />
+                                Complete
+                            </Button>
+                        ) : (
+                            <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-200 shadow-xs">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                Completed
+                            </span>
+                        )}
+                    </div>
+                );
+            }
         },
         {
             header: () => <div className="text-center">Action</div>,
@@ -304,104 +316,141 @@ export function AllOrders() {
 
                         {/* Content */}
                         <div className="p-6 overflow-y-auto flex-1 space-y-6">
-                            
-                            {/* Key Metrics */}
-                            <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-none border">
-                                <div>
-                                    <p className="text-gray-500 mb-1">Total Amount</p>
-                                    <p className="text-lg font-bold text-gray-900">{formatCurrency(selectedOrder.TotalAmount || selectedOrder.DisplayAmount)}</p>
-                                </div>
-                                <div>
-                                    <p className="text-gray-500 mb-1">Items Count</p>
-                                    <p className="text-lg font-bold text-gray-900">{selectedOrder.TotalItems || selectedOrder.ItemCount || 0} items</p>
-                                </div>
-                                <div>
-                                    <p className="text-gray-500 mb-1">Agent</p>
-                                    <p className="font-medium text-gray-900">{selectedOrder.AgentName}</p>
-                                </div>
-                                {selectedOrder.AwbUrl && (
-                                    <div>
-                                        <p className="text-gray-500 mb-1">AWB Document</p>
-                                        <button 
-                                            type="button"
-                                            onClick={() => setViewAwbUrl(selectedOrder.AwbUrl)}
-                                            className="px-3.5 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium text-xs tracking-wide rounded-none shadow-xs hover:shadow-sm transition-all duration-200 cursor-pointer"
-                                        >
-                                            View
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
+                            {(() => {
+                                const orderItems = selectedOrder.Items || selectedOrder.ImportedOrderItems || [];
+                                const hasUnmatchedItems = orderItems.some(i => !i.ProductID || i.PlatformSKU === '-' || i.MatchStatus === 'Unmatched') || Number(selectedOrder.DisplayAmount || 0) === 0;
 
-                            {/* Timeline */}
-                            <div>
-                                <h3 className="font-semibold text-gray-900 mb-4 flex items-center">
-                                    <Clock className="w-4 h-4 mr-2 text-gray-400" />
-                                    Timeline
-                                </h3>
-                                <div className="space-y-3 text-sm border-l-2 border-indigo-100 pl-4 ml-2">
-                                    <div>
-                                        <p className="font-medium text-gray-900">Order Created</p>
-                                        <p className="text-xs text-gray-500">
-                                            {selectedOrder.CreatedAt ? new Date(selectedOrder.CreatedAt).toLocaleString('en-US', {
-                                                year: 'numeric',
-                                                month: 'numeric',
-                                                day: 'numeric',
-                                                hour: 'numeric',
-                                                minute: 'numeric',
-                                                hour12: true
-                                            }) : 'N/A'}
-                                        </p>
-                                    </div>
-                                    {selectedOrder.IsPrinted && (
-                                        <div>
-                                            <p className="font-medium text-emerald-600">Print Done</p>
-                                            <p className="text-xs text-gray-500">
-                                                {selectedOrder.PrintedAt ? new Date(selectedOrder.PrintedAt).toLocaleString('en-US', {
-                                                    year: 'numeric',
-                                                    month: 'numeric',
-                                                    day: 'numeric',
-                                                    hour: 'numeric',
-                                                    minute: 'numeric',
-                                                    hour12: true
-                                                }) : 'Manually Marked'}
-                                            </p>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Order Items */}
-                            <div>
-                                <h3 className="font-semibold text-gray-900 mb-4 flex items-center">
-                                    <Package className="w-4 h-4 mr-2 text-gray-400" />
-                                    Order Items ({selectedOrder.Items?.length || selectedOrder.ImportedOrderItems?.length || 0})
-                                </h3>
-                                <div className="space-y-3">
-                                    {(selectedOrder.Items || selectedOrder.ImportedOrderItems)?.map((item) => {
-                                        const brand = item.Brand || item.Products?.Brand || '';
-                                        const productName = item.ProductName || item.Products?.ProductName || '';
-                                        const variation = item.Variation || item.Products?.Variation || '';
-                                        const size = item.Size || item.Products?.Size || '';
-                                        const displayName = [brand, productName, variation, size].filter(Boolean).join(' ') || item.PlatformProductName || 'Unknown Item';
-
-                                        return (
-                                            <div key={item.ItemID} className="p-3 bg-white border rounded-none shadow-sm flex justify-between items-center">
-                                                <div className="flex-1">
-                                                    <p className="font-medium text-sm text-gray-900 line-clamp-2">{displayName}</p>
-                                                    <div className="flex items-center text-xs text-gray-500 mt-1 space-x-2">
-                                                        <span>SKU: {item.PlatformSKU || 'N/A'}</span>
-                                                    </div>
-                                                </div>
-                                                <div className="ml-4 text-right">
-                                                    <div className="text-sm font-bold text-gray-900">x{item.Quantity}</div>
-                                                    <div className="text-xs font-medium text-emerald-600 mt-0.5">{formatCurrency(item.Subtotal)}</div>
+                                return (
+                                    <>
+                                        {hasUnmatchedItems && (
+                                            <div className="bg-amber-50 border border-amber-200/80 p-4 rounded-xl flex items-start space-x-3 text-amber-900 shadow-xs">
+                                                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                                                <div className="flex-1 text-xs">
+                                                    <p className="font-bold text-sm">Action Required: SKU Review (RM 0.00)</p>
+                                                    <p className="mt-1 text-amber-800 leading-relaxed">
+                                                        One or more items in this order have no Seller SKU (<code>SKU: -</code>). Commission and Total Amount will remain RM 0.00 until matched.
+                                                    </p>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => {
+                                                            handleCloseDrawer();
+                                                            navigate('/Orders/Product-Matcher');
+                                                        }}
+                                                        className="mt-2.5 h-7 text-xs font-semibold border-amber-300 bg-white hover:bg-amber-100/50 text-amber-900"
+                                                    >
+                                                        Open Product Matcher <ArrowRight className="ml-1.5 w-3.5 h-3.5" />
+                                                    </Button>
                                                 </div>
                                             </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
+                                        )}
+
+                                        {/* Key Metrics */}
+                                        <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-none border">
+                                            <div>
+                                                <p className="text-gray-500 mb-1">Total Amount</p>
+                                                <p className="text-lg font-bold text-gray-900">{formatCurrency(selectedOrder.TotalAmount || selectedOrder.DisplayAmount)}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-gray-500 mb-1">Items Count</p>
+                                                <p className="text-lg font-bold text-gray-900">{selectedOrder.TotalItems || selectedOrder.ItemCount || 0} items</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-gray-500 mb-1">Agent</p>
+                                                <p className="font-medium text-gray-900">{selectedOrder.AgentName}</p>
+                                            </div>
+                                            {selectedOrder.AwbUrl && (
+                                                <div>
+                                                    <p className="text-gray-500 mb-1">AWB Document</p>
+                                                    <button 
+                                                        type="button"
+                                                        onClick={() => setViewAwbUrl(selectedOrder.AwbUrl)}
+                                                        className="px-3.5 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium text-xs tracking-wide rounded-none shadow-xs hover:shadow-sm transition-all duration-200 cursor-pointer"
+                                                    >
+                                                        View
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Timeline */}
+                                        <div>
+                                            <h3 className="font-semibold text-gray-900 mb-4 flex items-center">
+                                                <Clock className="w-4 h-4 mr-2 text-gray-400" />
+                                                Timeline
+                                            </h3>
+                                            <div className="space-y-3 text-sm border-l-2 border-indigo-100 pl-4 ml-2">
+                                                <div>
+                                                    <p className="font-medium text-gray-900">Order Created</p>
+                                                    <p className="text-xs text-gray-500">
+                                                        {selectedOrder.CreatedAt ? new Date(selectedOrder.CreatedAt).toLocaleString('en-US', {
+                                                            year: 'numeric',
+                                                            month: 'numeric',
+                                                            day: 'numeric',
+                                                            hour: 'numeric',
+                                                            minute: 'numeric',
+                                                            hour12: true
+                                                        }) : 'N/A'}
+                                                    </p>
+                                                </div>
+                                                {selectedOrder.IsPrinted && (
+                                                    <div>
+                                                        <p className="font-medium text-emerald-600">Print Done</p>
+                                                        <p className="text-xs text-gray-500">
+                                                            {selectedOrder.PrintedAt ? new Date(selectedOrder.PrintedAt).toLocaleString('en-US', {
+                                                                year: 'numeric',
+                                                                month: 'numeric',
+                                                                day: 'numeric',
+                                                                hour: 'numeric',
+                                                                minute: 'numeric',
+                                                                hour12: true
+                                                            }) : 'Manually Marked'}
+                                                        </p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Order Items */}
+                                        <div>
+                                            <h3 className="font-semibold text-gray-900 mb-4 flex items-center">
+                                                <Package className="w-4 h-4 mr-2 text-gray-400" />
+                                                Order Items ({orderItems.length})
+                                            </h3>
+                                            <div className="space-y-3">
+                                                {orderItems.map((item) => {
+                                                    const brand = item.Brand || item.Products?.Brand || '';
+                                                    const productName = item.ProductName || item.Products?.ProductName || '';
+                                                    const variation = item.Variation || item.Products?.Variation || '';
+                                                    const size = item.Size || item.Products?.Size || '';
+                                                    const displayName = [brand, productName, variation, size].filter(Boolean).join(' ') || item.PlatformProductName || item.ProductName || 'Unknown Item';
+                                                    const isUnmatched = !item.ProductID || item.PlatformSKU === '-' || item.MatchStatus === 'Unmatched';
+
+                                                    return (
+                                                        <div key={item.ItemID} className="p-3 bg-white border rounded-none shadow-sm flex justify-between items-center">
+                                                            <div className="flex-1">
+                                                                <p className="font-medium text-sm text-gray-900 line-clamp-2">{displayName}</p>
+                                                                <div className="flex items-center text-xs text-gray-500 mt-1 space-x-2">
+                                                                    <span>SKU: {item.PlatformSKU || '-'}</span>
+                                                                    {isUnmatched && (
+                                                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                                                                            SKU Review
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                            <div className="ml-4 text-right">
+                                                                <div className="text-sm font-bold text-gray-900">x{item.Quantity}</div>
+                                                                <div className="text-xs font-medium text-emerald-600 mt-0.5">{formatCurrency(item.Subtotal)}</div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    </>
+                                );
+                            })()}
                         </div>
                     </div>
                 </div>

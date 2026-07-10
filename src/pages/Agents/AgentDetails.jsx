@@ -222,8 +222,8 @@ export function AgentDetails() {
                     <Button variant="secondary" onClick={() => navigate(`/Agent-Management/${id}/Statement`)}>
                         View Statement
                     </Button>
-                    <Button onClick={() => setIsPayoutModalOpen(true)}>
-                        Record Payout
+                    <Button onClick={() => navigate(`/Agent-Management/${id}/Records`)} className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold">
+                        Records
                     </Button>
                 </div>
             </div>

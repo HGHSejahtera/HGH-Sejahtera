@@ -276,24 +276,10 @@ export function AgentOrderCreate() {
                         <input {...getInputProps()} />
                         <UploadCloud className="mx-auto h-12 w-12 md:h-16 md:w-16 text-gray-400 mb-4" />
                         
-                        {/* Mobile Guide */}
-                        <div className="md:hidden block mb-6">
-                            <h3 className="text-xl font-bold text-indigo-700 mb-2">Tap to Upload PDF</h3>
-                            <div className="text-sm text-gray-600 text-left bg-white/50 p-4 rounded-lg inline-block">
-                                <p className="font-semibold mb-1">How to upload from mobile:</p>
-                                <ol className="list-decimal pl-5 space-y-1">
-                                    <li>Generate AWB in TikTok Seller App</li>
-                                    <li>Choose <span className="font-medium text-gray-900">Save to Files</span> (Must be PDF)</li>
-                                    <li>Tap this box to select the PDF</li>
-                                </ol>
-                            </div>
-                        </div>
-
-                        {/* Desktop Guide */}
-                        <div className="hidden md:block">
-                            <h3 className="text-lg font-semibold text-gray-900">Upload AWB</h3>
-                            <p className="text-gray-500 mt-2 mb-6">PDF Only</p>
-                            <Button>Select PDF</Button>
+                        <div>
+                            <h3 className="text-lg md:text-xl font-bold text-gray-900">Upload AWB</h3>
+                            <p className="text-gray-500 mt-2 mb-6 text-sm">PDF Only</p>
+                            <Button type="button">Select PDF</Button>
                         </div>
 
                         {FileStatus === 'Error' && (

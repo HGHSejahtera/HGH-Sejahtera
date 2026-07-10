@@ -37,6 +37,7 @@ export function Header() {
         if (path.includes('/Agent-Management')) return t('header.agents');
         if (path.toLowerCase().includes('/price')) return t('header.pricing');
         if (path.toLowerCase().includes('/settings')) return t('header.settings');
+        if (path.toLowerCase().includes('/orders/product-matcher')) return 'Product Matcher';
         if (path.toLowerCase().includes('/orders') && !path.includes('/upload')) return 'Orders';
         if (path.toLowerCase().includes('/agent/upload')) return 'Upload AWB';
         if (path.toLowerCase().includes('/agent/orders')) return 'Orders';

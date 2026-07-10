@@ -78,12 +78,41 @@ export function useDashboardMetrics(timeframe = 'this_month') {
                 };
             }) || [];
 
+            // 6. Inventory Health & Low Stock Alerts
+            const { data: productsData, error: productsError } = await supabase
+                .from('Products')
+                .select('ProductID, Brand, ProductName, Variation, Size, Stock, SellerSKU, Barcode')
+                .eq('IsActive', true)
+                .order('Stock', { ascending: true })
+                .limit(7);
+            if (productsError) throw productsError;
+
+            const inventoryAlerts = productsData?.map(p => {
+                const fullName = [p.Brand, p.ProductName, p.Variation, p.Size].filter(Boolean).join(' ');
+                const stockVal = Number(p.Stock || 0);
+                return {
+                    id: p.ProductID,
+                    sku: p.SellerSKU || p.Barcode || '—',
+                    name: fullName || p.ProductName || 'Unnamed Product',
+                    stock: stockVal,
+                    status: stockVal <= 0 ? 'Out of Stock' : stockVal <= 10 ? 'Critical Low' : 'Adequate'
+                };
+            }) || [];
+
+            const { count: outOfStockItems } = await supabase
+                .from('Products')
+                .select('ProductID', { count: 'exact', head: true })
+                .eq('IsActive', true)
+                .lte('Stock', 0);
+
             return {
                 totalSales,
                 totalOrders,
                 lowStockItems,
+                outOfStockItems: outOfStockItems || 0,
                 activeAgents,
-                recentOrders
+                recentOrders,
+                inventoryAlerts
             };
         },
         staleTime: 60 * 1000 // 1 min
