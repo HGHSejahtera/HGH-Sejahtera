@@ -659,7 +659,7 @@ export function Registration() {
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="nickname" className="text-sm font-medium text-zinc-300">Nickname (Nama Panggilan)</Label>
+                                <Label htmlFor="nickname" className="text-sm font-medium text-zinc-300">Preferred Name</Label>
                                 <Input
                                     id="nickname"
                                     type="text"
@@ -669,7 +669,6 @@ export function Registration() {
                                     onBlur={() => setIsTyping(false)}
                                     onChange={(e) => setNickname(toTitleCase(e.target.value))}
                                     className="h-12 bg-zinc-900 border-zinc-800 text-white focus:border-indigo-500 focus:ring-indigo-500"
-                                    placeholder="Contoh: Riz / Fariz"
                                 />
                             </div>
 

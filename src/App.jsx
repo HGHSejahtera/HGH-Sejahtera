@@ -57,7 +57,8 @@ export default function App() {
             <Routes>
                 {/* Public Routes */}
                 <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to={isAgent ? "/Agent/Upload" : "/Dashboard"} replace />} />
-                <Route path="/HGH/Registration" element={<Registration />} />
+                <Route path="/HGH/Register" element={<Registration />} />
+                <Route path="/HGH/Registration" element={<Navigate to="/HGH/Register" replace />} />
                 <Route path="/activation" element={<AccountActivation />} />
                 <Route path="/pending-approval" element={<PendingApproval />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
