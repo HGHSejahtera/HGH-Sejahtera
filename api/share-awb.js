@@ -1,11 +1,4 @@
 /* global process */
-import { createClient } from '@supabase/supabase-js';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-
-export const config = {
-    api: { bodyParser: false },
-    maxDuration: 60
-};
 
 export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -25,11 +18,22 @@ export default async function handler(req, res) {
     let fileNameOriginal = 'AWB.pdf';
 
     try {
-        const chunks = [];
-        for await (const chunk of req) {
-            chunks.push(chunk);
+        // Dynamic imports to catch any module loading errors gracefully
+        const { createClient } = await import('@supabase/supabase-js');
+        const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3');
+        const { TikTokPdfParserNode } = await import('./_utils/pdfParserNode.js');
+
+        // Safely read body
+        let body;
+        if (req.body && Buffer.isBuffer(req.body)) {
+            body = req.body;
+        } else {
+            const chunks = [];
+            for await (const chunk of req) {
+                chunks.push(chunk);
+            }
+            body = Buffer.concat(chunks);
         }
-        const body = Buffer.concat(chunks);
 
         const contentType = req.headers['content-type'] || '';
         const boundaryMatch = contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/i);
@@ -79,7 +83,6 @@ export default async function handler(req, res) {
         }
 
         // 1. Parse the PDF
-        const { TikTokPdfParserNode } = await import('./_utils/pdfParserNode.js');
         const extractedOrders = await TikTokPdfParserNode.parse(filePart.data);
         if (!extractedOrders || extractedOrders.length === 0) {
             throw new Error('No orders found in the PDF or invalid format.');
@@ -121,8 +124,8 @@ export default async function handler(req, res) {
             await S3.send(command);
 
             order.AwbUrl = folderPath;
-            order.SubmittedBy = agentData.UserID; // Crucial for Agent ownership
-            delete order.PdfBuffer; // Clean up before sending to DB
+            order.SubmittedBy = agentData.UserID; 
+            delete order.PdfBuffer; 
 
             return order;
         });
@@ -144,7 +147,7 @@ export default async function handler(req, res) {
             throw new Error(`Failed to save orders: ${dbError.message}`);
         }
 
-        // 4. Log success to PendingAWBUploads history
+        // 4. Log success
         await supabase.from('PendingAWBUploads').insert({
             StaffID: agentData.StaffID,
             UserID: agentData.UserID,
@@ -163,24 +166,24 @@ export default async function handler(req, res) {
     } catch (err) {
         console.error('Share AWB error:', err);
         
-        // Log failure if possible
         if (supabase && agentData) {
             await supabase.from('PendingAWBUploads').insert({
                 StaffID: agentData.StaffID,
                 UserID: agentData.UserID,
                 FileName: fileNameOriginal,
-                FilePath: err.message || 'Server Error',
+                FilePath: String(err.message).substring(0, 500),
                 Status: 'Failed'
             }).catch(() => {});
         }
 
-        return res.status(500).json({ error: 'Internal Server Error', details: err.message || String(err) });
+        // Must return 500 but safely stringify the error to avoid crashes
+        return res.status(500).json({ 
+            error: 'Internal Server Error', 
+            details: err ? (err.message || String(err)) : 'Unknown error' 
+        });
     }
 }
 
-/**
- * Lightweight multipart/form-data parser (no external dependencies)
- */
 function parseMultipart(body, boundary) {
     const parts = [];
     const boundaryBuffer = Buffer.from(`--${boundary}`);
