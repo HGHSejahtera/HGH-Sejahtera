@@ -41,10 +41,33 @@ export default async function handler(req, res) {
         const filePart = parts.find(p => p.name === 'awb_file');
 
         if (!staffId) {
-            return res.status(401).json({ error: 'Missing Staff ID.' });
+            return res.status(401).json({ error: 'Missing Staff ID.', parsed_parts: parts.map(p => ({ name: p.name, hasFilename: !!p.filename, hasData: !!p.data, hasValue: !!p.value, valueLength: p.value?.length, dataLength: p.data?.length })) });
         }
+
+        // Fallback: if awb_file part exists but was parsed as text (no filename header), convert it to file data
+        if (filePart && !filePart.data && filePart.value) {
+            filePart.data = Buffer.from(filePart.value, 'binary');
+            filePart.filename = filePart.filename || 'AWB.pdf';
+        }
+
         if (!filePart || !filePart.data) {
-            return res.status(400).json({ error: 'Missing PDF file.' });
+            return res.status(400).json({
+                error: 'Missing PDF file.',
+                debug: {
+                    total_parts: parts.length,
+                    part_names: parts.map(p => p.name),
+                    parts_detail: parts.map(p => ({
+                        name: p.name,
+                        hasFilename: !!p.filename,
+                        filename: p.filename || null,
+                        hasData: !!p.data,
+                        dataSize: p.data?.length || 0,
+                        hasValue: !!p.value,
+                        valueSize: p.value?.length || 0,
+                        valuePreview: p.value ? p.value.substring(0, 100) : null
+                    }))
+                }
+            });
         }
 
         // Initialize Supabase client (fallback to anon key if service role key is not set in Vercel)
