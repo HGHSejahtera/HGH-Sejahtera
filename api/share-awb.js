@@ -37,8 +37,8 @@ export default async function handler(req, res) {
 
         // Parse multipart form data manually
         const parts = parseMultipart(body, boundary);
-        const staffId = parts.find(p => p.name === 'staff_id')?.value;
-        const filePart = parts.find(p => p.name === 'awb_file');
+        const staffId = parts.find(p => p.name === 'staff_id' || p.name?.startsWith('staff_id'))?.value;
+        const filePart = parts.find(p => p.name === 'awb_file' || p.name?.startsWith('awb_file'));
 
         if (!staffId) {
             return res.status(401).json({ error: 'Missing Staff ID.', parsed_parts: parts.map(p => ({ name: p.name, hasFilename: !!p.filename, hasData: !!p.data, hasValue: !!p.value, valueLength: p.value?.length, dataLength: p.data?.length })) });
