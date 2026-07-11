@@ -57,16 +57,31 @@ export default async function handler(req, res) {
 
         const supabase = createClient(supabaseUrl, supabaseKey);
 
-        // Validate Staff ID — look up active agent by StaffID
-        const { data: agentData, error: lookupError } = await supabase
-            .from('Users')
-            .select('StaffID, UserID, DisplayName')
-            .eq('StaffID', staffId.trim().toUpperCase())
-            .eq('Role', 'Agent')
-            .eq('IsActive', true)
-            .single();
+        // Validate Staff ID — look up active agent by StaffID (try RPC first to bypass RLS, then direct query)
+        let agentData = null;
+        const { data: rpcData, error: rpcErr } = await supabase
+            .rpc('validate_agent_for_upload', { p_staff_id: staffId.trim() });
 
-        if (lookupError || !agentData) {
+        if (!rpcErr && rpcData && rpcData.length > 0) {
+            agentData = {
+                StaffID: rpcData[0].staff_id,
+                UserID: rpcData[0].user_id,
+                DisplayName: rpcData[0].display_name
+            };
+        } else {
+            const { data: directData, error: lookupError } = await supabase
+                .from('Users')
+                .select('StaffID, UserID, DisplayName')
+                .eq('StaffID', staffId.trim().toUpperCase())
+                .eq('Role', 'Agent')
+                .eq('IsActive', true)
+                .single();
+            if (!lookupError && directData) {
+                agentData = directData;
+            }
+        }
+
+        if (!agentData) {
             return res.status(401).json({ error: 'Invalid Staff ID.' });
         }
 
@@ -85,23 +100,32 @@ export default async function handler(req, res) {
 
         if (uploadError) {
             console.error('Storage upload error:', uploadError);
-            return res.status(500).json({ error: 'Failed to store file.' });
+            return res.status(500).json({ error: 'Failed to store file.', details: uploadError.message });
         }
 
-        // Create pending upload record
-        const { error: insertError } = await supabase
-            .from('PendingAWBUploads')
-            .insert({
-                StaffID: agentData.StaffID,
-                UserID: agentData.UserID,
-                FileName: filePart.filename || 'AWB.pdf',
-                FilePath: fileName,
-                Status: 'Pending'
+        // Create pending upload record (try RPC first, then direct insert)
+        const { error: rpcInsertErr } = await supabase
+            .rpc('submit_pending_awb_upload', {
+                p_staff_id: agentData.StaffID,
+                p_user_id: agentData.UserID,
+                p_file_name: filePart.filename || 'AWB.pdf',
+                p_file_path: fileName
             });
 
-        if (insertError) {
-            console.error('Insert error:', insertError);
-            return res.status(500).json({ error: 'Failed to create upload record.' });
+        if (rpcInsertErr) {
+            const { error: insertError } = await supabase
+                .from('PendingAWBUploads')
+                .insert({
+                    StaffID: agentData.StaffID,
+                    UserID: agentData.UserID,
+                    FileName: filePart.filename || 'AWB.pdf',
+                    FilePath: fileName,
+                    Status: 'Pending'
+                });
+            if (insertError) {
+                console.error('Insert error:', insertError);
+                return res.status(500).json({ error: 'Failed to create upload record.', details: insertError.message });
+            }
         }
 
         return res.status(200).json({
