@@ -59,8 +59,22 @@ export default async function handler(req, res) {
 
         // Validate Staff ID — look up active agent by StaffID (try RPC first to bypass RLS, then direct query)
         let agentData = null;
+        const debugInfo = {
+            received_staff_id: staffId,
+            trimmed_staff_id: staffId.trim(),
+            upper_staff_id: staffId.trim().toUpperCase(),
+            key_type: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'service_role' : (process.env.VITE_SUPABASE_ANON_KEY ? 'vite_anon' : 'supabase_anon'),
+            rpc_result: null,
+            rpc_error: null,
+            direct_result: null,
+            direct_error: null
+        };
+
         const { data: rpcData, error: rpcErr } = await supabase
             .rpc('validate_agent_for_upload', { p_staff_id: staffId.trim() });
+
+        debugInfo.rpc_result = rpcData;
+        debugInfo.rpc_error = rpcErr ? rpcErr.message : null;
 
         if (!rpcErr && rpcData && rpcData.length > 0) {
             agentData = {
@@ -76,13 +90,17 @@ export default async function handler(req, res) {
                 .eq('Role', 'Agent')
                 .eq('IsActive', true)
                 .single();
+
+            debugInfo.direct_result = directData;
+            debugInfo.direct_error = lookupError ? lookupError.message : null;
+
             if (!lookupError && directData) {
                 agentData = directData;
             }
         }
 
         if (!agentData) {
-            return res.status(401).json({ error: 'Invalid Staff ID.' });
+            return res.status(401).json({ error: 'Invalid Staff ID.', debug: debugInfo });
         }
 
         // Generate unique filename
