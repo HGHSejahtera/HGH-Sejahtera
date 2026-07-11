@@ -102,7 +102,7 @@ export default async function handler(req, res) {
 
         return res.status(200).json({
             success: true,
-            message: `AWB uploaded. ${agentData.DisplayName}, open the app to process it.`,
+            message: 'AWB Upload Complete',
             agent: agentData.DisplayName
         });
 
