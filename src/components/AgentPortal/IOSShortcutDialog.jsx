@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 // TODO: Replace '#' with actual iCloud Shortcut link once created
-const SHORTCUT_LINK = '#';
+const SHORTCUT_LINK = 'https://www.icloud.com/shortcuts/7e7c3e0bffdd4fa281e75a1fb18e797e';
 
 export function IOSShortcutDialog() {
     const [isPWA] = useState(() => {
