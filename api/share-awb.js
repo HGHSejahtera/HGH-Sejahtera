@@ -1,7 +1,7 @@
 /* global process */
 import { createClient } from '@supabase/supabase-js';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-import { TikTokPdfParserNode } from './utils/pdfParserNode.js';
+import { TikTokPdfParserNode } from './_utils/pdfParserNode.js';
 
 export const config = {
     api: { bodyParser: false },
