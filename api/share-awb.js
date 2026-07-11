@@ -47,11 +47,15 @@ export default async function handler(req, res) {
             return res.status(400).json({ error: 'Missing PDF file.' });
         }
 
-        // Initialize Supabase with service role key
-        const supabase = createClient(
-            process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL,
-            process.env.SUPABASE_SERVICE_ROLE_KEY
-        );
+        // Initialize Supabase client (fallback to anon key if service role key is not set in Vercel)
+        const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+
+        if (!supabaseUrl || !supabaseKey) {
+            return res.status(500).json({ error: 'Server configuration error: Missing Supabase URL or Key.' });
+        }
+
+        const supabase = createClient(supabaseUrl, supabaseKey);
 
         // Validate Staff ID — look up active agent by StaffID
         const { data: agentData, error: lookupError } = await supabase
@@ -108,7 +112,7 @@ export default async function handler(req, res) {
 
     } catch (err) {
         console.error('Share AWB error:', err);
-        return res.status(500).json({ error: 'Internal Server Error' });
+        return res.status(500).json({ error: 'Internal Server Error', details: err.message || String(err) });
     }
 }
 
