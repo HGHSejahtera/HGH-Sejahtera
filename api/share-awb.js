@@ -1,7 +1,6 @@
 /* global process */
 import { createClient } from '@supabase/supabase-js';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-import { TikTokPdfParserNode } from './_utils/pdfParserNode.js';
 
 export const config = {
     api: { bodyParser: false },
@@ -80,6 +79,7 @@ export default async function handler(req, res) {
         }
 
         // 1. Parse the PDF
+        const { TikTokPdfParserNode } = await import('./_utils/pdfParserNode.js');
         const extractedOrders = await TikTokPdfParserNode.parse(filePart.data);
         if (!extractedOrders || extractedOrders.length === 0) {
             throw new Error('No orders found in the PDF or invalid format.');
