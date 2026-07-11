@@ -17,7 +17,6 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { AgentTabs } from './AgentTabs';
 import { IOSShortcutDialog } from '@/components/AgentPortal/IOSShortcutDialog';
 import { getAndClearSharedFile } from '@/utils/sharedFileStorage';
-import { fetchPendingServerUploads } from '@/services/api/pendingUploads';
 
 export function AgentOrderCreate() {
     const { user } = useAuthStore();
@@ -155,14 +154,10 @@ export function AgentOrderCreate() {
         const checkSharedFile = async () => {
             // 1. Check for Android PWA Web Share Target uploads (Local)
             const sharedFile = await getAndClearSharedFile();
-            
-            // 2. Check for iOS Shortcut uploads (Server)
-            const serverFiles = await fetchPendingServerUploads(user?.id);
 
             if (isMounted) {
                 const allFilesToProcess = [];
                 if (sharedFile) allFilesToProcess.push(sharedFile);
-                if (serverFiles && serverFiles.length > 0) allFilesToProcess.push(...serverFiles);
 
                 if (allFilesToProcess.length > 0) {
                     onDrop(allFilesToProcess);
@@ -171,7 +166,7 @@ export function AgentOrderCreate() {
         };
         checkSharedFile();
         return () => { isMounted = false; };
-    }, [onDrop, user?.id]);
+    }, [onDrop]);
 
     const handleConfirmSave = async () => {
         setFileStatus('Upload');

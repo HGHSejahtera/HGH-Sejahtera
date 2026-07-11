@@ -1,7 +1,8 @@
 import { NavLink } from 'react-router-dom';
-import { Package, FileUp, Wallet } from 'lucide-react';
+import { Package, Monitor, Smartphone, Wallet } from 'lucide-react';
 const AGENT_TABS = [
-    { name: 'Upload AWB', path: '/Agent/Upload', icon: FileUp },
+    { name: 'Upload AWB', path: '/Agent/Upload', icon: Monitor },
+    { name: 'Upload AWB', path: '/Agent/Upload-Lite', icon: Smartphone },
     { name: 'Orders', path: '/Agent/Orders', icon: Package }
 ];
 
@@ -16,7 +17,7 @@ export function AgentTabs() {
                     to={tab.path}
                     className={({ isActive }) =>
                         `flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                            (isActive || window.location.pathname.startsWith(tab.path))
+                            (isActive || (window.location.pathname === tab.path))
                                 ? 'bg-white text-gray-900 shadow-sm'
                                 : 'text-gray-500 hover:text-gray-700'
                         }`
