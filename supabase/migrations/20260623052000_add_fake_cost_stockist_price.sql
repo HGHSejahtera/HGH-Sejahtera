@@ -1,5 +1,0 @@
-﻿ALTER TABLE public."Products"
-ADD COLUMN IF NOT EXISTS "FakeCostPrice" DECIMAL(10,2) NOT NULL DEFAULT 0,
-ADD COLUMN IF NOT EXISTS "StockistPrice" DECIMAL(10,2) NOT NULL DEFAULT 0;
-
-NOTIFY pgrst, 'reload schema';
