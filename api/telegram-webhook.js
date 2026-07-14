@@ -13,14 +13,21 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 async function sendTelegramMessage(chatId, text) {
-    if (!TELEGRAM_BOT_TOKEN) return;
+    if (!TELEGRAM_BOT_TOKEN) {
+        console.error('Error: TELEGRAM_BOT_TOKEN is missing');
+        return;
+    }
     const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
     try {
-        await fetch(url, {
+        const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ chat_id: chatId, text: text })
         });
+        if (!res.ok) {
+            const errBody = await res.text();
+            console.error(`Telegram API error status ${res.status}: ${errBody}`);
+        }
     } catch (e) {
         console.error('Error sending Telegram message:', e);
     }
