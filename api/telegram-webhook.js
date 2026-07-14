@@ -12,17 +12,24 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-async function sendTelegramMessage(chatId, text) {
+async function sendTelegramMessage(chatId, text, inlineKeyboard = null) {
     if (!TELEGRAM_BOT_TOKEN) {
         console.error('Error: TELEGRAM_BOT_TOKEN is missing');
         return;
     }
     const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+    const body = {
+        chat_id: chatId,
+        text: text
+    };
+    if (inlineKeyboard) {
+        body.reply_markup = { inline_keyboard: inlineKeyboard };
+    }
     try {
         const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id: chatId, text: text })
+            body: JSON.stringify(body)
         });
         if (!res.ok) {
             const errBody = await res.text();
@@ -30,6 +37,46 @@ async function sendTelegramMessage(chatId, text) {
         }
     } catch (e) {
         console.error('Error sending Telegram message:', e);
+    }
+}
+
+async function editTelegramMessageText(chatId, messageId, text, inlineKeyboard = null) {
+    if (!TELEGRAM_BOT_TOKEN || !chatId || !messageId) return;
+    const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/editMessageText`;
+    const body = {
+        chat_id: chatId,
+        message_id: messageId,
+        text: text
+    };
+    if (inlineKeyboard) {
+        body.reply_markup = { inline_keyboard: inlineKeyboard };
+    }
+    try {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        if (!res.ok) {
+            const errBody = await res.text();
+            console.error(`Telegram editMessageText error status ${res.status}: ${errBody}`);
+        }
+    } catch (e) {
+        console.error('Error editing Telegram message:', e);
+    }
+}
+
+async function answerTelegramCallbackQuery(callbackQueryId, text = '') {
+    if (!TELEGRAM_BOT_TOKEN || !callbackQueryId) return;
+    const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerCallbackQuery`;
+    try {
+        await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ callback_query_id: callbackQueryId, text: text })
+        });
+    } catch (e) {
+        console.error('Error answering callback query:', e);
     }
 }
 
@@ -41,6 +88,22 @@ async function getTelegramFileUrl(fileId) {
     }
     return `https://api.telegram.org/file/bot${TELEGRAM_BOT_TOKEN}/${data.result.file_path}`;
 }
+
+const DASHBOARD_BUTTONS = [
+    [
+        { text: 'Records', callback_data: 'records' },
+        { text: 'Upload', callback_data: 'upload' }
+    ],
+    [
+        { text: 'Log Out', callback_data: 'logout' }
+    ]
+];
+
+const BACK_BUTTON = [
+    [
+        { text: 'Back', callback_data: 'cancel_link' }
+    ]
+];
 
 export default async function handler(req, res) {
     if (req.method === 'GET') {
@@ -58,7 +121,66 @@ export default async function handler(req, res) {
 
     try {
         const update = req.body;
-        if (!update || !update.message) {
+        if (!update) {
+            return res.status(200).json({ status: 'ignored' });
+        }
+
+        // --- HANDLER 1: BUTTON CALLBACK QUERIES ---
+        if (update.callback_query) {
+            const cb = update.callback_query;
+            const chatId = cb.message?.chat?.id;
+            const messageId = cb.message?.message_id;
+            const data = cb.data;
+
+            await answerTelegramCallbackQuery(cb.id);
+
+            if (!chatId) {
+                return res.status(200).json({ status: 'no_chat_id' });
+            }
+
+            if (data === 'cancel_link' || data === 'unlink_account' || data === 'logout') {
+                // Call SECURITY DEFINER RPC to reset both positive and negative chatId bindings
+                await supabase.rpc('telegram_bot_unlink_agent', { p_chat_id: chatId });
+                
+                if (messageId) {
+                    await editTelegramMessageText(chatId, messageId, 'Enter Identifier:');
+                } else {
+                    await sendTelegramMessage(chatId, 'Enter Identifier:');
+                }
+                return res.status(200).json({ status: data });
+            }
+
+            if (data === 'upload_awb' || data === 'upload') {
+                await sendTelegramMessage(chatId, 'Forward or upload any TikTok AWB PDF file directly into this chat.');
+                return res.status(200).json({ status: 'guide_sent' });
+            }
+
+            if (data === 'my_uploads' || data === 'records') {
+                const { data: agent } = await supabase
+                    .from('Users')
+                    .select('UserID, StaffID, DisplayName')
+                    .eq('TelegramChatID', chatId)
+                    .eq('IsActive', true)
+                    .single();
+
+                if (agent) {
+                    const { count } = await supabase
+                        .from('PendingAWBUploads')
+                        .select('*', { count: 'exact', head: true })
+                        .eq('UploadedBy', agent.UserID);
+                    
+                    await sendTelegramMessage(chatId, `Records: ${count || 0} PDF files.`, DASHBOARD_BUTTONS);
+                } else {
+                    await sendTelegramMessage(chatId, 'Enter Identifier:');
+                }
+                return res.status(200).json({ status: 'stats_sent' });
+            }
+
+            return res.status(200).json({ status: 'unknown_callback' });
+        }
+
+        // --- HANDLER 2: STANDARD MESSAGES ---
+        if (!update.message) {
             return res.status(200).json({ status: 'ignored' });
         }
 
@@ -76,125 +198,124 @@ export default async function handler(req, res) {
             .select('UserID, StaffID, DisplayName, TelegramChatID, Role')
             .eq('TelegramChatID', chatId)
             .eq('IsActive', true)
-            .single();
+            .maybeSingle();
 
-        // Check if chatId is currently pending double confirmation (negative ID = -chatId)
+        // Check if chatId is currently pending password confirmation (negative ID = -chatId)
         const pendingChatId = -Math.abs(chatId);
         const { data: pendingAgent } = await supabase
             .from('Users')
-            .select('UserID, StaffID, DisplayName, TelegramChatID')
+            .select('UserID, StaffID, DisplayName, Email, TelegramChatID, Role')
             .eq('TelegramChatID', pendingChatId)
             .eq('IsActive', true)
-            .single();
+            .maybeSingle();
 
         // --- COMMANDS: /relink or /logout ---
         if (text === '/relink' || text === '/logout') {
-            if (linkedAgent) {
-                await supabase.from('Users').update({ TelegramChatID: null }).eq('UserID', linkedAgent.UserID);
-            }
-            if (pendingAgent) {
-                await supabase.from('Users').update({ TelegramChatID: null }).eq('UserID', pendingAgent.UserID);
-            }
-            await sendTelegramMessage(chatId, 'Welcome to HGH Sejahtera. Please enter your Identifier');
+            await supabase.rpc('telegram_bot_unlink_agent', { p_chat_id: chatId });
+            await sendTelegramMessage(chatId, 'Enter Identifier:');
             return res.status(200).json({ status: 'unlinked' });
         }
 
-        // --- STEP 2: DOUBLE CONFIRMATION REPLY ---
-        if (pendingAgent) {
-            if (text.toUpperCase() === 'YES') {
-                // Confirm setup and set TelegramChatID to positive chatId
-                const { error: updErr } = await supabase
-                    .from('Users')
-                    .update({ TelegramChatID: chatId })
-                    .eq('UserID', pendingAgent.UserID);
+        // --- STEP 3: LINKED AGENT UPLOADS AWB PDF OR CHATS ---
+        if (linkedAgent) {
+            if (msg.document) {
+                const doc = msg.document;
+                const fileName = doc.file_name || 'TikTok_AWB.pdf';
 
-                if (updErr) {
-                    await sendTelegramMessage(chatId, 'Error completing setup. Please try again or enter your Identifier.');
-                } else {
-                    await sendTelegramMessage(chatId, `Setup Complete.\n\nStaff ID: ${pendingAgent.StaffID}`);
+                if (!fileName.toLowerCase().endsWith('.pdf') && doc.mime_type !== 'application/pdf') {
+                    await sendTelegramMessage(chatId, 'Please upload a valid TikTok AWB PDF document.', DASHBOARD_BUTTONS);
+                    return res.status(200).json({ status: 'invalid_file_type' });
                 }
-                return res.status(200).json({ status: 'setup_complete' });
-            } else {
-                // If they type anything else, unbind pending and treat as new Identifier attempt or prompt
-                await supabase.from('Users').update({ TelegramChatID: null }).eq('UserID', pendingAgent.UserID);
-                // Proceed downward to treat text as potential new Identifier
+
+                try {
+                    const fileUrl = await getTelegramFileUrl(doc.file_id);
+                    const fileRes = await fetch(fileUrl);
+                    const arrayBuffer = await fileRes.arrayBuffer();
+                    const pdfBuffer = Buffer.from(arrayBuffer);
+
+                    const { processAwbPdf } = await import('./_utils/processAwb.js');
+                    const resOutput = await processAwbPdf({
+                        pdfBuffer,
+                        fileName,
+                        agentId: linkedAgent.UserID,
+                        staffId: linkedAgent.StaffID,
+                        supabase
+                    });
+
+                    await sendTelegramMessage(chatId, `${resOutput.totalOrders} orders imported.`, DASHBOARD_BUTTONS);
+                    return res.status(200).json({ status: 'awb_processed', orders: resOutput.totalOrders });
+                } catch (err) {
+                    console.error('Error processing PDF upload from Telegram:', err);
+                    await sendTelegramMessage(chatId, `Failed to process AWB PDF: ${err.message || 'Unknown error'}`, DASHBOARD_BUTTONS);
+                    return res.status(200).json({ status: 'awb_error', error: err.message });
+                }
             }
+
+            // If command or text sent while linked
+            const setupText = `Setup Complete\nFull Name: ${linkedAgent.DisplayName || linkedAgent.StaffID}\nRole: ${linkedAgent.Role || 'Agent'}\nID: ${linkedAgent.StaffID || 'N/A'}`;
+            await sendTelegramMessage(chatId, setupText, DASHBOARD_BUTTONS);
+            return res.status(200).json({ status: 'dashboard_displayed' });
         }
 
-        // --- STEP 1: ONE-TIME SETUP (IF NOT LINKED) ---
-        if (!linkedAgent) {
-            if (!text || text === '/start') {
-                await sendTelegramMessage(chatId, 'Welcome to HGH Sejahtera. Please enter your Identifier');
-                return res.status(200).json({ status: 'prompt_identifier' });
+        // --- STEP 2: PENDING AGENT SUBMITS ACCOUNT PASSWORD ---
+        if (pendingAgent) {
+            if (!text || text === '/start' || text === '/cancel') {
+                await supabase.rpc('telegram_bot_unlink_agent', { p_chat_id: chatId });
+                await sendTelegramMessage(chatId, 'Enter Identifier:');
+                return res.status(200).json({ status: 'reset' });
             }
 
-            // Match text against Username, Email, or StaffID
-            const { data: matchedUsers, error: matchErr } = await supabase
-                .from('Users')
-                .select('UserID, StaffID, DisplayName, Username, Email, Role')
-                .eq('Role', 'Agent')
-                .eq('IsActive', true)
-                .or(`Username.ilike.${text},Email.ilike.${text},StaffID.ilike.${text}`);
+            // Verify password using official Supabase Auth signInWithPassword (same as /login)
+            const { data: authData, error: authErr } = await supabase.auth.signInWithPassword({
+                email: pendingAgent.Email,
+                password: text
+            });
 
-            if (matchErr || !matchedUsers || matchedUsers.length === 0) {
-                await sendTelegramMessage(chatId, 'Welcome to HGH Sejahtera. Please enter your Identifier');
-                return res.status(200).json({ status: 'invalid_identifier' });
+            if (authErr || !authData?.user) {
+                await sendTelegramMessage(chatId, 'Incorrect Password. Enter Password:', BACK_BUTTON);
+                return res.status(200).json({ status: 'invalid_password' });
             }
 
-            const matchedAgent = matchedUsers[0];
+            // Password is correct -> link agent account using SECURITY DEFINER RPC
+            const { error: linkErr } = await supabase.rpc('telegram_bot_link_agent', {
+                p_user_id: pendingAgent.UserID,
+                p_chat_id: chatId
+            });
 
-            // Set temporary pending ID (-chatId) on this user
-            await supabase
-                .from('Users')
-                .update({ TelegramChatID: pendingChatId })
-                .eq('UserID', matchedAgent.UserID);
+            if (linkErr) {
+                // Fallback direct update if RPC somehow fails
+                await supabase.from('Users').update({ TelegramChatID: chatId }).eq('UserID', pendingAgent.UserID);
+            }
 
-            await sendTelegramMessage(chatId, `User: ${matchedAgent.DisplayName || matchedAgent.StaffID}.\n\nReply YES to confirm.`);
-            return res.status(200).json({ status: 'awaiting_confirmation' });
+            const setupText = `Setup Complete\nFull Name: ${pendingAgent.DisplayName || pendingAgent.StaffID}\nRole: ${pendingAgent.Role || 'Agent'}\nID: ${pendingAgent.StaffID || 'N/A'}`;
+            await sendTelegramMessage(chatId, setupText, DASHBOARD_BUTTONS);
+            return res.status(200).json({ status: 'setup_complete' });
         }
 
-        // --- STEP 3: LINKED AGENT UPLOADS AWB PDF ---
-        if (msg.document) {
-            const doc = msg.document;
-            const fileName = doc.file_name || 'TikTok_AWB.pdf';
-
-            if (!fileName.toLowerCase().endsWith('.pdf') && doc.mime_type !== 'application/pdf') {
-                await sendTelegramMessage(chatId, 'Please upload a valid TikTok AWB PDF document.');
-                return res.status(200).json({ status: 'invalid_file_type' });
-            }
-
-            try {
-                // Download file from Telegram
-                const fileUrl = await getTelegramFileUrl(doc.file_id);
-                const fileRes = await fetch(fileUrl);
-                const arrayBuffer = await fileRes.arrayBuffer();
-                const pdfBuffer = Buffer.from(arrayBuffer);
-
-                // Process PDF through central utility via dynamic import
-                const { processAwbPdf } = await import('./_utils/processAwb.js');
-                const resOutput = await processAwbPdf({
-                    pdfBuffer,
-                    fileName,
-                    agentId: linkedAgent.UserID,
-                    staffId: linkedAgent.StaffID,
-                    supabase
-                });
-
-                await sendTelegramMessage(chatId, `${resOutput.totalOrders} orders imported.`);
-                return res.status(200).json({ status: 'awb_processed', orders: resOutput.totalOrders });
-            } catch (err) {
-                console.error('Error processing PDF upload from Telegram:', err);
-                await sendTelegramMessage(chatId, `Failed to process AWB PDF: ${err.message || 'Unknown error'}`);
-                return res.status(200).json({ status: 'awb_error', error: err.message });
-            }
+        // --- STEP 1: ONE-TIME SETUP IDENTIFIER ENTRY ---
+        if (!text || text === '/start') {
+            await sendTelegramMessage(chatId, 'Enter Identifier:');
+            return res.status(200).json({ status: 'prompt_identifier' });
         }
 
-        // If linked but sent random text instead of PDF
-        await sendTelegramMessage(chatId, 'Please upload your TikTok AWB PDF document.');
-        return res.status(200).json({ status: 'awaiting_pdf' });
+        // Call SECURITY DEFINER RPC to match text against Username, Email, or StaffID and set pending (-chatId)
+        const { data: pendingRes, error: pendingErr } = await supabase.rpc('telegram_bot_set_pending', {
+            p_identifier: text,
+            p_chat_id: chatId
+        });
+
+        if (pendingErr || !pendingRes) {
+            await sendTelegramMessage(chatId, 'Enter Identifier:');
+            return res.status(200).json({ status: 'invalid_identifier' });
+        }
+
+        // User matched cleanly, now prompt for password with Back button
+        await sendTelegramMessage(chatId, 'Enter Password:', BACK_BUTTON);
+        return res.status(200).json({ status: 'awaiting_password' });
 
     } catch (error) {
         console.error('Webhook Top Level Error:', error);
         return res.status(500).json({ error: 'Internal Server Error' });
     }
 }
+
