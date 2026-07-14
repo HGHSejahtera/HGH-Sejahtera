@@ -167,7 +167,7 @@ export default async function handler(req, res) {
                     const { count } = await supabase
                         .from('PendingAWBUploads')
                         .select('*', { count: 'exact', head: true })
-                        .eq('UploadedBy', agent.UserID);
+                        .eq('UserID', agent.UserID);
                     
                     await sendTelegramMessage(chatId, `Records: ${count || 0} PDF files.`, DASHBOARD_BUTTONS);
                 } else {

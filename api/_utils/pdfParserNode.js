@@ -7,7 +7,7 @@ export const TikTokPdfParserNode = {
     parse: async (buffer) => {
         try {
             // Dynamically import heavy PDF libraries to prevent Vercel top-level cold boot crashes
-            const pdfjsLib = await import('pdfjs-dist');
+            const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
             const { PDFDocument } = await import('pdf-lib');
 
             // Note: In Node.js, we don't need the worker.

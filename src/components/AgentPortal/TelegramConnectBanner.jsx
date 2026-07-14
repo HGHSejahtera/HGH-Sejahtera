@@ -7,6 +7,8 @@ export function TelegramConnectBanner() {
     const botUsername = 'HGHSejahtera_Bot';
     const botUrl = `https://t.me/${botUsername}`;
 
+    if (isLinked) return null;
+
     return (
         <div className="bg-gradient-to-r from-sky-500/10 via-indigo-500/10 to-blue-500/10 border border-sky-500/20 rounded-2xl p-5 mb-6 backdrop-blur-sm">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
