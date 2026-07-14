@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/hooks/useAuth';
 import { AgentTabs } from './AgentTabs';
-import { TelegramConnectBanner } from '@/components/AgentPortal/TelegramConnectBanner';
+
 import { DataTable } from '@/components/common/DataTable';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, RefreshCw } from 'lucide-react';
@@ -65,8 +65,6 @@ export function AgentUploadLite() {
             <p className="text-gray-500">
                 Files shared via Telegram Bot are processed automatically by the server. Monitor upload status below.
             </p>
-
-            <TelegramConnectBanner />
 
             <div className="bg-white rounded-xl shadow-sm border p-6 mt-6">
                 <h2 className="text-lg font-semibold mb-4">Upload History (Last 50)</h2>

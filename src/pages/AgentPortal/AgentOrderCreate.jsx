@@ -15,7 +15,7 @@ import { useAgentPortal } from '@/hooks/useAgentPortal';
 import { useProducts } from '@/hooks/useProducts';
 import { useTranslation } from '@/hooks/useTranslation';
 import { AgentTabs } from './AgentTabs';
-import { TelegramConnectBanner } from '@/components/AgentPortal/TelegramConnectBanner';
+
 
 export function AgentOrderCreate() {
     const { user } = useAuthStore();
@@ -266,8 +266,6 @@ export function AgentOrderCreate() {
     return (
         <div className="space-y-6 max-w-7xl mx-auto">
             <AgentTabs />
-
-            <TelegramConnectBanner />
 
             <div className="space-y-6">
                 {/* Dropzone */}

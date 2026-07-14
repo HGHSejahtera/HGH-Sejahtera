@@ -8,11 +8,17 @@ export const TikTokPdfParserNode = {
         try {
             // Dynamically import heavy PDF libraries to prevent Vercel top-level cold boot crashes
             const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+            // Explicitly trace worker for @vercel/nft so it gets included in Vercel serverless deployment
+            await import('pdfjs-dist/legacy/build/pdf.worker.mjs');
             const { PDFDocument } = await import('pdf-lib');
 
-            // Note: In Node.js, we don't need the worker.
             const data = new Uint8Array(buffer);
-            const loadingTask = pdfjsLib.getDocument({ data });
+            const loadingTask = pdfjsLib.getDocument({
+                data,
+                disableFontFace: true,
+                useSystemFonts: true,
+                isEvalSupported: false
+            });
             const pdfDocument = await loadingTask.promise;
             
             const numPages = pdfDocument.numPages;
@@ -185,7 +191,8 @@ export const TikTokPdfParserNode = {
 
         } catch (error) {
             console.error("Error parse PDF Node:", error);
-            throw new Error("Fail parse PDF file. Please ensure it is a valid TikTok AWB.", { cause: error });
+            const detailMsg = error?.message || error?.toString() || 'Unknown error';
+            throw new Error(`Fail parse PDF file: ${detailMsg}. Please ensure it is a valid TikTok AWB.`, { cause: error });
         }
     }
 };
