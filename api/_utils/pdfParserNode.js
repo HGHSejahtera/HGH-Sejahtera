@@ -1,3 +1,43 @@
+// Polyfill browser globals required by pdfjs-dist v6 in Node.js (Vercel Serverless)
+if (typeof globalThis.DOMMatrix === 'undefined') {
+    globalThis.DOMMatrix = class DOMMatrix {
+        constructor(init) {
+            const values = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+            if (Array.isArray(init)) {
+                if (init.length === 6) {
+                    values[0] = init[0]; values[1] = init[1];
+                    values[4] = init[2]; values[5] = init[3];
+                    values[12] = init[4]; values[13] = init[5];
+                } else if (init.length === 16) {
+                    for (let i = 0; i < 16; i++) values[i] = init[i];
+                }
+            }
+            this.a = values[0]; this.b = values[1]; this.c = values[4]; this.d = values[5];
+            this.e = values[12]; this.f = values[13];
+            this.m11 = values[0]; this.m12 = values[1]; this.m13 = values[2]; this.m14 = values[3];
+            this.m21 = values[4]; this.m22 = values[5]; this.m23 = values[6]; this.m24 = values[7];
+            this.m31 = values[8]; this.m32 = values[9]; this.m33 = values[10]; this.m34 = values[11];
+            this.m41 = values[12]; this.m42 = values[13]; this.m43 = values[14]; this.m44 = values[15];
+            this.is2D = true; this.isIdentity = values[0] === 1 && values[5] === 1;
+        }
+        inverse() { return new DOMMatrix(); }
+        multiply() { return new DOMMatrix(); }
+        scale() { return new DOMMatrix(); }
+        translate() { return new DOMMatrix(); }
+        transformPoint(p) { return p || { x: 0, y: 0, z: 0, w: 1 }; }
+        static fromMatrix() { return new DOMMatrix(); }
+        static fromFloat32Array(a) { return new DOMMatrix(Array.from(a)); }
+        static fromFloat64Array(a) { return new DOMMatrix(Array.from(a)); }
+    };
+}
+if (typeof globalThis.Path2D === 'undefined') {
+    globalThis.Path2D = class Path2D {
+        constructor() { this._ops = []; }
+        moveTo() {} lineTo() {} bezierCurveTo() {} quadraticCurveTo() {}
+        arc() {} arcTo() {} ellipse() {} rect() {} closePath() {} addPath() {}
+    };
+}
+
 export const TikTokPdfParserNode = {
     /**
      * Parses a TikTok AWB PDF Buffer and extracts orders.
@@ -6,10 +46,8 @@ export const TikTokPdfParserNode = {
      */
     parse: async (buffer) => {
         try {
-            // Dynamically import heavy PDF libraries to prevent Vercel top-level cold boot crashes
+            // pdfjs-dist v6 legacy build + DOMMatrix/Path2D polyfills above
             const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
-            // Explicitly trace worker for @vercel/nft so it gets included in Vercel serverless deployment
-            await import('pdfjs-dist/legacy/build/pdf.worker.mjs');
             const { PDFDocument } = await import('pdf-lib');
 
             const data = new Uint8Array(buffer);
