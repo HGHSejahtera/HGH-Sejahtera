@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/hooks/useAuth';
 import { AgentTabs } from './AgentTabs';
-import { IOSShortcutDialog } from '@/components/AgentPortal/IOSShortcutDialog';
+import { TelegramConnectBanner } from '@/components/AgentPortal/TelegramConnectBanner';
 import { DataTable } from '@/components/common/DataTable';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, RefreshCw } from 'lucide-react';
@@ -20,7 +20,7 @@ export function AgentUploadLite() {
                 .eq('UserID', user?.id)
                 .order('CreatedAt', { ascending: false })
                 .limit(50);
-            
+
             if (error) throw error;
             return data;
         },
@@ -40,9 +40,9 @@ export function AgentUploadLite() {
             id: 'Status',
             cell: (row) => (
                 <Badge variant={
-                    row.Status === 'Processed' ? 'success' : 
-                    row.Status === 'Failed' ? 'destructive' : 
-                    'secondary'
+                    row.Status === 'Processed' ? 'success' :
+                        row.Status === 'Failed' ? 'destructive' :
+                            'secondary'
                 }>
                     {row.Status}
                 </Badge>
@@ -53,7 +53,7 @@ export function AgentUploadLite() {
     return (
         <div className="space-y-6 max-w-7xl mx-auto">
             <AgentTabs />
-            
+
             <div className="flex justify-between items-center">
                 <h1 className="text-2xl font-bold">Mobile Upload History</h1>
                 <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
@@ -63,13 +63,13 @@ export function AgentUploadLite() {
             </div>
 
             <p className="text-gray-500">
-                Fail yang dihantar melalui iOS Shortcut akan diproses secara automatik oleh server. Sila pantau status di sini.
+                Files shared via Telegram Bot are processed automatically by the server. Monitor upload status below.
             </p>
 
-            <IOSShortcutDialog />
+            <TelegramConnectBanner />
 
             <div className="bg-white rounded-xl shadow-sm border p-6 mt-6">
-                <h2 className="text-lg font-semibold mb-4">Senarai Fail Dihantar (50 Terkini)</h2>
+                <h2 className="text-lg font-semibold mb-4">Upload History (Last 50)</h2>
                 {isLoading ? (
                     <div className="flex justify-center p-8">
                         <Loader2 className="w-8 h-8 animate-spin text-gray-400" />

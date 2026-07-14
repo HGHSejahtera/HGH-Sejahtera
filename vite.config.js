@@ -11,7 +11,7 @@ const __dirname = path.dirname(__filename);
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
-    react(), 
+    react(),
     tailwindcss(),
     VitePWA({
       strategies: 'injectManifest',
@@ -22,7 +22,7 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024 // 5MB
       },
       devOptions: {
-        enabled: true
+        enabled: false
       },
       manifest: {
         name: 'HGH Sejahtera',
@@ -31,19 +31,6 @@ export default defineConfig({
         theme_color: '#09090b',
         background_color: '#09090b',
         display: 'standalone',
-        share_target: {
-          action: '/share-target',
-          method: 'POST',
-          enctype: 'multipart/form-data',
-          params: {
-            files: [
-              {
-                name: 'awb_file',
-                accept: ['application/pdf', '.pdf']
-              }
-            ]
-          }
-        },
         icons: [
           {
             src: 'pwa-icon.svg',

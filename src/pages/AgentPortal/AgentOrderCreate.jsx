@@ -15,8 +15,7 @@ import { useAgentPortal } from '@/hooks/useAgentPortal';
 import { useProducts } from '@/hooks/useProducts';
 import { useTranslation } from '@/hooks/useTranslation';
 import { AgentTabs } from './AgentTabs';
-import { IOSShortcutDialog } from '@/components/AgentPortal/IOSShortcutDialog';
-import { getAndClearSharedFile } from '@/utils/sharedFileStorage';
+import { TelegramConnectBanner } from '@/components/AgentPortal/TelegramConnectBanner';
 
 export function AgentOrderCreate() {
     const { user } = useAuthStore();
@@ -63,7 +62,7 @@ export function AgentOrderCreate() {
         for (const item of allItems) {
             const cleanedBarcode = cleanSku(item.Barcode);
             const key = cleanedBarcode && cleanedBarcode !== '-' ? cleanedBarcode : item.ProductName;
-            
+
             if (!aggregated[key]) {
                 aggregated[key] = { ...item, Barcode: cleanedBarcode };
             } else {
@@ -76,7 +75,7 @@ export function AgentOrderCreate() {
 
     const onDrop = useCallback(async (acceptedFiles) => {
         if (acceptedFiles.length === 0) return;
-        
+
         setFileStatus('Process');
         setSummary(null);
 
@@ -85,26 +84,26 @@ export function AgentOrderCreate() {
             let totalOrders = 0;
             let generatedPayloads = [];
             let fileCount = 0;
-            
+
             // Parse all PDFs
             for (const file of acceptedFiles) {
                 // Gap masa logic: Add fileCount seconds to ensure unique timestamps
                 const now = new Date();
                 now.setSeconds(now.getSeconds() + fileCount);
                 fileCount++;
-                
+
                 const options = { timeZone: 'Asia/Kuala_Lumpur', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
                 const formatter = new Intl.DateTimeFormat('en-GB', options);
                 const parts = formatter.formatToParts(now);
                 const p = {};
                 parts.forEach(({ type, value }) => { p[type] = value; });
-                
+
                 const dateStr = `${p.year}${p.month}${p.day}`;
                 const timeStr = `${p.hour}${p.minute}${p.second}`;
                 const newFileName = `TikTokSeller-${dateStr}-${timeStr}.pdf`;
 
                 const ExtractedData = await TikTokPdfParser.parse(file);
-                
+
                 if (isAgent) {
                     ExtractedData.forEach(Order => {
                         Order.SubmittedBy = user?.id || null;
@@ -137,7 +136,7 @@ export function AgentOrderCreate() {
                 TotalOrders: totalOrders,
                 MissingSKUs: totalMissingSKUs
             });
-            
+
             setPayloads(generatedPayloads);
             setOrderList(generatedPayloads.flatMap(p => p.OrderList));
             setFileStatus('Success');
@@ -149,24 +148,7 @@ export function AgentOrderCreate() {
         }
     }, [isAgent, user?.id]);
 
-    useEffect(() => {
-        let isMounted = true;
-        const checkSharedFile = async () => {
-            // 1. Check for Android PWA Web Share Target uploads (Local)
-            const sharedFile = await getAndClearSharedFile();
 
-            if (isMounted) {
-                const allFilesToProcess = [];
-                if (sharedFile) allFilesToProcess.push(sharedFile);
-
-                if (allFilesToProcess.length > 0) {
-                    onDrop(allFilesToProcess);
-                }
-            }
-        };
-        checkSharedFile();
-        return () => { isMounted = false; };
-    }, [onDrop]);
 
     const handleConfirmSave = async () => {
         setFileStatus('Upload');
@@ -184,35 +166,35 @@ export function AgentOrderCreate() {
                         newOrderList.push({ ...order });
                         continue;
                     }
-                    
+
                     const orderDateStr = order.CreatedTime || order.CreatedAt || order.OrderCreatedTime || order.Date;
                     let orderDate = orderDateStr ? new Date(orderDateStr) : new Date();
                     if (isNaN(orderDate.getTime())) {
                         orderDate = new Date();
                     }
-                    
+
                     const year = orderDate.getFullYear();
                     const month = String(orderDate.getMonth() + 1).padStart(2, '0');
                     const day = String(orderDate.getDate()).padStart(2, '0');
                     const staffId = user?.staffId || user?.StaffID || user?.id || 'Unknown';
                     const hours = String(orderDate.getHours()).padStart(2, '0');
                     const minutes = String(orderDate.getMinutes()).padStart(2, '0');
-                    
+
                     const dateStr = `${year}${month}${day}`;
                     const timeStr = `${hours}${minutes}`;
                     const fileName = `TikTokSeller-${staffId}-${order.OrderID}-${dateStr}-${timeStr}.pdf`;
-                    
+
                     // Folder structure: Order Archive/[Platform]/[STAFFID]/[YEAR]/[MONTH]/
                     const folderPath = `Order Archive/TikTok/${staffId}/${year}/${month}/${fileName}`;
-                    
+
                     // 1. Generate Presigned URL
                     const resUrl = await fetch('/api/generate-r2-url', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
-                            fileName: folderPath, 
+                        body: JSON.stringify({
+                            fileName: folderPath,
                             fileType: 'application/pdf',
-                            isPrivate: true 
+                            isPrivate: true
                         })
                     });
 
@@ -238,7 +220,7 @@ export function AgentOrderCreate() {
                     // 3. Construct new order object without mutating state
                     const orderWithoutBlob = { ...order };
                     delete orderWithoutBlob.PdfBlob;
-                    
+
                     newOrderList.push({
                         ...orderWithoutBlob,
                         AwbUrl: folderPath
@@ -253,19 +235,19 @@ export function AgentOrderCreate() {
                     OrderList: newOrderList,
                     SkipPrintQueue: SkipPrintQueue
                 };
-                
+
                 const response = await uploadOrders(dbPayload);
                 if (response) {
                     totalSkipped += (response.skipped_orders || 0);
                     totalUpdated += (response.awb_updated || 0);
                 }
             }
-            
+
             setUploadResult({
                 skipped: totalSkipped,
                 updated: totalUpdated
             });
-            
+
             setFileStatus('Complete');
         } catch (ErrorObj) {
             console.error('Save error:', ErrorObj);
@@ -274,7 +256,7 @@ export function AgentOrderCreate() {
         }
     };
 
-    const { getRootProps, getInputProps, isDragActive } = useDropzone({ 
+    const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,
         accept: {
             'application/pdf': ['.pdf']
@@ -285,19 +267,19 @@ export function AgentOrderCreate() {
         <div className="space-y-6 max-w-7xl mx-auto">
             <AgentTabs />
 
-            <IOSShortcutDialog />
+            <TelegramConnectBanner />
 
             <div className="space-y-6">
                 {/* Dropzone */}
                 {FileStatus === 'Idle' || FileStatus === 'Error' ? (
-                    <div 
-                        {...getRootProps()} 
+                    <div
+                        {...getRootProps()}
                         className={`border-2 border-dashed rounded-xl p-8 md:p-16 text-center cursor-pointer transition-colors
                             ${isDragActive ? 'border-indigo-500 bg-indigo-50' : 'border-gray-300 hover:border-gray-400 bg-gray-50'}`}
                     >
                         <input {...getInputProps()} />
                         <UploadCloud className="mx-auto h-12 w-12 md:h-16 md:w-16 text-gray-400 mb-4" />
-                        
+
                         <div>
                             <h3 className="text-lg md:text-xl font-bold text-gray-900">Upload AWB</h3>
                             <p className="text-gray-500 mt-2 mb-6 text-sm">PDF Only</p>
@@ -344,11 +326,11 @@ export function AgentOrderCreate() {
                                 </div>
                                 <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
                                     <label className="flex items-center space-x-2 text-sm font-medium text-gray-700 cursor-pointer bg-gray-50 px-3 py-2 rounded-none border border-gray-300 hover:bg-gray-100 transition-colors">
-                                        <input 
-                                            type="checkbox" 
-                                            checked={SkipPrintQueue} 
-                                            onChange={(e) => SetSkipPrintQueue(e.target.checked)} 
-                                            className="rounded-none border-gray-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer" 
+                                        <input
+                                            type="checkbox"
+                                            checked={SkipPrintQueue}
+                                            onChange={(e) => SetSkipPrintQueue(e.target.checked)}
+                                            className="rounded-none border-gray-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer"
                                         />
                                         <span>Skip Queue (Already Printed Direct)</span>
                                     </label>
@@ -370,19 +352,21 @@ export function AgentOrderCreate() {
                                 <h3 className="font-semibold text-gray-900">Orders Preview</h3>
                             </div>
                             <div className="p-4">
-                                <DataTable 
+                                <DataTable
                                     columns={[
-                                        { accessorKey: 'Barcode', header: 'Seller SKU', cell: ({ row }) => (
-                                            <span className="font-mono text-indigo-600">{cleanSku(row.original.Barcode) || '-'}</span>
-                                        )},
-                                        { 
-                                            id: 'Products', 
-                                            header: 'Products', 
+                                        {
+                                            accessorKey: 'Barcode', header: 'Seller SKU', cell: ({ row }) => (
+                                                <span className="font-mono text-indigo-600">{cleanSku(row.original.Barcode) || '-'}</span>
+                                            )
+                                        },
+                                        {
+                                            id: 'Products',
+                                            header: 'Products',
                                             cell: ({ row }) => {
                                                 const item = row.original;
                                                 const sysProduct = productMap.get(cleanSku(item.Barcode));
                                                 const systemName = sysProduct ? [sysProduct.Brand, sysProduct.ProductName, sysProduct.Variation, sysProduct.Size].filter(Boolean).join(' ') : item.ProductName;
-                                                
+
                                                 return (
                                                     <div>
                                                         <div className={sysProduct ? "text-gray-900 font-medium" : "text-gray-500 italic"}>
@@ -393,11 +377,13 @@ export function AgentOrderCreate() {
                                                 );
                                             }
                                         },
-                                        { accessorKey: 'Quantity', header: 'Quantity', cell: ({ row }) => (
-                                            <span className="font-bold">{row.original.Quantity}</span>
-                                        )}
-                                    ]} 
-                                    data={previewItems} 
+                                        {
+                                            accessorKey: 'Quantity', header: 'Quantity', cell: ({ row }) => (
+                                                <span className="font-bold">{row.original.Quantity}</span>
+                                            )
+                                        }
+                                    ]}
+                                    data={previewItems}
                                     searchPlaceholder="Search"
                                 />
                             </div>
@@ -405,7 +391,7 @@ export function AgentOrderCreate() {
                     </div>
                 )}
 
-                <Dialog open={FileStatus === 'Upload'} onOpenChange={() => {}}>
+                <Dialog open={FileStatus === 'Upload'} onOpenChange={() => { }}>
                     <DialogContent className="sm:max-w-md [&>button]:hidden">
                         <div className="flex flex-col items-center justify-center p-8 space-y-4">
                             <Loader2 className="h-12 w-12 text-indigo-600 animate-spin" />
@@ -415,7 +401,7 @@ export function AgentOrderCreate() {
                     </DialogContent>
                 </Dialog>
 
-                <Dialog open={FileStatus === 'Complete'} onOpenChange={(open) => { if(!open) { setFileStatus('Idle'); setOrderList([]); setPayloads([]); setUploadResult(null); } }}>
+                <Dialog open={FileStatus === 'Complete'} onOpenChange={(open) => { if (!open) { setFileStatus('Idle'); setOrderList([]); setPayloads([]); setUploadResult(null); } }}>
                     <DialogContent className="sm:max-w-md [&>button]:hidden rounded-none p-0 overflow-hidden border-0 shadow-xl">
                         <div className="p-8 pb-4 text-center">
                             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-none bg-emerald-100 mb-4">
@@ -426,7 +412,7 @@ export function AgentOrderCreate() {
                             </DialogTitle>
                             <p className="text-gray-500 mt-2 text-sm">Your AWB has been successfully processed.</p>
                         </div>
-                        
+
                         <div className="px-8 pb-8">
                             {UploadResult?.skipped > 0 && (
                                 <div className="bg-amber-50 border-l-4 border-amber-500 p-4 text-sm text-amber-900 space-y-2 mt-2 mb-6 rounded-none">
@@ -439,10 +425,10 @@ export function AgentOrderCreate() {
                                     )}
                                 </div>
                             )}
-                            
+
                             <DialogFooter className="sm:justify-center">
-                                <Button 
-                                    onClick={() => { setFileStatus('Idle'); setOrderList([]); setPayloads([]); setUploadResult(null); }} 
+                                <Button
+                                    onClick={() => { setFileStatus('Idle'); setOrderList([]); setPayloads([]); setUploadResult(null); }}
                                     className="w-full rounded-none bg-indigo-600 hover:bg-indigo-700 text-white shadow-none font-medium h-11"
                                 >
                                     Done

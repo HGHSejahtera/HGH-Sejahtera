@@ -22,6 +22,16 @@
         }
       })();
     </script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for(let registration of registrations) {
+            registration.unregister();
+            console.log('Stale Service Worker Unregistered!');
+          }
+        });
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
