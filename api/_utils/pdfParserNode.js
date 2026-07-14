@@ -1,6 +1,3 @@
-import * as pdfjsLib from 'pdfjs-dist';
-import { PDFDocument } from 'pdf-lib';
-
 export const TikTokPdfParserNode = {
     /**
      * Parses a TikTok AWB PDF Buffer and extracts orders.
@@ -9,6 +6,10 @@ export const TikTokPdfParserNode = {
      */
     parse: async (buffer) => {
         try {
+            // Dynamically import heavy PDF libraries to prevent Vercel top-level cold boot crashes
+            const pdfjsLib = await import('pdfjs-dist');
+            const { PDFDocument } = await import('pdf-lib');
+
             // Note: In Node.js, we don't need the worker.
             const data = new Uint8Array(buffer);
             const loadingTask = pdfjsLib.getDocument({ data });

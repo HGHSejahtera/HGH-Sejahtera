@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
-import { processAwbPdf } from './_utils/processAwb.js';
 
 // Vercel Serverless Function for Telegram Bot Webhook
 // NOTE: No `export const config = { ... }` as per AGENTS.md rule to prevent Hobby tier errors.
+// NOTE: Dynamic await import() is used for PDF utilities to prevent top-level cold boot crashes (`FUNCTION_INVOCATION_FAILED`).
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET;
@@ -36,6 +36,10 @@ async function getTelegramFileUrl(fileId) {
 }
 
 export default async function handler(req, res) {
+    if (req.method === 'GET') {
+        return res.status(200).json({ status: 'Telegram Webhook is Active and Healthy', endpoint: '/api/telegram-webhook' });
+    }
+
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method Not Allowed' });
     }
@@ -60,7 +64,7 @@ export default async function handler(req, res) {
         }
 
         // Check if chatId is already linked to an active agent (positive ID)
-        const { data: linkedAgent, error: linkErr } = await supabase
+        const { data: linkedAgent } = await supabase
             .from('Users')
             .select('UserID, StaffID, DisplayName, TelegramChatID, Role')
             .eq('TelegramChatID', chatId)
@@ -159,7 +163,8 @@ export default async function handler(req, res) {
                 const arrayBuffer = await fileRes.arrayBuffer();
                 const pdfBuffer = Buffer.from(arrayBuffer);
 
-                // Process PDF through central utility
+                // Process PDF through central utility via dynamic import
+                const { processAwbPdf } = await import('./_utils/processAwb.js');
                 const resOutput = await processAwbPdf({
                     pdfBuffer,
                     fileName,

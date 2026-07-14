@@ -1,5 +1,4 @@
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-import { TikTokPdfParserNode } from './pdfParserNode.js';
 
 const r2Client = new S3Client({
     region: 'auto',
@@ -18,7 +17,8 @@ const BUCKET_NAME = process.env.R2_PRIVATE_BUCKET_NAME || 'hgh-awb';
  */
 export async function processAwbPdf({ pdfBuffer, fileName, agentId, staffId, supabase }) {
     try {
-        // 1. Parse and split PDF
+        // 1. Parse and split PDF via dynamic import
+        const { TikTokPdfParserNode } = await import('./pdfParserNode.js');
         const orders = await TikTokPdfParserNode.parse(pdfBuffer);
         
         if (!orders || orders.length === 0) {
