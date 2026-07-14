@@ -44,7 +44,7 @@ export async function processAwbPdf({ pdfBuffer, fileName, agentId, staffId, sup
         const { data: rpcRes, error: rpcErr } = await supabase.rpc('process_agent_order_upload', {
             payload: {
                 Platform: 'TikTok',
-                FileType: 'pdf',
+                FileType: 'PDF',
                 FileName: fileName || 'Telegram_AWB.pdf',
                 AgentID: agentId,
                 OrderList: orders
