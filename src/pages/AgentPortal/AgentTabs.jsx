@@ -1,8 +1,7 @@
 import { NavLink } from 'react-router-dom';
-import { Package, Monitor, Smartphone, Wallet } from 'lucide-react';
+import { Package, Monitor } from 'lucide-react';
 const AGENT_TABS = [
     { name: 'Upload AWB', path: '/Agent/Upload', icon: Monitor },
-    { name: 'Upload AWB', path: '/Agent/Upload-Lite', icon: Smartphone },
     { name: 'Orders', path: '/Agent/Orders', icon: Package }
 ];
 

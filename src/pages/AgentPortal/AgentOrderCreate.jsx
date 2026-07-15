@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from 'react';
-import { CheckCircle, UploadCloud, AlertTriangle, Loader2 } from 'lucide-react';
+import { CheckCircle, UploadCloud, AlertTriangle, Loader2, RefreshCw, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -322,24 +322,45 @@ export function AgentOrderCreate() {
                                         )}
                                     </div>
                                 </div>
-                                <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-                                    <label className="flex items-center space-x-2 text-sm font-medium text-gray-700 cursor-pointer bg-gray-50 px-3 py-2 rounded-none border border-gray-300 hover:bg-gray-100 transition-colors">
-                                        <input
-                                            type="checkbox"
-                                            checked={SkipPrintQueue}
-                                            onChange={(e) => SetSkipPrintQueue(e.target.checked)}
-                                            className="rounded-none border-gray-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer"
-                                        />
-                                        <span>Skip Queue (Already Printed Direct)</span>
+                                <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4 w-full md:w-auto p-2 bg-gray-50 rounded-2xl border border-gray-100/80">
+                                    <label className="flex items-center cursor-pointer gap-3 sm:pr-2 py-1.5 px-3 w-full sm:w-auto hover:bg-white rounded-xl transition-all border border-transparent hover:border-gray-200 hover:shadow-sm group">
+                                        <div className="relative shrink-0 flex items-center">
+                                            <input 
+                                                type="checkbox" 
+                                                className="sr-only" 
+                                                checked={SkipPrintQueue}
+                                                onChange={() => SetSkipPrintQueue(!SkipPrintQueue)}
+                                            />
+                                            <div className={`block w-11 h-6 rounded-full transition-colors duration-300 ${SkipPrintQueue ? 'bg-indigo-500' : 'bg-gray-300 group-hover:bg-gray-400'}`}></div>
+                                            <div className={`absolute left-1 bg-white w-4 h-4 rounded-full transition-transform duration-300 shadow-sm ${SkipPrintQueue ? 'translate-x-5' : 'translate-x-0'}`}></div>
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <span className={`text-sm font-bold leading-tight transition-colors ${SkipPrintQueue ? 'text-indigo-900' : 'text-gray-700'}`}>Skip Queue</span>
+                                            <span className="text-[10px] text-gray-500 font-medium leading-tight mt-0.5 uppercase tracking-wider">Already Printed</span>
+                                        </div>
                                     </label>
-                                    <Button variant="outline" onClick={() => { setFileStatus('Idle'); setOrderList([]); setPayloads([]); SetSkipPrintQueue(false); }} className="w-full sm:w-auto rounded-none">
-                                        Upload Another
-                                    </Button>
-                                    {FileStatus === 'Success' && (
-                                        <Button onClick={handleConfirmSave} className="bg-indigo-600 hover:bg-indigo-700 text-white w-full sm:w-auto rounded-none shadow-xs">
-                                            Submit AWB
+                                    
+                                    <div className="w-full sm:w-px h-px sm:h-8 bg-gray-200 hidden sm:block"></div>
+                                    
+                                    <div className="flex w-full sm:w-auto gap-2 px-1">
+                                        <Button 
+                                            variant="outline" 
+                                            onClick={() => { setFileStatus('Idle'); setOrderList([]); setPayloads([]); SetSkipPrintQueue(false); }} 
+                                            className="w-full sm:w-auto rounded-xl border-gray-200 hover:bg-white hover:text-gray-900 shadow-sm transition-all text-sm font-semibold h-11 px-5"
+                                        >
+                                            <RefreshCw className="w-4 h-4 mr-2 text-gray-500" />
+                                            Upload Another
                                         </Button>
-                                    )}
+                                        {FileStatus === 'Success' && (
+                                            <Button 
+                                                onClick={handleConfirmSave} 
+                                                className="w-full sm:w-auto rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-md hover:shadow-lg transition-all text-sm font-semibold h-11 px-6 border border-indigo-700/50"
+                                            >
+                                                Submit AWB
+                                                <Send className="w-4 h-4 ml-2" />
+                                            </Button>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>

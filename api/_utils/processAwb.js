@@ -28,7 +28,26 @@ export async function processAwbPdf({ pdfBuffer, fileName, agentId, staffId, sup
         // 2. Upload individual split PDFs to R2
         for (const order of orders) {
             if (order.PdfBuffer) {
-                const r2Key = `${staffId}/${order.OrderID}-${Date.now()}.pdf`;
+                const orderDateStr = order.CreatedTime || order.CreatedAt || order.OrderCreatedTime || order.Date;
+                let orderDate = orderDateStr ? new Date(orderDateStr) : new Date();
+                if (isNaN(orderDate.getTime())) {
+                    orderDate = new Date();
+                }
+
+                // Convert to UTC+8 (Malaysia Time) for consistent folder naming
+                const mytDate = new Date(orderDate.getTime() + (8 * 60 * 60 * 1000));
+                
+                const year = mytDate.getUTCFullYear();
+                const month = String(mytDate.getUTCMonth() + 1).padStart(2, '0');
+                const day = String(mytDate.getUTCDate()).padStart(2, '0');
+                const hours = String(mytDate.getUTCHours()).padStart(2, '0');
+                const minutes = String(mytDate.getUTCMinutes()).padStart(2, '0');
+
+                const dateStr = `${year}${month}${day}`;
+                const timeStr = `${hours}${minutes}`;
+                const r2FileName = `TikTokSeller-${staffId}-${order.OrderID}-${dateStr}-${timeStr}.pdf`;
+                const r2Key = `Order Archive/TikTok/${staffId}/${year}/${month}/${r2FileName}`;
+
                 await r2Client.send(new PutObjectCommand({
                     Bucket: BUCKET_NAME,
                     Key: r2Key,

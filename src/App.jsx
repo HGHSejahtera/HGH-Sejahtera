@@ -18,7 +18,6 @@ import { useIdleTimeout } from './hooks/useIdleTimeout';
 import { usePreferences } from './hooks/usePreferences';
 
 import { AgentOrderCreate } from './pages/AgentPortal/AgentOrderCreate';
-import { AgentUploadLite } from './pages/AgentPortal/AgentUploadLite';
 import { AgentMyOrders } from './pages/AgentPortal/AgentMyOrders';
 import { AgentList } from './pages/Agents/AgentList';
 import { AgentDetails } from './pages/Agents/AgentDetails';
@@ -73,7 +72,6 @@ export default function App() {
                                     <Route path="/" element={<Navigate to="/Agent/Upload" replace />} />
                                     <Route path="/Agent" element={<Navigate to="/Agent/Upload" replace />} />
                                     <Route path="/Agent/Upload" element={<AgentOrderCreate />} />
-                                    <Route path="/Agent/Upload-Lite" element={<AgentUploadLite />} />
                                     <Route path="/Agent/Orders" element={<AgentMyOrders />} />
                                     <Route path="/Settings/Account" element={<AccountSettings />} />
                                     <Route path="/Settings" element={<Navigate to="/Settings/Account" replace />} />
