@@ -242,8 +242,18 @@ export default async function handler(req, res) {
                         supabase
                     });
 
-                    await sendTelegramMessage(chatId, `${resOutput.totalOrders} orders imported.`, DASHBOARD_BUTTONS);
-                    return res.status(200).json({ status: 'awb_processed', orders: resOutput.totalOrders });
+                    const result = resOutput.result || {};
+                    const totalProcessed = result.total_orders || resOutput.totalOrders || 0;
+                    const skippedOrders = result.skipped_orders || 0;
+                    const newOrders = totalProcessed - skippedOrders;
+
+                    let replyMessage = `✅ ${newOrders} new orders successfully imported.`;
+                    if (skippedOrders > 0) {
+                        replyMessage += `\n⚠️ ${skippedOrders} orders were skipped (already uploaded previously).`;
+                    }
+
+                    await sendTelegramMessage(chatId, replyMessage, DASHBOARD_BUTTONS);
+                    return res.status(200).json({ status: 'awb_processed', orders: newOrders, skipped: skippedOrders });
                 } catch (err) {
                     console.error('Error processing PDF upload from Telegram:', err);
                     await sendTelegramMessage(chatId, `Failed to process AWB PDF: ${err.message || 'Unknown error'}`, DASHBOARD_BUTTONS);

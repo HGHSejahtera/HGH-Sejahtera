@@ -54,7 +54,7 @@ export async function processAwbPdf({ pdfBuffer, fileName, agentId, staffId, sup
                     Body: order.PdfBuffer,
                     ContentType: 'application/pdf'
                 }));
-                order.AwbUrl = `/api/proxy-pdf?key=${encodeURIComponent(r2Key)}`;
+                order.AwbUrl = r2Key;
                 delete order.PdfBuffer;
             }
         }
