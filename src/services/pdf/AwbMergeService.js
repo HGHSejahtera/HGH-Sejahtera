@@ -126,14 +126,15 @@ export async function MergeAndPrintAwbs(OrdersList) {
 
     for (const Order of ValidOrders) {
         try {
-            const Response = await fetch(Order.AwbUrl);
-            if (!Response.ok) continue;
+            const pdfUrl = `/api/proxy-pdf?url=${encodeURIComponent(Order.AwbUrl)}`;
+            const Response = await fetch(pdfUrl);
+            if (!Response.ok) throw new Error(`Failed to fetch AWB (HTTP ${Response.status})`);
             const ArrayBuffer = await Response.arrayBuffer();
             const SourcePdf = await PDFDocument.load(ArrayBuffer);
             const CopiedPages = await MergedPdf.copyPages(SourcePdf, SourcePdf.getPageIndices());
             CopiedPages.forEach(Page => MergedPdf.addPage(Page));
-        } catch (Error) {
-            console.error(`Failed to merge AWB for Order ${Order.PlatformOrderID || Order.ImportedOrderID}:`, Error);
+        } catch (error) {
+            console.error(`Failed to merge AWB for Order ${Order.PlatformOrderID || Order.ImportedOrderID}:`, error);
         }
     }
 

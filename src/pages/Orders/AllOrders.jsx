@@ -103,9 +103,9 @@ export function AllOrders() {
                 await MarkAsPrinted({ orderIds: PrintedIds, isPrinted: true });
                 SetRowSelection({});
             }
-        } catch (Error) {
-            console.error('Failed to print batch AWBs:', Error);
-            alert(Error.message || 'Failed to merge or print AWB files.');
+        } catch (error) {
+            console.error('Failed to print batch AWBs:', error);
+            alert(error.message || 'Failed to merge or print AWB files.');
         } finally {
             SetIsPrinting(false);
         }
@@ -129,16 +129,20 @@ export function AllOrders() {
                     />
                 </div>
             ),
-            cell: ({ row }) => (
+            cell: ({ row }) => {
+                const isMissingAwb = !row.original.AwbUrl || row.original.AwbUrl.trim() === '';
+                return (
                 <div className="flex justify-center items-center px-2">
                     <Checkbox
                         checked={row.getIsSelected()}
                         onCheckedChange={(value) => row.toggleSelected(!!value)}
                         aria-label="Select row"
                         className="border-gray-300"
+                        disabled={isMissingAwb}
                     />
                 </div>
-            ),
+                );
+            },
             enableSorting: false,
             enableHiding: false,
         },
@@ -203,19 +207,25 @@ export function AllOrders() {
             header: () => <div className="text-center">Status</div>,
             id: 'status_action',
             cell: ({ row }) => {
+                const isMissingAwb = !row.original.AwbUrl || row.original.AwbUrl.trim() === '';
                 const hasUnmatched = (row.original.Items || row.original.ImportedOrderItems)?.some(
                     i => !i.ProductID || i.PlatformSKU === '-' || i.MatchStatus === 'Unmatched'
                 ) || (Number(row.original.DisplayAmount || 0) === 0 && (row.original.Items?.length > 0 || row.original.ImportedOrderItems?.length > 0));
 
                 return (
                     <div className="flex justify-center">
-                        {hasUnmatched ? (
-                            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-800 bg-amber-100/90 px-2.5 py-1 rounded-md border border-amber-300 shadow-xs">
+                        {isMissingAwb ? (
+                            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-800 bg-rose-100 px-2.5 py-1 rounded-md border border-rose-300 shadow-xs whitespace-nowrap">
+                                <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                                Missing AWB
+                            </span>
+                        ) : hasUnmatched ? (
+                            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-800 bg-amber-100/90 px-2.5 py-1 rounded-md border border-amber-300 shadow-xs whitespace-nowrap">
                                 <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                                 SKU Review
                             </span>
                         ) : row.original.IsPrinted ? (
-                            <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-200 shadow-xs">
+                            <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-200 shadow-xs whitespace-nowrap">
                                 <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                                 Completed
                             </span>
@@ -371,9 +381,22 @@ export function AllOrders() {
                             {(() => {
                                 const orderItems = selectedOrder.Items || selectedOrder.ImportedOrderItems || [];
                                 const hasUnmatchedItems = orderItems.some(i => !i.ProductID || i.PlatformSKU === '-' || i.MatchStatus === 'Unmatched') || Number(selectedOrder.DisplayAmount || 0) === 0;
+                                const isMissingAwb = !selectedOrder.AwbUrl || selectedOrder.AwbUrl.trim() === '';
 
                                 return (
                                     <>
+                                        {isMissingAwb && (
+                                            <div className="bg-rose-50 border border-rose-200 p-4 rounded-xl flex items-start space-x-3 text-rose-900 shadow-xs">
+                                                <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                                                <div className="flex-1 text-xs">
+                                                    <p className="font-bold text-sm">Action Required: Missing AWB PDF</p>
+                                                    <p className="mt-1 text-rose-800 leading-relaxed">
+                                                        This order was recorded but the AWB PDF failed to upload. 
+                                                        You cannot print this order. Please upload the PDF via <b>Upload AWB (PC)</b> to attach it to this order.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )}
                                         {hasUnmatchedItems && (
                                             <div className="bg-amber-50 border border-amber-200/80 p-4 rounded-xl flex items-start space-x-3 text-amber-900 shadow-xs">
                                                 <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
