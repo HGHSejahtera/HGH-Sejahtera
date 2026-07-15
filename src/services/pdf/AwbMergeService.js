@@ -123,6 +123,7 @@ export async function MergeAndPrintAwbs(OrdersList) {
     }
 
     const MergedPdf = await PDFDocument.create();
+    const SuccessfulOrderIds = [];
 
     for (const Order of ValidOrders) {
         try {
@@ -133,9 +134,14 @@ export async function MergeAndPrintAwbs(OrdersList) {
             const SourcePdf = await PDFDocument.load(ArrayBuffer);
             const CopiedPages = await MergedPdf.copyPages(SourcePdf, SourcePdf.getPageIndices());
             CopiedPages.forEach(Page => MergedPdf.addPage(Page));
+            SuccessfulOrderIds.push(Order.ImportedOrderID);
         } catch (error) {
             console.error(`Failed to merge AWB for Order ${Order.PlatformOrderID || Order.ImportedOrderID}:`, error);
         }
+    }
+
+    if (SuccessfulOrderIds.length === 0 || MergedPdf.getPageCount() === 0) {
+        throw new Error('All selected orders failed to load their AWB PDFs. The files may be corrupted or missing from the server.');
     }
 
     const MergedPdfBytes = await MergedPdf.save();
@@ -159,5 +165,5 @@ export async function MergeAndPrintAwbs(OrdersList) {
         document.body.removeChild(Link);
     }
 
-    return ValidOrders.map(Order => Order.ImportedOrderID);
+    return SuccessfulOrderIds;
 }

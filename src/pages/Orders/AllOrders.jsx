@@ -165,14 +165,40 @@ export function AllOrders() {
         { 
             header: 'Order ID', 
             accessorKey: 'PlatformOrderID',
-            cell: ({ row }) => (
-                <div className="flex items-center space-x-2">
-                    {row.original.IsPrinted && (
-                        <span className="inline-block h-2.5 w-2.5 rounded-full bg-green-500 shadow-sm shrink-0" title="Print Done"></span>
-                    )}
-                    <span className="font-semibold text-gray-900">{row.original.PlatformOrderID}</span>
-                </div>
-            )
+            cell: ({ row }) => {
+                const isMissingAwb = !row.original.AwbUrl || row.original.AwbUrl.trim() === '';
+                const hasUnmatched = (row.original.Items || row.original.ImportedOrderItems)?.some(
+                    i => !i.ProductID || i.PlatformSKU === '-' || i.MatchStatus === 'Unmatched'
+                ) || (Number(row.original.DisplayAmount || 0) === 0 && (row.original.Items?.length > 0 || row.original.ImportedOrderItems?.length > 0));
+
+                return (
+                    <div className="flex flex-col">
+                        <div className="flex items-center space-x-2">
+                            {row.original.IsPrinted && (
+                                <span 
+                                    className={`inline-block h-2 w-2 rounded-full shadow-sm shrink-0 ${isMissingAwb ? 'bg-amber-400' : 'bg-emerald-500'}`} 
+                                    title={isMissingAwb ? "Missing AWB" : "Print Done"}
+                                ></span>
+                            )}
+                            <span className="font-semibold text-gray-900">{row.original.PlatformOrderID}</span>
+                        </div>
+                        {(isMissingAwb || hasUnmatched) && (
+                            <div className="flex gap-1.5 mt-1.5 flex-wrap">
+                                {isMissingAwb && (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-rose-800 bg-rose-100 px-1.5 py-0.5 rounded border border-rose-300">
+                                        <AlertTriangle className="w-3 h-3 text-rose-600" /> Missing AWB
+                                    </span>
+                                )}
+                                {hasUnmatched && (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded border border-amber-300">
+                                        <AlertTriangle className="w-3 h-3 text-amber-600" /> SKU Review
+                                    </span>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                );
+            }
         },
         { 
             header: () => <div className="text-center">Platform</div>, 
@@ -203,37 +229,7 @@ export function AllOrders() {
                 </div>
             )
         },
-        {
-            header: () => <div className="text-center">Status</div>,
-            id: 'status_action',
-            cell: ({ row }) => {
-                const isMissingAwb = !row.original.AwbUrl || row.original.AwbUrl.trim() === '';
-                const hasUnmatched = (row.original.Items || row.original.ImportedOrderItems)?.some(
-                    i => !i.ProductID || i.PlatformSKU === '-' || i.MatchStatus === 'Unmatched'
-                ) || (Number(row.original.DisplayAmount || 0) === 0 && (row.original.Items?.length > 0 || row.original.ImportedOrderItems?.length > 0));
 
-                return (
-                    <div className="flex justify-center">
-                        {isMissingAwb ? (
-                            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-800 bg-rose-100 px-2.5 py-1 rounded-md border border-rose-300 shadow-xs whitespace-nowrap">
-                                <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                                Missing AWB
-                            </span>
-                        ) : hasUnmatched ? (
-                            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-800 bg-amber-100/90 px-2.5 py-1 rounded-md border border-amber-300 shadow-xs whitespace-nowrap">
-                                <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                                SKU Review
-                            </span>
-                        ) : row.original.IsPrinted ? (
-                            <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-200 shadow-xs whitespace-nowrap">
-                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                Completed
-                            </span>
-                        ) : null}
-                    </div>
-                );
-            }
-        },
         {
             header: () => <div className="text-center">Action</div>,
             id: 'actions',
