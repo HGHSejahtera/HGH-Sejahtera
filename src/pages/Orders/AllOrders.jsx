@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useOrderHistory } from '@/hooks/useOrderHistory';
 import { AwbPdfViewer } from '@/components/common/AwbPdfViewer';
 import { SortOrders, MergeAndPrintAwbs } from '@/services/pdf/AwbMergeService';
@@ -7,6 +7,7 @@ import { Clock, ChevronRight, Package, X, Printer, CheckCircle2, AlertTriangle, 
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/common/DataTable';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/hooks/useAuth';
@@ -30,6 +31,25 @@ export function AllOrders() {
     const [ActiveTab, SetActiveTab] = useState('Queue');
     const [SortBy, SetSortBy] = useState('Product');
     const [IsPrinting, SetIsPrinting] = useState(false);
+    const [FilterAgent, SetFilterAgent] = useState('All');
+    const [FilterPlatform, SetFilterPlatform] = useState('All');
+    const [RowSelection, SetRowSelection] = useState({});
+
+    // Reset selection when changing tabs or filters
+    useEffect(() => {
+        SetRowSelection({});
+    }, [ActiveTab, FilterAgent, FilterPlatform, SortBy]);
+
+    // Unique options for filters
+    const UniqueAgents = useMemo(() => {
+        const agents = new Set(orders.filter(o => o.AgentName).map(o => o.AgentName));
+        return ['All', ...Array.from(agents).sort()];
+    }, [orders]);
+
+    const UniquePlatforms = useMemo(() => {
+        const platforms = new Set(orders.filter(o => o.Platform).map(o => o.Platform));
+        return ['All', ...Array.from(platforms).sort()];
+    }, [orders]);
 
     // Drawer state
     const [selectedOrder, setSelectedOrder] = useState(null);
@@ -51,24 +71,37 @@ export function AllOrders() {
     };
 
     const QueueOrders = useMemo(() => {
-        const Unprinted = orders.filter(Order => !Order.IsPrinted);
+        let Unprinted = orders.filter(Order => !Order.IsPrinted);
+        if (FilterAgent !== 'All') Unprinted = Unprinted.filter(o => o.AgentName === FilterAgent);
+        if (FilterPlatform !== 'All') Unprinted = Unprinted.filter(o => o.Platform === FilterPlatform);
         return SortOrders(Unprinted, SortBy);
-    }, [orders, SortBy]);
+    }, [orders, SortBy, FilterAgent, FilterPlatform]);
 
     const CompleteOrders = useMemo(() => {
-        const Printed = orders.filter(Order => Order.IsPrinted);
+        let Printed = orders.filter(Order => Order.IsPrinted);
+        if (FilterAgent !== 'All') Printed = Printed.filter(o => o.AgentName === FilterAgent);
+        if (FilterPlatform !== 'All') Printed = Printed.filter(o => o.Platform === FilterPlatform);
         return SortOrders(Printed, SortBy);
-    }, [orders, SortBy]);
+    }, [orders, SortBy, FilterAgent, FilterPlatform]);
 
     const DisplayOrders = ActiveTab === 'Queue' ? QueueOrders : CompleteOrders;
 
     const HandlePrintAll = async () => {
-        if (QueueOrders.length === 0) return;
+        const selectedIndices = Object.keys(RowSelection).filter(k => RowSelection[k]);
+        let ordersToPrint = QueueOrders;
+        
+        if (selectedIndices.length > 0) {
+            ordersToPrint = selectedIndices.map(index => QueueOrders[index]);
+        }
+        
+        if (ordersToPrint.length === 0) return;
+        
         SetIsPrinting(true);
         try {
-            const PrintedIds = await MergeAndPrintAwbs(QueueOrders);
+            const PrintedIds = await MergeAndPrintAwbs(ordersToPrint);
             if (PrintedIds && PrintedIds.length > 0) {
                 await MarkAsPrinted({ orderIds: PrintedIds, isPrinted: true });
+                SetRowSelection({});
             }
         } catch (Error) {
             console.error('Failed to print batch AWBs:', Error);
@@ -78,22 +111,37 @@ export function AllOrders() {
         }
     };
 
-    const HandleMarkBatchDone = async () => {
-        if (QueueOrders.length === 0) return;
-        const OrderIds = QueueOrders.map(Order => Order.ImportedOrderID);
-        try {
-            await MarkAsPrinted({ orderIds: OrderIds, isPrinted: true });
-        } catch (Error) {
-            console.error('Failed to mark batch as done:', Error);
-        }
-    };
-
     // RLS Protection in UI
     if (isAgent || isStaff) {
         return <Navigate to="/Dashboard" replace />;
     }
 
     const columns = [
+        {
+            id: 'select',
+            header: ({ table }) => (
+                <div className="flex justify-center items-center px-2">
+                    <Checkbox
+                        checked={table.getIsAllPageRowsSelected()}
+                        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+                        aria-label="Select all"
+                        className="border-gray-300"
+                    />
+                </div>
+            ),
+            cell: ({ row }) => (
+                <div className="flex justify-center items-center px-2">
+                    <Checkbox
+                        checked={row.getIsSelected()}
+                        onCheckedChange={(value) => row.toggleSelected(!!value)}
+                        aria-label="Select row"
+                        className="border-gray-300"
+                    />
+                </div>
+            ),
+            enableSorting: false,
+            enableHiding: false,
+        },
         { 
             header: 'Date', 
             accessorKey: 'CreatedAt',
@@ -166,27 +214,12 @@ export function AllOrders() {
                                 <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                                 SKU Review
                             </span>
-                        ) : !row.original.IsPrinted ? (
-                            <Button 
-                                variant="outline" 
-                                size="sm" 
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    MarkAsPrinted({ orderIds: [row.original.ImportedOrderID], isPrinted: true });
-                                }}
-                                disabled={IsMarkingPrinted}
-                                title="Mark Order as Complete"
-                                className="border-emerald-200 bg-emerald-50/50 hover:bg-emerald-50 text-emerald-700 hover:border-emerald-300 font-medium text-xs rounded-md h-7 px-3 shadow-xs transition-all cursor-pointer"
-                            >
-                                <CheckCircle2 className="w-3.5 h-3.5 mr-1 text-emerald-600" />
-                                Complete
-                            </Button>
-                        ) : (
+                        ) : row.original.IsPrinted ? (
                             <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-200 shadow-xs">
                                 <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                                 Completed
                             </span>
-                        )}
+                        ) : null}
                     </div>
                 );
             }
@@ -209,9 +242,36 @@ export function AllOrders() {
         }
     ];
 
+    const selectedCount = Object.keys(RowSelection).filter(k => RowSelection[k]).length;
     const QueueActionElement = ActiveTab === 'Queue' ? (
         <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center gap-1 text-xs">
+                <span className="text-gray-500 font-medium mr-1">Platform:</span>
+                <Select value={FilterPlatform} onValueChange={SetFilterPlatform}>
+                    <SelectTrigger className="h-8 w-[110px] bg-white text-xs font-medium rounded-md border-gray-200 hover:border-gray-300 shadow-xs transition-colors">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent side="bottom" className="rounded-md shadow-lg border-gray-200">
+                        {UniquePlatforms.map(platform => (
+                            <SelectItem key={platform} value={platform}>{platform}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+            <div className="flex items-center gap-1 text-xs ml-2">
+                <span className="text-gray-500 font-medium mr-1">Agent:</span>
+                <Select value={FilterAgent} onValueChange={SetFilterAgent}>
+                    <SelectTrigger className="h-8 w-[110px] bg-white text-xs font-medium rounded-md border-gray-200 hover:border-gray-300 shadow-xs transition-colors">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent side="bottom" className="rounded-md shadow-lg border-gray-200">
+                        {UniqueAgents.map(agent => (
+                            <SelectItem key={agent} value={agent}>{agent}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+            <div className="flex items-center gap-1 text-xs ml-2">
                 <span className="text-gray-500 font-medium mr-1">Sort By:</span>
                 <Select value={SortBy} onValueChange={SetSortBy}>
                     <SelectTrigger className="h-8 w-[130px] bg-white text-xs font-medium rounded-md border-gray-200 hover:border-gray-300 shadow-xs transition-colors">
@@ -230,20 +290,10 @@ export function AllOrders() {
                 size="sm" 
                 onClick={HandlePrintAll}
                 disabled={IsPrinting || QueueOrders.length === 0}
-                className="border-gray-200 bg-white hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 text-gray-700 font-medium text-xs rounded-md h-8 px-3 shadow-xs transition-all cursor-pointer"
+                className="border-gray-200 bg-white hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 text-gray-700 font-medium text-xs rounded-md h-8 px-3 shadow-xs transition-all cursor-pointer ml-2"
             >
                 <Printer className="w-3.5 h-3.5 mr-1.5 text-indigo-600" />
-                Print All ({QueueOrders.length})
-            </Button>
-            <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={HandleMarkBatchDone}
-                disabled={IsMarkingPrinted || QueueOrders.length === 0}
-                className="border-gray-200 bg-white hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 text-gray-700 font-medium text-xs rounded-md h-8 px-3 shadow-xs transition-all cursor-pointer"
-            >
-                <CheckCircle2 className="w-3.5 h-3.5 mr-1.5 text-emerald-600" />
-                Complete Order
+                {selectedCount > 0 ? `Print Selected (${selectedCount})` : `Print All (${QueueOrders.length})`}
             </Button>
         </div>
     ) : null;
@@ -291,6 +341,8 @@ export function AllOrders() {
                         isLoading={isLoading} 
                         searchPlaceholder="Search" 
                         actionElement={QueueActionElement}
+                        rowSelection={RowSelection}
+                        onRowSelectionChange={SetRowSelection}
                     />
                 </div>
             </div>
