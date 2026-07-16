@@ -53,6 +53,7 @@ export function SortOrders(OrdersList, SortBy = 'Product') {
         const PrimaryBrand = DistinctBrands.length === 1 ? DistinctBrands[0] : 'Mixed Brands';
         const IsSingleBrand = DistinctBrands.length === 1;
         const CreatedTimestamp = new Date(Order.CreatedAt || 0).getTime();
+        const CreatedMonth = new Date(Order.CreatedAt || 0).getMonth();
 
         return {
             ...Order,
@@ -60,7 +61,8 @@ export function SortOrders(OrdersList, SortBy = 'Product') {
             ComboKey,
             PrimaryBrand,
             IsSingleBrand,
-            CreatedTimestamp
+            CreatedTimestamp,
+            CreatedMonth
         };
     });
 
@@ -112,37 +114,126 @@ export function SortOrders(OrdersList, SortBy = 'Product') {
             return OrderA.ComboKey.localeCompare(OrderB.ComboKey);
         }
 
+        if (SortBy === 'MonthJanDec') {
+            if (OrderA.CreatedMonth !== OrderB.CreatedMonth) {
+                return OrderA.CreatedMonth - OrderB.CreatedMonth;
+            }
+            if (OrderA.CreatedTimestamp !== OrderB.CreatedTimestamp) {
+                return OrderA.CreatedTimestamp - OrderB.CreatedTimestamp;
+            }
+            return OrderA.ComboKey.localeCompare(OrderB.ComboKey);
+        }
+
+        if (SortBy === 'MonthDecJan') {
+            if (OrderA.CreatedMonth !== OrderB.CreatedMonth) {
+                return OrderB.CreatedMonth - OrderA.CreatedMonth;
+            }
+            if (OrderA.CreatedTimestamp !== OrderB.CreatedTimestamp) {
+                return OrderB.CreatedTimestamp - OrderA.CreatedTimestamp;
+            }
+            return OrderA.ComboKey.localeCompare(OrderB.ComboKey);
+        }
+
         return 0;
     });
 }
 
-export async function MergeAndPrintAwbs(OrdersList) {
+export async function MergeAndPrintAwbs(OrdersList, onProgress = null) {
     const ValidOrders = OrdersList.filter(Order => Order.AwbUrl && Order.AwbUrl.trim() !== '');
     if (ValidOrders.length === 0) {
         throw new Error('No valid AWB PDF files found in selected orders.');
     }
 
+    if (onProgress) {
+        onProgress({ current: 0, total: ValidOrders.length, status: 'Initializing PDF merger...', successCount: 0, failCount: 0, errors: [] });
+    }
+
     const { PDFDocument } = await LoadPdfLib();
     const MergedPdf = await PDFDocument.create();
     const SuccessfulOrderIds = [];
+    const ErrorsList = [];
+    let failCount = 0;
 
-    for (const Order of ValidOrders) {
-        try {
-            const pdfUrl = `/api/proxy-pdf?url=${encodeURIComponent(Order.AwbUrl)}`;
-            const fetchRes = await fetch(pdfUrl);
-            if (!fetchRes.ok) throw new Error(`Failed to fetch AWB (HTTP ${fetchRes.status})`);
-            const pdfArrayBuffer = await fetchRes.arrayBuffer();
-            const SourcePdf = await PDFDocument.load(pdfArrayBuffer);
-            const CopiedPages = await MergedPdf.copyPages(SourcePdf, SourcePdf.getPageIndices());
-            CopiedPages.forEach(Page => MergedPdf.addPage(Page));
-            SuccessfulOrderIds.push(Order.ImportedOrderID);
-        } catch (error) {
-            console.error(`Failed to merge AWB for Order ${Order.PlatformOrderID || Order.ImportedOrderID}:`, error);
+    for (let i = 0; i < ValidOrders.length; i++) {
+        const Order = ValidOrders[i];
+        const orderIdDisplay = Order.PlatformOrderID || Order.ImportedOrderID || `Order #${i + 1}`;
+        
+        if (onProgress) {
+            onProgress({
+                current: i + 1,
+                total: ValidOrders.length,
+                status: `Fetching AWB (${i + 1}/${ValidOrders.length}): ${orderIdDisplay}...`,
+                successCount: SuccessfulOrderIds.length,
+                failCount,
+                errors: ErrorsList
+            });
+        }
+
+        let fetchSuccess = false;
+        const pdfUrl = `/api/proxy-pdf?url=${encodeURIComponent(Order.AwbUrl)}`;
+
+        // Retry mechanism (up to 3 attempts total) for network/proxy glitches like 502 Bad Gateway
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+                const fetchRes = await fetch(pdfUrl);
+                if (!fetchRes.ok) {
+                    throw new Error(`HTTP ${fetchRes.status}`);
+                }
+                const pdfArrayBuffer = await fetchRes.arrayBuffer();
+                const SourcePdf = await PDFDocument.load(pdfArrayBuffer);
+                const CopiedPages = await MergedPdf.copyPages(SourcePdf, SourcePdf.getPageIndices());
+                CopiedPages.forEach(Page => MergedPdf.addPage(Page));
+                SuccessfulOrderIds.push(Order.ImportedOrderID);
+                fetchSuccess = true;
+                break;
+            } catch (error) {
+                if (attempt < 3) {
+                    // Wait 600ms before retrying
+                    await new Promise(resolve => setTimeout(resolve, 600));
+                } else {
+                    console.error(`Failed to merge AWB for Order ${orderIdDisplay} after 3 attempts:`, error);
+                    failCount++;
+                    ErrorsList.push({ orderId: orderIdDisplay, error: error.message || 'Download error' });
+                }
+            }
+        }
+
+        if (onProgress) {
+            onProgress({
+                current: i + 1,
+                total: ValidOrders.length,
+                status: `Processed (${i + 1}/${ValidOrders.length}): ${orderIdDisplay}`,
+                successCount: SuccessfulOrderIds.length,
+                failCount,
+                errors: ErrorsList
+            });
         }
     }
 
     if (SuccessfulOrderIds.length === 0 || MergedPdf.getPageCount() === 0) {
-        throw new Error('All selected orders failed to load their AWB PDFs. The files may be corrupted or missing from the server.');
+        if (onProgress) {
+            onProgress({
+                current: ValidOrders.length,
+                total: ValidOrders.length,
+                status: 'Failed to download any AWB PDFs (HTTP 502 / Proxy Error).',
+                successCount: 0,
+                failCount,
+                errors: ErrorsList,
+                isDone: true
+            });
+        }
+        throw new Error('All selected orders failed to load their AWB PDFs. The server proxy may be unreachable (HTTP 502).');
+    }
+
+    if (onProgress) {
+        onProgress({
+            current: ValidOrders.length,
+            total: ValidOrders.length,
+            status: `Preparing document for printing (${SuccessfulOrderIds.length} pages ready)...`,
+            successCount: SuccessfulOrderIds.length,
+            failCount,
+            errors: ErrorsList
+        });
     }
 
     const MergedPdfBytes = await MergedPdf.save();
@@ -160,11 +251,133 @@ export async function MergeAndPrintAwbs(OrdersList) {
         // Fallback if popup blocked: create download link
         const Link = document.createElement('a');
         Link.href = BlobUrl;
-        Link.download = `Batch_AWBs_${new Date().toISOString().slice(0,10)}.pdf`;
+        Link.download = getBatchAwbFilename();
         document.body.appendChild(Link);
         Link.click();
         document.body.removeChild(Link);
     }
 
+    if (onProgress) {
+        onProgress({
+            current: ValidOrders.length,
+            total: ValidOrders.length,
+            status: `Done! Merged and opened ${SuccessfulOrderIds.length} AWBs.`,
+            successCount: SuccessfulOrderIds.length,
+            failCount,
+            errors: ErrorsList,
+            isDone: true
+        });
+    }
+
     return SuccessfulOrderIds;
+}
+
+export function getBatchAwbFilename() {
+    const now = new Date();
+    const date = now.toISOString().slice(0, 10);
+    const time = now.toTimeString().slice(0, 8).replace(/:/g, '');
+    return `Batch-AWB-${date}-${time}.pdf`;
+}
+
+export async function MergeAwbsBatch(OrdersList, onProgress = null) {
+    const ValidOrders = OrdersList.filter(Order => Order.AwbUrl && Order.AwbUrl.trim() !== '');
+    if (ValidOrders.length === 0) {
+        throw new Error('No valid AWB PDF files found in selected orders.');
+    }
+
+    if (onProgress) {
+        onProgress({ current: 0, total: ValidOrders.length, status: 'Initializing batch PDF merger...', successCount: 0, failCount: 0, errors: [] });
+    }
+
+    const { PDFDocument } = await LoadPdfLib();
+    const MergedPdf = await PDFDocument.create();
+    const SuccessfulOrderIds = [];
+    const FailedOrdersList = [];
+    const ErrorsList = [];
+
+    for (let i = 0; i < ValidOrders.length; i++) {
+        const Order = ValidOrders[i];
+        const orderIdDisplay = Order.PlatformOrderID || Order.ImportedOrderID || `Order #${i + 1}`;
+        
+        if (onProgress) {
+            onProgress({
+                current: i + 1,
+                total: ValidOrders.length,
+                status: `Fetching AWB (${i + 1}/${ValidOrders.length}): ${orderIdDisplay}...`,
+                successCount: SuccessfulOrderIds.length,
+                failCount: FailedOrdersList.length,
+                errors: ErrorsList
+            });
+        }
+
+        let fetchSuccess = false;
+        const pdfUrl = `/api/proxy-pdf?url=${encodeURIComponent(Order.AwbUrl)}`;
+
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+                const fetchRes = await fetch(pdfUrl);
+                if (!fetchRes.ok) {
+                    throw new Error(`HTTP ${fetchRes.status}`);
+                }
+                const pdfArrayBuffer = await fetchRes.arrayBuffer();
+                const SourcePdf = await PDFDocument.load(pdfArrayBuffer);
+                const CopiedPages = await MergedPdf.copyPages(SourcePdf, SourcePdf.getPageIndices());
+                CopiedPages.forEach(Page => MergedPdf.addPage(Page));
+                SuccessfulOrderIds.push(Order.ImportedOrderID);
+                fetchSuccess = true;
+                break;
+            } catch (error) {
+                if (attempt < 3) {
+                    await new Promise(resolve => setTimeout(resolve, 600));
+                } else {
+                    console.error(`Failed to merge AWB for Order ${orderIdDisplay} after 3 attempts:`, error);
+                    const errorMsg = error.message || 'Download error';
+                    ErrorsList.push({ orderId: orderIdDisplay, error: errorMsg });
+                    FailedOrdersList.push({
+                        orderId: orderIdDisplay,
+                        importedOrderId: Order.ImportedOrderID,
+                        error: errorMsg,
+                        order: Order
+                    });
+                }
+            }
+        }
+
+        if (onProgress) {
+            onProgress({
+                current: i + 1,
+                total: ValidOrders.length,
+                status: `Processed (${i + 1}/${ValidOrders.length}): ${orderIdDisplay}`,
+                successCount: SuccessfulOrderIds.length,
+                failCount: FailedOrdersList.length,
+                errors: ErrorsList
+            });
+        }
+    }
+
+    let BlobUrl = null;
+    if (MergedPdf.getPageCount() > 0) {
+        const MergedPdfBytes = await MergedPdf.save();
+        const PdfBlob = new Blob([MergedPdfBytes], { type: 'application/pdf' });
+        BlobUrl = URL.createObjectURL(PdfBlob);
+    }
+
+    if (onProgress) {
+        onProgress({
+            current: ValidOrders.length,
+            total: ValidOrders.length,
+            status: SuccessfulOrderIds.length > 0 ? 'Ready' : 'Failed to download any AWBs (HTTP 502 / Proxy Error).',
+            successCount: SuccessfulOrderIds.length,
+            failCount: FailedOrdersList.length,
+            errors: ErrorsList,
+            isDone: true
+        });
+    }
+
+    return {
+        successfulIds: SuccessfulOrderIds,
+        failedOrders: FailedOrdersList,
+        blobUrl: BlobUrl,
+        totalProcessed: ValidOrders.length
+    };
 }

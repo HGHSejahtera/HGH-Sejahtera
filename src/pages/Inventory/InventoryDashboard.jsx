@@ -758,7 +758,7 @@ export function InventoryDashboard() {
     }
 
     return (
-        <div className="space-y-6 flex flex-col h-full">
+        <div className="space-y-6">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between shrink-0">
                 <div 
                     className="flex items-center gap-2 cursor-pointer group"
@@ -862,7 +862,7 @@ export function InventoryDashboard() {
             )}
 
             {activeTab === 'Inventory' && (
-                <div className="rounded-xl border bg-white p-4 shadow-sm flex-1 flex flex-col min-h-0">
+                <div className="rounded-xl border bg-white p-4 shadow-sm">
                     {isLoading ? (
                         <div className="py-12 text-center text-gray-500">Loading inventory...</div>
                     ) : (

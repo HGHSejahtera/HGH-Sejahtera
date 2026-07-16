@@ -52,7 +52,7 @@ export default defineConfig({
       '/api': {
         target: 'https://www.hghsejahtera.my',
         changeOrigin: true,
-        secure: true,
+        secure: false,
       },
     },
   },

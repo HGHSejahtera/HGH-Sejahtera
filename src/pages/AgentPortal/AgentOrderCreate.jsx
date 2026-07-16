@@ -16,6 +16,31 @@ import { useProducts } from '@/hooks/useProducts';
 import { useTranslation } from '@/hooks/useTranslation';
 import { AgentTabs } from './AgentTabs';
 
+async function fetchWithRetry(url, options, maxRetries = 3, delayMs = 1000) {
+    let lastError;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            const response = await fetch(url, options);
+            if (response.ok) {
+                return response;
+            }
+            // Retry on 500, 502, 503, 504 status codes
+            if (response.status >= 500 && attempt < maxRetries) {
+                console.warn(`[Retry ${attempt}/${maxRetries}] ${url} returned ${response.status}. Retrying in ${delayMs}ms...`);
+                await new Promise(r => setTimeout(r, delayMs * attempt));
+                continue;
+            }
+            return response;
+        } catch (error) {
+            lastError = error;
+            if (attempt < maxRetries) {
+                console.warn(`[Retry ${attempt}/${maxRetries}] ${url} network/proxy error: ${error.message}. Retrying in ${delayMs}ms...`);
+                await new Promise(r => setTimeout(r, delayMs * attempt));
+            }
+        }
+    }
+    if (lastError) throw lastError;
+}
 
 export function AgentOrderCreate() {
     const { user } = useAuthStore();
@@ -185,10 +210,10 @@ export function AgentOrderCreate() {
                     const fileName = `TikTokSeller-${staffId}-${order.OrderID}-${dateStr}-${timeStr}.pdf`;
 
                     // Folder structure: Order Archive/[Platform]/[STAFFID]/[YEAR]/[MONTH]/
-                    const folderPath = `Order Archive/TikTok/${staffId}/${year}/${month}/${fileName}`;
+                    const folderPath = `Order Archive/TikTok/${staffId}/${year}/${month}/${fileName}`.replace(/\/+/g, '/');
 
-                    // 1. Generate Presigned URL
-                    const resUrl = await fetch('/api/generate-r2-url', {
+                    // 1. Generate Presigned URL with retry
+                    const resUrl = await fetchWithRetry('/api/generate-r2-url', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -198,14 +223,14 @@ export function AgentOrderCreate() {
                         })
                     });
 
-                    if (!resUrl.ok) {
+                    if (!resUrl || !resUrl.ok) {
                         throw new Error(t('errors.uploadOrdersFailedR2'));
                     }
 
                     const { url } = await resUrl.json();
 
-                    // 2. Upload file securely to Cloudflare R2
-                    const uploadRes = await fetch(url, {
+                    // 2. Upload file securely to Cloudflare R2 with retry
+                    const uploadRes = await fetchWithRetry(url, {
                         method: 'PUT',
                         headers: {
                             'Content-Type': 'application/pdf',
@@ -213,7 +238,7 @@ export function AgentOrderCreate() {
                         body: order.PdfBlob
                     });
 
-                    if (!uploadRes.ok) {
+                    if (!uploadRes || !uploadRes.ok) {
                         throw new Error('Failed to upload file to Cloudflare R2.');
                     }
 

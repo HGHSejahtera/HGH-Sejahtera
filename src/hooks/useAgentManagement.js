@@ -114,14 +114,61 @@ export const useAgentRecentOrders = (agentId) => {
                 .from('ImportedOrders')
                 .select(`
                     *,
-                    OrderImports!inner(AgentID)
+                    OrderImports!inner (
+                        AgentID,
+                        Source,
+                        Platform,
+                        AccountName
+                    ),
+                    ImportedOrderItems (
+                        *,
+                        Products (
+                            CostPrice, Brand, ProductName, Variation, Size, Barcode,
+                            ProductPricing (AgentMarkup)
+                        )
+                    )
                 `)
                 .eq('OrderImports.AgentID', resolvedId)
                 .order('CreatedAt', { ascending: false })
-                .limit(50);
+                .limit(5000);
                 
             if (error) throw error;
-            return data;
+            
+            return (data || []).map(order => {
+                const parent = order.OrderImports;
+                const isAgentOrder = parent?.Source === 'AgentOrder';
+                const mappedItems = order.ImportedOrderItems?.map(item => {
+                    let unitPrice = Number(item.UnitPrice || 0);
+                    if (unitPrice === 0 || isAgentOrder) {
+                        if (item.Products?.ProductPricing?.AgentMarkup !== undefined && item.Products?.ProductPricing?.AgentMarkup !== null) {
+                            unitPrice = Number(item.Products.ProductPricing.AgentMarkup);
+                        }
+                    }
+                    const subtotal = unitPrice * Number(item.Quantity || 1);
+                    return {
+                        ...item,
+                        UnitPrice: unitPrice,
+                        Subtotal: subtotal
+                    };
+                }) || [];
+
+                const displayAmount = mappedItems.reduce((sum, item) => sum + item.Subtotal, 0);
+                const totalItems = mappedItems.reduce((sum, item) => sum + Number(item.Quantity || 1), 0);
+
+                return {
+                    ...order,
+                    ImportedOrderItems: mappedItems,
+                    Items: mappedItems,
+                    Platform: order.Platform || parent?.Platform || 'TikTok',
+                    Source: parent?.Source,
+                    AccountName: parent?.AccountName || 'Main Account',
+                    DisplayAmount: displayAmount,
+                    TotalAmount: displayAmount,
+                    OrderAmount: displayAmount,
+                    TotalItems: totalItems,
+                    ItemCount: totalItems
+                };
+            });
         },
         enabled: !!agentId && isAuthorized,
     });

@@ -1,12 +1,20 @@
-import { useState } from 'react';
-import { Search, ShoppingCart, Trash2, Plus, Minus, Wallet, CheckCircle, Tag } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { Search, ShoppingCart, Trash2, Plus, Minus, Wallet, CheckCircle, Tag, Crown, Building2, Briefcase, ChevronDown, Check, LayoutGrid, List, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { useHardwareScanner } from '@/hooks/useHardwareScanner';
 import { useProducts } from '@/hooks/useProducts';
 import { usePOS } from '@/hooks/usePOS';
 import { Receipt } from './Receipt';
+
+const TIER_OPTIONS = [
+    { id: 'stockist', label: 'Stockist', icon: Crown, badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-200', iconClass: 'text-emerald-600' },
+    { id: 'wholesale', label: 'Wholesale', icon: Building2, badgeClass: 'bg-amber-50 text-amber-800 border-amber-200', iconClass: 'text-amber-600' },
+    { id: 'agent', label: 'Agent', icon: Briefcase, badgeClass: 'bg-purple-50 text-purple-800 border-purple-200', iconClass: 'text-purple-600' },
+    { id: 'retail', label: 'Retail', icon: Tag, badgeClass: 'bg-blue-50 text-blue-800 border-blue-200', iconClass: 'text-blue-600' }
+];
 
 export function POS() {
     const { data: products = [], isLoading } = useProducts();
@@ -15,6 +23,15 @@ export function POS() {
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
     const [pricingTier, setPricingTier] = useState('retail');
+    const [selectedIndex, setSelectedIndex] = useState(0);
+    const [viewMode, setViewMode] = useState(() => localStorage.getItem('pos_product_view_mode') || 'grid');
+    const searchInputRef = useRef(null);
+    const itemRefs = useRef([]);
+
+    const handleViewModeChange = (mode) => {
+        setViewMode(mode);
+        localStorage.setItem('pos_product_view_mode', mode);
+    };
     const [isTestMode, setIsTestMode] = useState(false); // retail, wholesale
     const [paymentModalOpen, setPaymentModalOpen] = useState(false);
     const [paymentMethod, setPaymentMethod] = useState(''); // '', 'cash', 'duitnow'
@@ -25,7 +42,7 @@ export function POS() {
     const [saleData, setSaleData] = useState(null);
     const [editingPriceItemId, setEditingPriceItemId] = useState(null);
 
-    const addToCart = (product) => {
+    const addToCart = (product, { clearSearch = false } = {}) => {
         setCart(prev => {
             const existing = prev.find(item => item.ProductID === product.ProductID);
             if (existing) {
@@ -37,14 +54,17 @@ export function POS() {
             }
             return [...prev, { ...product, quantity: 1 }];
         });
-        setSearchQuery('');
-        setSearchResults([]);
+        if (clearSearch) {
+            setSearchQuery('');
+            setSearchResults([]);
+            setSelectedIndex(0);
+        }
     };
 
     useHardwareScanner((barcode) => {
         const product = products.find(p => p.Barcode === barcode);
         if (product) {
-            addToCart(product);
+            addToCart(product, { clearSearch: true });
         } else {
             alert(`Product with barcode ${barcode} not found!`);
         }
@@ -53,6 +73,7 @@ export function POS() {
     const handleSearch = (e) => {
         const query = e.target.value;
         setSearchQuery(query);
+        setSelectedIndex(0);
         if (query.length > 2) {
             const results = products.filter(p => 
                 p.ProductName.toLowerCase().includes(query.toLowerCase()) || 
@@ -67,25 +88,74 @@ export function POS() {
     };
 
     const handleKeyDown = (e) => {
-        if (e.key === 'Enter' && searchQuery) {
+        if (e.key === 'ArrowDown') {
+            if (searchResults.length > 0) {
+                e.preventDefault();
+                setSelectedIndex(prev => Math.min(prev + 1, searchResults.length - 1));
+            }
+        } else if (e.key === 'ArrowUp') {
+            if (searchResults.length > 0) {
+                e.preventDefault();
+                setSelectedIndex(prev => Math.max(prev - 1, 0));
+            }
+        } else if (e.key === 'Enter' && searchQuery) {
+            e.preventDefault();
             const exactMatch = products.find(p => 
                 p.Barcode === searchQuery || 
                 p.MasterSKU === searchQuery
             );
             
             if (exactMatch) {
-                addToCart(exactMatch);
-            } else if (searchResults.length === 1) {
-                addToCart(searchResults[0]);
+                addToCart(exactMatch, { clearSearch: true });
+            } else if (searchResults.length > 0 && selectedIndex >= 0 && selectedIndex < searchResults.length) {
+                addToCart(searchResults[selectedIndex], { clearSearch: false });
             } else if (searchResults.length === 0) {
                 alert(`Product not found!`);
             }
         }
     };
 
+    const handleGlobalKeyDown = useCallback((e) => {
+        if (paymentModalOpen || editingPriceItemId !== null) return;
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+        if (e.key === 'ArrowDown') {
+            if (searchResults.length > 0) {
+                e.preventDefault();
+                setSelectedIndex(prev => Math.min(prev + 1, searchResults.length - 1));
+            }
+        } else if (e.key === 'ArrowUp') {
+            if (searchResults.length > 0) {
+                e.preventDefault();
+                setSelectedIndex(prev => Math.max(prev - 1, 0));
+            }
+        } else if (e.key === 'Enter') {
+            if (searchResults.length > 0 && selectedIndex >= 0 && selectedIndex < searchResults.length) {
+                e.preventDefault();
+                addToCart(searchResults[selectedIndex], { clearSearch: false });
+                searchInputRef.current?.focus();
+            }
+        }
+    }, [searchResults, selectedIndex, paymentModalOpen, editingPriceItemId]);
+
+    useEffect(() => {
+        window.addEventListener('keydown', handleGlobalKeyDown);
+        return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+    }, [handleGlobalKeyDown]);
+
+    useEffect(() => {
+        const activeEl = itemRefs.current[selectedIndex];
+        if (activeEl) {
+            activeEl.scrollIntoView({ block: 'nearest' });
+        }
+    }, [selectedIndex]);
+
     const getPrice = (item) => {
         if (item.customPrice !== undefined) return parseFloat(item.customPrice);
-        return pricingTier === 'wholesale' ? (item.WholesalePrice || 0) : (item.RetailPrice || 0);
+        if (pricingTier === 'stockist') return item.StockistPrice || 0;
+        if (pricingTier === 'agent') return item.AgentPrice || 0;
+        if (pricingTier === 'wholesale') return item.WholesalePrice || 0;
+        return item.RetailPrice || 0;
     };
 
     const saveCustomPrice = (productId, newPrice) => {
@@ -120,7 +190,7 @@ export function POS() {
         try {
             const result = await completeSale.mutateAsync({
                 isTestMode,
-                CustomerTier: pricingTier === 'wholesale' ? 'Wholesale' : 'Retail',
+                CustomerTier: TIER_OPTIONS.find(t => t.id === pricingTier)?.label || 'Retail',
                 PaymentMethod: paymentMethod === 'cash' ? 'Cash' : 'DuitNowQR',
                 PaymentReference: referenceNumber || null,
                 AmountReceived: paymentMethod === 'cash' ? parseFloat(amountReceived || 0) : subtotalCalc,
@@ -141,6 +211,7 @@ export function POS() {
             const finalSaleId = result?.SaleID || result?.sale_id;
 
             setSaleData({
+                customerTier: TIER_OPTIONS.find(t => t.id === pricingTier)?.label || 'Retail',
                 items: cart.map(item => ({
                     ...item,
                     UnitPrice: getPrice(item)
@@ -183,45 +254,125 @@ export function POS() {
         <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
             {/* Left: Product Search & Scanning */}
             <div className="w-full lg:w-2/3 p-4 md:p-6 flex flex-col border-r h-full overflow-hidden bg-gray-50">
-                <div className="mb-6 shrink-0">
-                    <div className="relative">
+                <div className="mb-6 shrink-0 flex items-center gap-3">
+                    <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                         <Input 
+                            ref={searchInputRef}
                             type="text" 
                             placeholder="Search" 
-                            className="pl-10 h-12 text-lg shadow-sm"
+                            className={`pl-10 h-12 text-base shadow-sm bg-white ${searchQuery ? 'pr-10' : ''}`}
                             value={searchQuery}
                             onChange={handleSearch}
                             onKeyDown={handleKeyDown}
                             autoFocus
                         />
+                        {searchQuery && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setSearchQuery('');
+                                    setSearchResults([]);
+                                    setSelectedIndex(0);
+                                    searchInputRef.current?.focus();
+                                }}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
+                                title="Clear Search"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        )}
+                    </div>
+                    <div className="flex items-center bg-gray-200/80 p-1 rounded-lg border border-gray-300/60 shrink-0">
+                        <button
+                            type="button"
+                            onClick={() => handleViewModeChange('grid')}
+                            title="Grid View"
+                            className={`p-2 rounded-md transition-all cursor-pointer ${viewMode === 'grid' ? 'bg-white shadow-xs text-indigo-600 font-bold' : 'text-gray-500 hover:text-gray-800'}`}
+                        >
+                            <LayoutGrid className="w-5 h-5" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => handleViewModeChange('list')}
+                            title="List View"
+                            className={`p-2 rounded-md transition-all cursor-pointer ${viewMode === 'list' ? 'bg-white shadow-xs text-indigo-600 font-bold' : 'text-gray-500 hover:text-gray-800'}`}
+                        >
+                            <List className="w-5 h-5" />
+                        </button>
                     </div>
                 </div>
 
                 {/* Search Results */}
                 <div className="flex-1 overflow-y-auto min-h-0 pr-2 pb-2">
                     {searchQuery.length > 2 && searchResults.length > 0 ? (
-                        <div className="grid grid-cols-3 gap-4">
-                            {searchResults.map(product => (
-                                <div 
-                                    key={product.ProductID}
-                                    onClick={() => addToCart(product)}
-                                    className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 cursor-pointer hover:border-indigo-500 hover:ring-1 hover:ring-indigo-500 transition-all active:scale-95 flex justify-between items-start gap-4"
-                                >
-                                    <div className="flex-1">
-                                        <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider mb-1">{product.Brand || 'No Brand'}</p>
-                                        <h3 className="font-semibold text-gray-900 line-clamp-2 leading-tight">{product.ProductName}</h3>
-                                        <p className="text-sm text-gray-500 mt-1">{`${product.Variation || ''} ${product.Size || ''}`.trim()}</p>
-                                        <p className="text-lg font-bold text-indigo-600 mt-2">RM {getPrice(product).toFixed(2)}</p>
-                                    </div>
-                                    {product.ImageURL && (
-                                        <div className="w-16 h-16 bg-gray-50 rounded-lg overflow-hidden border flex-shrink-0">
-                                            <img src={product.ImageURL} alt={product.ProductName} className="w-full h-full object-contain" />
+                        viewMode === 'grid' ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {searchResults.map(product => (
+                                    <div 
+                                        key={product.ProductID}
+                                        onClick={() => {
+                                            addToCart(product, { clearSearch: false });
+                                            searchInputRef.current?.focus();
+                                        }}
+                                        className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 cursor-pointer hover:border-indigo-500 hover:ring-1 hover:ring-indigo-500 transition-all active:scale-95 flex justify-between items-start gap-4"
+                                    >
+                                        <div className="flex-1">
+                                            <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider mb-1">{product.Brand || 'No Brand'}</p>
+                                            <h3 className="font-semibold text-gray-900 line-clamp-2 leading-tight">{product.ProductName}</h3>
+                                            <p className="text-sm text-gray-500 mt-1">{`${product.Variation || ''} ${product.Size || ''}`.trim()}</p>
+                                            <p className="text-lg font-bold text-indigo-600 mt-2">RM {getPrice(product).toFixed(2)}</p>
                                         </div>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
+                                        {product.ImageURL && (
+                                            <div className="w-16 h-16 bg-gray-50 rounded-lg overflow-hidden border flex-shrink-0">
+                                                <img src={product.ImageURL} alt={product.ProductName} className="w-full h-full object-contain" />
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="divide-y divide-gray-200 border border-gray-200 bg-white overflow-hidden shadow-xs">
+                                {searchResults.map((product, index) => {
+                                    const isSelected = index === selectedIndex;
+                                    const fullName = [product.Brand, product.ProductName, product.Variation, product.Size]
+                                        .filter(Boolean)
+                                        .join(' ');
+                                    const barcodeOnly = product.Barcode || '-';
+
+                                    return (
+                                        <div 
+                                            key={product.ProductID}
+                                            ref={(el) => (itemRefs.current[index] = el)}
+                                            onClick={() => {
+                                                addToCart(product, { clearSearch: false });
+                                                searchInputRef.current?.focus();
+                                            }}
+                                            onMouseEnter={() => setSelectedIndex(index)}
+                                            className={`p-3.5 flex items-center justify-between gap-4 transition-colors cursor-pointer ${
+                                                isSelected 
+                                                    ? 'bg-indigo-50 border-l-4 border-l-indigo-600 pl-2.5 font-medium' 
+                                                    : 'hover:bg-gray-50 border-l-4 border-l-transparent'
+                                            }`}
+                                        >
+                                            <div className="flex-1 min-w-0">
+                                                <h4 className={`text-sm truncate leading-snug ${isSelected ? 'font-bold text-indigo-950' : 'font-semibold text-gray-900'}`}>
+                                                    {fullName}
+                                                </h4>
+                                                <p className="text-xs font-mono text-gray-500 mt-0.5 truncate">
+                                                    {barcodeOnly}
+                                                </p>
+                                            </div>
+                                            <div className="flex items-center shrink-0 text-right">
+                                                <div className="text-base font-bold text-indigo-600">
+                                                    RM {getPrice(product).toFixed(2)}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )
                     ) : searchQuery.length > 2 ? (
                         <div className="text-center text-gray-500 mt-10">No products found.</div>
                     ) : isLoading ? (
@@ -255,20 +406,36 @@ export function POS() {
             <div className="w-full lg:w-1/3 flex flex-col h-full bg-white">
                 <div className="p-4 border-b flex justify-between items-center bg-white z-10 shadow-sm shrink-0">
                     <h3 className="font-bold text-lg">Order</h3>
-                    <div className="flex bg-gray-100 p-1 rounded-lg">
-                        <button 
-                            className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${pricingTier === 'retail' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`} 
-                            onClick={() => setPricingTier('retail')}
-                        >
-                            Retail
-                        </button>
-                        <button 
-                            className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${pricingTier === 'wholesale' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`} 
-                            onClick={() => setPricingTier('wholesale')}
-                        >
-                            Wholesale
-                        </button>
-                    </div>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <button className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md border shadow-2xs transition-all cursor-pointer ${TIER_OPTIONS.find(t => t.id === pricingTier)?.badgeClass || TIER_OPTIONS[3].badgeClass}`}>
+                                {(() => {
+                                    const currentConfig = TIER_OPTIONS.find(t => t.id === pricingTier) || TIER_OPTIONS[3];
+                                    const IconComp = currentConfig.icon;
+                                    return <IconComp className={`w-3.5 h-3.5 ${currentConfig.iconClass}`} />;
+                                })()}
+                                <span>{TIER_OPTIONS.find(t => t.id === pricingTier)?.label || 'Retail'}</span>
+                                <ChevronDown className="w-3.5 h-3.5 ml-0.5 opacity-60" />
+                            </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-44 bg-white rounded-md shadow-lg border-gray-200 p-1 space-y-0.5 z-50">
+                            {TIER_OPTIONS.map(option => {
+                                const IconComponent = option.icon;
+                                const isSelected = pricingTier === option.id;
+                                return (
+                                    <DropdownMenuItem
+                                        key={option.id}
+                                        onClick={() => setPricingTier(option.id)}
+                                        className={`flex items-center gap-2.5 px-3 py-2 rounded-sm text-xs font-medium cursor-pointer transition-colors ${isSelected ? 'bg-gray-100 font-bold text-gray-900' : 'text-gray-700 hover:bg-gray-50'}`}
+                                    >
+                                        <IconComponent className={`w-3.5 h-3.5 shrink-0 ${option.iconClass}`} />
+                                        <span className="flex-1">{option.label}</span>
+                                        {isSelected && <Check className="w-3.5 h-3.5 text-gray-900 shrink-0" />}
+                                    </DropdownMenuItem>
+                                );
+                            })}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
 
                 {/* Cart Items */}
@@ -362,8 +529,8 @@ export function POS() {
             {/* Payment Modal */}
             {paymentModalOpen && (
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-none shadow-xl w-full max-w-md max-h-[95vh] overflow-hidden flex flex-col">
-                        <div className="p-6 border-b flex justify-between items-center">
+                    <div className={`bg-white rounded-none shadow-xl w-full ${showReceipt ? 'max-w-3xl' : 'max-w-md'} max-h-[95vh] overflow-hidden flex flex-col`}>
+                        <div className="p-6 border-b flex justify-between items-center print:hidden">
                             <h2 className="text-xl font-bold">Payment</h2>
                             <span className="text-xl font-bold text-indigo-600">RM {total.toFixed(2)}</span>
                         </div>

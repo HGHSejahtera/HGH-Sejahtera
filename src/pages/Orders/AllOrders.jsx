@@ -2,13 +2,16 @@ import { useState, useMemo, useEffect } from 'react';
 import { useOrderHistory } from '@/hooks/useOrderHistory';
 import { AwbPdfViewer } from '@/components/common/AwbPdfViewer';
 import { SortOrders, MergeAndPrintAwbs } from '@/services/pdf/AwbMergeService';
+import { useAwbPrintStore } from '@/hooks/useAwbPrintStore';
 
-import { Clock, ChevronRight, Package, X, Printer, CheckCircle2, AlertTriangle, ArrowRight } from 'lucide-react';
+import { Clock, ChevronRight, Package, X, Printer, CheckCircle2, AlertTriangle, ArrowRight, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/common/DataTable';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/hooks/useAuth';
 import { Navigate, useNavigate } from 'react-router-dom';
@@ -17,6 +20,22 @@ const formatCurrency = (value) => new Intl.NumberFormat('ms-MY', {
     style: 'currency',
     currency: 'MYR',
 }).format(Number(value || 0));
+
+const MonthOptions = [
+    { label: 'All Months', value: 'All' },
+    { label: 'January', value: '0' },
+    { label: 'February', value: '1' },
+    { label: 'March', value: '2' },
+    { label: 'April', value: '3' },
+    { label: 'May', value: '4' },
+    { label: 'June', value: '5' },
+    { label: 'July', value: '6' },
+    { label: 'August', value: '7' },
+    { label: 'September', value: '8' },
+    { label: 'October', value: '9' },
+    { label: 'November', value: '10' },
+    { label: 'December', value: '11' },
+];
 
 export function AllOrders() {
     const navigate = useNavigate();
@@ -29,17 +48,20 @@ export function AllOrders() {
     
     // UI state - PascalCase for all variables per MemoryCore
     const [ActiveTab, SetActiveTab] = useState('Queue');
-    const [SortBy, SetSortBy] = useState('Product');
+    const [QueueSortBy, SetQueueSortBy] = useState('DateNewest');
+    const [HistorySortBy, SetHistorySortBy] = useState('DateNewest');
     const [IsPrinting, SetIsPrinting] = useState(false);
     const [FilterAgent, SetFilterAgent] = useState('All');
     const [FilterPlatform, SetFilterPlatform] = useState('All');
     const [FilterAccount, SetFilterAccount] = useState('All');
+    const [FilterMonth, SetFilterMonth] = useState(String(new Date().getMonth()));
+    const [DateRange, SetDateRange] = useState({ from: '', to: '' });
     const [RowSelection, SetRowSelection] = useState({});
 
     // Reset selection when changing tabs or filters
     useEffect(() => {
         SetRowSelection({});
-    }, [ActiveTab, FilterAgent, FilterPlatform, FilterAccount, SortBy]);
+    }, [ActiveTab, FilterAgent, FilterPlatform, FilterAccount, QueueSortBy, HistorySortBy, FilterMonth, DateRange.from, DateRange.to]);
 
     // Unique options for filters
     const UniqueAgents = useMemo(() => {
@@ -81,16 +103,29 @@ export function AllOrders() {
         if (FilterAgent !== 'All') Unprinted = Unprinted.filter(o => o.AgentName === FilterAgent);
         if (FilterPlatform !== 'All') Unprinted = Unprinted.filter(o => o.Platform === FilterPlatform);
         if (FilterAccount !== 'All') Unprinted = Unprinted.filter(o => o.AccountName === FilterAccount);
-        return SortOrders(Unprinted, SortBy);
-    }, [orders, SortBy, FilterAgent, FilterPlatform, FilterAccount]);
+        return SortOrders(Unprinted, QueueSortBy);
+    }, [orders, QueueSortBy, FilterAgent, FilterPlatform, FilterAccount]);
 
     const CompleteOrders = useMemo(() => {
         let Printed = orders.filter(Order => Order.IsPrinted);
         if (FilterAgent !== 'All') Printed = Printed.filter(o => o.AgentName === FilterAgent);
         if (FilterPlatform !== 'All') Printed = Printed.filter(o => o.Platform === FilterPlatform);
         if (FilterAccount !== 'All') Printed = Printed.filter(o => o.AccountName === FilterAccount);
-        return SortOrders(Printed, SortBy);
-    }, [orders, SortBy, FilterAgent, FilterPlatform, FilterAccount]);
+        // If DateRange is active, bypass FilterMonth so specific dates take precedence without collision
+        const hasDateRange = Boolean(DateRange.from || DateRange.to);
+        if (!hasDateRange && FilterMonth !== 'All') {
+            Printed = Printed.filter(o => new Date(o.CreatedAt || 0).getMonth() === Number(FilterMonth));
+        }
+        if (DateRange.from) {
+            const FromTime = new Date(`${DateRange.from}T00:00:00`).getTime();
+            Printed = Printed.filter(o => new Date(o.CreatedAt || 0).getTime() >= FromTime);
+        }
+        if (DateRange.to) {
+            const ToTime = new Date(`${DateRange.to}T23:59:59`).getTime();
+            Printed = Printed.filter(o => new Date(o.CreatedAt || 0).getTime() <= ToTime);
+        }
+        return SortOrders(Printed, HistorySortBy);
+    }, [orders, HistorySortBy, FilterAgent, FilterPlatform, FilterAccount, FilterMonth, DateRange.from, DateRange.to]);
 
     const DisplayOrders = ActiveTab === 'Queue' ? QueueOrders : CompleteOrders;
 
@@ -106,14 +141,8 @@ export function AllOrders() {
         
         SetIsPrinting(true);
         try {
-            const PrintedIds = await MergeAndPrintAwbs(ordersToPrint);
-            if (PrintedIds && PrintedIds.length > 0) {
-                await MarkAsPrinted({ orderIds: PrintedIds, isPrinted: true });
-                SetRowSelection({});
-            }
-        } catch (error) {
-            console.error('Failed to print batch AWBs:', error);
-            alert(error.message || 'Failed to merge or print AWB files.');
+            await useAwbPrintStore.getState().startBatchPrint(ordersToPrint, MarkAsPrinted);
+            SetRowSelection({});
         } finally {
             SetIsPrinting(false);
         }
@@ -124,7 +153,7 @@ export function AllOrders() {
         return <Navigate to="/Dashboard" replace />;
     }
 
-    const columns = [
+    const queueColumns = [
         {
             id: 'select',
             header: ({ table }) => (
@@ -175,35 +204,15 @@ export function AllOrders() {
             accessorKey: 'PlatformOrderID',
             cell: ({ row }) => {
                 const isMissingAwb = !row.original.AwbUrl || row.original.AwbUrl.trim() === '';
-                const hasUnmatched = (row.original.Items || row.original.ImportedOrderItems)?.some(
-                    i => !i.ProductID || i.PlatformSKU === '-' || i.MatchStatus === 'Unmatched'
-                ) || (Number(row.original.DisplayAmount || 0) === 0 && (row.original.Items?.length > 0 || row.original.ImportedOrderItems?.length > 0));
-
                 return (
-                    <div className="flex flex-col">
-                        <div className="flex items-center space-x-2">
-                            {row.original.IsPrinted && (
-                                <span 
-                                    className={`inline-block h-2 w-2 rounded-full shadow-sm shrink-0 ${isMissingAwb ? 'bg-amber-400' : 'bg-emerald-500'}`} 
-                                    title={isMissingAwb ? "Missing AWB" : "Print Done"}
-                                ></span>
-                            )}
-                            <span className="font-semibold text-gray-900">{row.original.PlatformOrderID}</span>
-                        </div>
-                        {(isMissingAwb || hasUnmatched) && (
-                            <div className="flex gap-1.5 mt-1.5 flex-wrap">
-                                {isMissingAwb && (
-                                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-rose-800 bg-rose-100 px-1.5 py-0.5 rounded border border-rose-300">
-                                        <AlertTriangle className="w-3 h-3 text-rose-600" /> Missing AWB
-                                    </span>
-                                )}
-                                {hasUnmatched && (
-                                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded border border-amber-300">
-                                        <AlertTriangle className="w-3 h-3 text-amber-600" /> SKU Review
-                                    </span>
-                                )}
-                            </div>
+                    <div className="flex items-center space-x-2">
+                        {row.original.IsPrinted && (
+                            <span 
+                                className={`inline-block h-2 w-2 rounded-full shadow-sm shrink-0 ${isMissingAwb ? 'bg-amber-400' : 'bg-emerald-500'}`} 
+                                title={isMissingAwb ? "Missing AWB" : "Print Done"}
+                            ></span>
                         )}
+                        <span className="font-semibold text-gray-900">{row.original.PlatformOrderID}</span>
                     </div>
                 );
             }
@@ -237,7 +246,160 @@ export function AllOrders() {
                 </div>
             )
         },
+        {
+            header: () => <div className="text-center">Review</div>,
+            id: 'review',
+            cell: ({ row }) => {
+                const isMissingAwb = !row.original.AwbUrl || row.original.AwbUrl.trim() === '';
+                const hasUnmatched = (row.original.Items || row.original.ImportedOrderItems)?.some(
+                    i => !i.ProductID || i.PlatformSKU === '-' || i.MatchStatus === 'Unmatched'
+                ) || (Number(row.original.DisplayAmount || 0) === 0 && (row.original.Items?.length > 0 || row.original.ImportedOrderItems?.length > 0));
 
+                return (
+                    <div className="flex justify-center items-center gap-1.5 flex-wrap">
+                        {isMissingAwb && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-rose-800 bg-rose-100 px-2 py-0.5 rounded border border-rose-300 shadow-2xs">
+                                <AlertTriangle className="w-3 h-3 text-rose-600 shrink-0" /> Missing AWB
+                            </span>
+                        )}
+                        {hasUnmatched && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-300 shadow-2xs">
+                                <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" /> SKU Review
+                            </span>
+                        )}
+                        {!isMissingAwb && !hasUnmatched && (
+                            <span className="text-gray-400 text-xs font-medium">-</span>
+                        )}
+                    </div>
+                );
+            }
+        },
+        {
+            header: () => <div className="text-center">Action</div>,
+            id: 'actions',
+            cell: ({ row }) => (
+                <div className="flex justify-center">
+                    <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => handleOpenDrawer(row.original)} 
+                        className="h-7 px-3 border-gray-200 bg-white hover:bg-gray-50 text-gray-700 hover:border-gray-300 font-medium text-xs rounded-md shadow-xs transition-all cursor-pointer"
+                    >
+                        View <ChevronRight className="w-3.5 h-3.5 ml-1 text-gray-400" />
+                    </Button>
+                </div>
+            )
+        }
+    ];
+
+    const completeColumns = [
+        {
+            id: 'select',
+            header: ({ table }) => (
+                <div className="flex justify-center items-center px-2">
+                    <Checkbox
+                        checked={table.getIsAllPageRowsSelected()}
+                        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+                        aria-label="Select all"
+                        className="border-gray-300"
+                    />
+                </div>
+            ),
+            cell: ({ row }) => {
+                const isMissingAwb = !row.original.AwbUrl || row.original.AwbUrl.trim() === '';
+                return (
+                <div className="flex justify-center items-center px-2">
+                    <Checkbox
+                        checked={row.getIsSelected()}
+                        onCheckedChange={(value) => row.toggleSelected(!!value)}
+                        aria-label="Select row"
+                        className="border-gray-300"
+                        disabled={isMissingAwb}
+                    />
+                </div>
+                );
+            },
+            enableSorting: false,
+            enableHiding: false,
+        },
+        { 
+            header: 'Date', 
+            accessorKey: 'CreatedAt',
+            cell: ({ row }) => {
+                const date = new Date(row.original.CreatedAt);
+                return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+            }
+        },
+        { 
+            header: 'Time', 
+            id: 'time',
+            cell: ({ row }) => {
+                const date = new Date(row.original.CreatedAt);
+                return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+            }
+        },
+        { 
+            header: 'Order ID', 
+            accessorKey: 'PlatformOrderID',
+            cell: ({ row }) => (
+                <div className="flex items-center space-x-2">
+                    <span className="font-semibold text-gray-900">{row.original.PlatformOrderID}</span>
+                </div>
+            )
+        },
+        { 
+            header: () => <div className="text-center">Platform</div>, 
+            accessorKey: 'Platform',
+            cell: ({ row }) => (
+                <div className="flex justify-center">
+                    <Badge variant="outline" className="bg-white rounded-md font-medium text-xs border-gray-200 px-2.5 py-0.5 shadow-xs">
+                        {row.original.Platform}
+                    </Badge>
+                </div>
+            )
+        },
+        { 
+            header: 'Agent', 
+            accessorKey: 'AgentName',
+            cell: ({ row }) => (
+                <div className="flex flex-col">
+                    <span className="font-medium text-gray-900">{row.original.AgentName}</span>
+                </div>
+            )
+        },
+        { 
+            header: () => <div className="text-right">Amount</div>, 
+            accessorKey: 'DisplayAmount',
+            cell: ({ row }) => (
+                <div className="text-right font-medium text-emerald-600">
+                    {formatCurrency(row.original.DisplayAmount)}
+                </div>
+            )
+        },
+        {
+            header: () => <div className="text-center">Status</div>,
+            id: 'status',
+            cell: ({ row }) => {
+                const hasUnmatched = (row.original.Items || row.original.ImportedOrderItems)?.some(
+                    i => !i.ProductID || i.PlatformSKU === '-' || i.MatchStatus === 'Unmatched'
+                ) || (Number(row.original.DisplayAmount || 0) === 0 && (row.original.Items?.length > 0 || row.original.ImportedOrderItems?.length > 0));
+
+                return (
+                    <div className="flex justify-center items-center">
+                        {hasUnmatched ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-full border border-amber-300 shadow-2xs" title="Order contains unmatched items without Seller SKU">
+                                <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" /> SKU Review
+                            </span>
+                        ) : (
+                            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-300 shadow-2xs">
+                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-600"></span>
+                                {(row.original.OrderStatus || 'Complete').replace('Completed', 'Complete')}
+                            </span>
+                        )}
+                    </div>
+                );
+            }
+        },
         {
             header: () => <div className="text-center">Action</div>,
             id: 'actions',
@@ -300,7 +462,7 @@ export function AllOrders() {
             </div>
             <div className="flex items-center gap-1 text-xs ml-2">
                 <span className="text-gray-500 font-medium mr-1">Sort By:</span>
-                <Select value={SortBy} onValueChange={SetSortBy}>
+                <Select value={QueueSortBy} onValueChange={SetQueueSortBy}>
                     <SelectTrigger className="h-8 w-[130px] bg-white text-xs font-medium rounded-md border-gray-200 hover:border-gray-300 shadow-xs transition-colors">
                         <SelectValue />
                     </SelectTrigger>
@@ -313,15 +475,202 @@ export function AllOrders() {
                 </Select>
             </div>
             <Button 
-                variant="outline" 
+                variant="default" 
                 size="sm" 
                 onClick={HandlePrintAll}
                 disabled={IsPrinting || QueueOrders.length === 0}
-                className="border-gray-200 bg-white hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 text-gray-700 font-medium text-xs rounded-md h-8 px-3 shadow-xs transition-all cursor-pointer ml-2"
+                className="bg-purple-600 hover:bg-purple-700 text-white font-medium text-xs rounded-md h-8 px-3.5 shadow-sm transition-all cursor-pointer ml-2 border border-purple-600 hover:border-purple-700"
             >
-                <Printer className="w-3.5 h-3.5 mr-1.5 text-indigo-600" />
+                <Printer className="w-3.5 h-3.5 mr-1.5 text-white" />
                 {selectedCount > 0 ? `Print Selected (${selectedCount})` : `Print All (${QueueOrders.length})`}
             </Button>
+        </div>
+    ) : null;
+
+    const CompleteActionElement = ActiveTab === 'Complete' ? (
+        <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1 text-xs">
+                <span className="text-gray-500 font-medium mr-1">Platform:</span>
+                <Select value={FilterPlatform} onValueChange={SetFilterPlatform}>
+                    <SelectTrigger className="h-8 w-[100px] bg-white text-xs font-medium rounded-md border-gray-200 hover:border-gray-300 shadow-xs transition-colors">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent side="bottom" className="rounded-md shadow-lg border-gray-200">
+                        {UniquePlatforms.map(platform => (
+                            <SelectItem key={platform} value={platform}>{platform}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+            <div className="flex items-center gap-1 text-xs ml-1">
+                <span className="text-gray-500 font-medium mr-1">Account:</span>
+                <Select value={FilterAccount} onValueChange={SetFilterAccount}>
+                    <SelectTrigger className="h-8 w-[100px] bg-white text-xs font-medium rounded-md border-gray-200 hover:border-gray-300 shadow-xs transition-colors">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent side="bottom" className="rounded-md shadow-lg border-gray-200">
+                        {UniqueAccounts.map(account => (
+                            <SelectItem key={account} value={account}>{account}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+            <div className="flex items-center gap-1 text-xs ml-1">
+                <span className="text-gray-500 font-medium mr-1">Agent:</span>
+                <Select value={FilterAgent} onValueChange={SetFilterAgent}>
+                    <SelectTrigger className="h-8 w-[100px] bg-white text-xs font-medium rounded-md border-gray-200 hover:border-gray-300 shadow-xs transition-colors">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent side="bottom" className="rounded-md shadow-lg border-gray-200">
+                        {UniqueAgents.map(agent => (
+                            <SelectItem key={agent} value={agent}>{agent}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+            <div className="flex items-center gap-1 text-xs ml-1">
+                <span className="text-gray-500 font-medium mr-1">Month:</span>
+                <Select value={FilterMonth} onValueChange={SetFilterMonth}>
+                    <SelectTrigger className="h-8 w-[110px] bg-white text-xs font-medium rounded-md border-gray-200 hover:border-gray-300 shadow-xs transition-colors">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent side="bottom" className="rounded-md shadow-lg border-gray-200 max-h-[260px]">
+                        {MonthOptions.map(m => (
+                            <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+
+            {/* Airbnb-Style Date Range Picker */}
+            <div className="flex items-center ml-1">
+                <Popover>
+                    <PopoverTrigger asChild>
+                        <Button 
+                            variant="outline" 
+                            size="sm"
+                            className={cn(
+                                "h-8 px-2.5 rounded-md border-gray-200 bg-white hover:bg-gray-50 text-xs font-medium shadow-xs transition-colors flex items-center gap-2 cursor-pointer",
+                                (DateRange.from || DateRange.to) ? "border-indigo-600 text-indigo-600 bg-indigo-50/60 font-semibold" : "text-gray-700"
+                            )}
+                        >
+                            <Calendar className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                            {DateRange.from && DateRange.to 
+                                ? `${new Date(DateRange.from).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} — ${new Date(DateRange.to).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`
+                                : DateRange.from 
+                                ? `${new Date(DateRange.from).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} — Select To Date`
+                                : "Select Dates"}
+                            {(DateRange.from || DateRange.to) && (
+                                <span 
+                                    className="p-0.5 rounded-md hover:bg-indigo-200/60 text-indigo-500 transition-colors ml-0.5 cursor-pointer"
+                                    onClick={(e) => { e.stopPropagation(); SetDateRange({ from: '', to: '' }); }}
+                                    title="Clear dates"
+                                >
+                                    <X className="w-3 h-3" />
+                                </span>
+                            )}
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent side="bottom" align="start" className="w-[360px] p-4 rounded-md shadow-lg border border-gray-200 bg-white">
+                        <div className="space-y-4">
+                            <div>
+                                <h4 className="font-bold text-gray-900 text-sm">Select Date Range</h4>
+                                <p className="text-xs text-gray-500">Filter completed order history by exact dates.</p>
+                            </div>
+
+                            {/* Dual From / To Inputs */}
+                            <div className="grid grid-cols-2 gap-2 p-1 bg-gray-50 border border-gray-200 rounded-md">
+                                <div className="p-2 border-r border-gray-200">
+                                    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">FROM</label>
+                                    <input 
+                                        type="date" 
+                                        value={DateRange.from} 
+                                        onChange={(e) => SetDateRange(prev => ({ ...prev, from: e.target.value }))}
+                                        className="w-full bg-transparent text-xs font-semibold text-gray-900 outline-hidden cursor-pointer"
+                                    />
+                                </div>
+                                <div className="p-2">
+                                    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">TO</label>
+                                    <input 
+                                        type="date" 
+                                        value={DateRange.to} 
+                                        onChange={(e) => SetDateRange(prev => ({ ...prev, to: e.target.value }))}
+                                        className="w-full bg-transparent text-xs font-semibold text-gray-900 outline-hidden cursor-pointer"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Preset Shortcuts */}
+                            <div className="space-y-1.5">
+                                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Quick shortcuts</span>
+                                <div className="flex flex-wrap gap-1.5">
+                                    <button 
+                                        type="button"
+                                        onClick={() => {
+                                            const today = new Date().toISOString().split('T')[0];
+                                            SetDateRange({ from: today, to: today });
+                                        }}
+                                        className="px-2.5 py-1 text-xs font-medium rounded-md bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors cursor-pointer"
+                                    >
+                                        Today
+                                    </button>
+                                    <button 
+                                        type="button"
+                                        onClick={() => {
+                                            const today = new Date();
+                                            const last7 = new Date();
+                                            last7.setDate(today.getDate() - 6);
+                                            SetDateRange({ 
+                                                from: last7.toISOString().split('T')[0], 
+                                                to: today.toISOString().split('T')[0] 
+                                            });
+                                        }}
+                                        className="px-2.5 py-1 text-xs font-medium rounded-md bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors cursor-pointer"
+                                    >
+                                        Last 7 Days
+                                    </button>
+                                    <button 
+                                        type="button"
+                                        onClick={() => {
+                                            const now = new Date();
+                                            const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+                                            const today = now.toISOString().split('T')[0];
+                                            SetDateRange({ from: firstDay, to: today });
+                                        }}
+                                        className="px-2.5 py-1 text-xs font-medium rounded-md bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors cursor-pointer"
+                                    >
+                                        This Month
+                                    </button>
+                                    <button 
+                                        type="button"
+                                        onClick={() => SetDateRange({ from: '', to: '' })}
+                                        className="px-2.5 py-1 text-xs font-medium rounded-md bg-rose-50 hover:bg-rose-100 text-rose-600 transition-colors cursor-pointer ml-auto"
+                                    >
+                                        Clear
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </PopoverContent>
+                </Popover>
+            </div>
+
+            <div className="flex items-center gap-1 text-xs ml-1">
+                <span className="text-gray-500 font-medium mr-1">Sort By:</span>
+                <Select value={HistorySortBy} onValueChange={SetHistorySortBy}>
+                    <SelectTrigger className="h-8 w-[140px] bg-white text-xs font-medium rounded-md border-gray-200 hover:border-gray-300 shadow-xs transition-colors">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent side="bottom" className="rounded-md shadow-lg border-gray-200">
+                        <SelectItem value="Product">Product</SelectItem>
+                        <SelectItem value="Brand">Brand</SelectItem>
+                        <SelectItem value="DateOldest">Date (Oldest)</SelectItem>
+                        <SelectItem value="DateNewest">Date (Newest)</SelectItem>
+                        <SelectItem value="MonthJanDec">Month (Jan - Dec)</SelectItem>
+                        <SelectItem value="MonthDecJan">Month (Dec - Jan)</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
         </div>
     ) : null;
 
@@ -356,20 +705,22 @@ export function AllOrders() {
                             : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                     )}
                 >
-                    Order Complete
+                    Order History
                 </button>
             </div>
 
             <div className="bg-white rounded-none shadow-xs border overflow-hidden">
                 <div className="p-4">
                     <DataTable 
-                        columns={columns} 
+                        key={ActiveTab}
+                        columns={ActiveTab === 'Queue' ? queueColumns : completeColumns} 
                         data={DisplayOrders} 
                         isLoading={isLoading} 
                         searchPlaceholder="Search" 
-                        actionElement={QueueActionElement}
+                        actionElement={ActiveTab === 'Queue' ? QueueActionElement : CompleteActionElement}
                         rowSelection={RowSelection}
                         onRowSelectionChange={SetRowSelection}
+                        defaultPageSize={999999}
                     />
                 </div>
             </div>
@@ -547,6 +898,8 @@ export function AllOrders() {
                     </div>
                 </div>
             )}
+
+
 
             <AwbPdfViewer 
                 url={viewAwbUrl} 

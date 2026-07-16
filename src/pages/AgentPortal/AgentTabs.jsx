@@ -1,8 +1,8 @@
 import { NavLink } from 'react-router-dom';
-import { Package, Monitor } from 'lucide-react';
+
 const AGENT_TABS = [
-    { name: 'Upload AWB', path: '/Agent/Upload', icon: Monitor },
-    { name: 'Orders', path: '/Agent/Orders', icon: Package }
+    { name: 'Upload AWB', path: '/Agent/Upload' },
+    { name: 'Orders', path: '/Agent/Orders' }
 ];
 
 export function AgentTabs() {
@@ -24,11 +24,6 @@ export function AgentTabs() {
                 >
                     {({ isActive }) => (
                         <>
-                            {tab.icon ? (
-                                <tab.icon className="w-4 h-4" />
-                            ) : (
-                                <img src={tab.imgSrc} alt={tab.name} className={`w-4 h-4 ${!isActive ? 'opacity-70' : ''}`} />
-                            )}
                             {tab.name}
                         </>
                     )}

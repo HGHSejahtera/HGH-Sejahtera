@@ -16,6 +16,7 @@ import { ProductMatcher } from './pages/Orders/ProductMatcher';
 import { AllOrders } from './pages/Orders/AllOrders';
 import { useIdleTimeout } from './hooks/useIdleTimeout';
 import { usePreferences } from './hooks/usePreferences';
+import { GlobalAwbPrintModal } from './components/common/GlobalAwbPrintModal';
 
 import { AgentOrderCreate } from './pages/AgentPortal/AgentOrderCreate';
 import { AgentMyOrders } from './pages/AgentPortal/AgentMyOrders';
@@ -54,6 +55,7 @@ export default function App() {
     return (
         <BrowserRouter>
             <PINUnlock />
+            <GlobalAwbPrintModal />
             <Routes>
                 {/* Public Routes */}
                 <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to={isAgent ? "/Agent/Upload" : "/Dashboard"} replace />} />

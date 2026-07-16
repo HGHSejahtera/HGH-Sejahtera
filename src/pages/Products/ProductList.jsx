@@ -79,7 +79,7 @@ export function ProductList() {
                         columns={columns} 
                         data={products || []} 
                         searchKey="ProductName"
-                        searchPlaceholder="Search products by name..."
+                        searchPlaceholder="Search"
                     />
                 </div>
             )}

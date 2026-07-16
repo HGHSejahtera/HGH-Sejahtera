@@ -4,15 +4,11 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 
 
-export default async function handler(req, res) {
-    if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method Not Allowed' });
-    }
+let s3ClientInstance = null;
 
-
-
-    try {
-        const S3 = new S3Client({
+function getS3Client() {
+    if (!s3ClientInstance) {
+        s3ClientInstance = new S3Client({
             region: 'auto',
             endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
             credentials: {
@@ -21,6 +17,17 @@ export default async function handler(req, res) {
             },
             forcePathStyle: true,
         });
+    }
+    return s3ClientInstance;
+}
+
+export default async function handler(req, res) {
+    if (req.method !== 'POST') {
+        return res.status(405).json({ error: 'Method Not Allowed' });
+    }
+
+    try {
+        const S3 = getS3Client();
 
         const { fileName, fileType, isPrivate } = req.body;
 
@@ -28,11 +35,10 @@ export default async function handler(req, res) {
             return res.status(400).json({ error: 'fileName and fileType are required' });
         }
 
-        const targetBucket = isPrivate ? (process.env.R2_PRIVATE_BUCKET_NAME || 'hgh-awb') : process.env.R2_BUCKET_NAME;
+        // Clean double slashes and leading slashes from key path
+        const cleanKey = String(fileName).replace(/\/+/g, '/').replace(/^\/+/, '');
 
-        console.log('--- DEBUG R2 ENV ---');
-        console.log('isPrivate:', isPrivate);
-        console.log('targetBucket:', targetBucket);
+        const targetBucket = isPrivate ? (process.env.R2_PRIVATE_BUCKET_NAME || 'hgh-awb') : process.env.R2_BUCKET_NAME;
 
         if (!targetBucket) {
             return res.status(500).json({ error: 'Bucket configuration is missing' });
@@ -40,7 +46,7 @@ export default async function handler(req, res) {
 
         const command = new PutObjectCommand({
             Bucket: targetBucket,
-            Key: fileName,
+            Key: cleanKey,
             ContentType: fileType,
         });
 
@@ -50,11 +56,11 @@ export default async function handler(req, res) {
         // Also return the final public URL. 
         // We use VITE_R2_PUBLIC_URL from env if available, otherwise it relies on frontend to construct it.
         const publicUrlBase = process.env.VITE_R2_PUBLIC_URL || '';
-        const publicUrl = (!isPrivate && publicUrlBase) ? `${publicUrlBase}/${fileName}` : '';
+        const publicUrl = (!isPrivate && publicUrlBase) ? `${publicUrlBase}/${cleanKey}` : '';
 
-        res.status(200).json({ url: signedUrl, key: fileName, publicUrl });
+        res.status(200).json({ url: signedUrl, key: cleanKey, publicUrl });
     } catch (err) {
         console.error('Error generating pre-signed URL:', err);
-        res.status(500).json({ error: 'Internal Server Error' });
+        res.status(500).json({ error: 'Internal Server Error', details: err.message || err });
     }
 }

@@ -43,11 +43,13 @@ export function DataTable({
     onRowSelectionChange,
     columnVisibility: externalColumnVisibility,
     onColumnVisibilityChange: externalOnColumnVisibilityChange,
-    tableContainerClassName = "max-h-[calc(100vh-220px)] overflow-auto"
+    tableContainerClassName = "max-h-[calc(100vh-220px)] overflow-auto",
+    defaultPageSize = 100
 }) {
     const [globalFilter, setGlobalFilter] = useState("")
     const [internalColumnVisibility, setInternalColumnVisibility] = useState({})
     const [sorting, setSorting] = useState([])
+    const [visibleLimit, setVisibleLimit] = useState(100)
 
     const columnVisibility = externalColumnVisibility !== undefined ? externalColumnVisibility : internalColumnVisibility;
     const setColumnVisibility = externalOnColumnVisibilityChange || setInternalColumnVisibility;
@@ -72,10 +74,13 @@ export function DataTable({
         },
         initialState: {
             pagination: {
-                pageSize: 100,
+                pageSize: defaultPageSize,
             },
         },
-        onGlobalFilterChange: setGlobalFilter,
+        onGlobalFilterChange: (value) => {
+            setGlobalFilter(value);
+            setVisibleLimit(100);
+        },
     })
 
     return (
@@ -164,8 +169,8 @@ export function DataTable({
                         ))}
                     </TableHeader>
                     <TableBody>
-                        {table.getRowModel().rows?.length ? (
-                            table.getRowModel().rows.map((row) => (
+                        {(table.getState().pagination.pageSize === 999999 ? table.getRowModel().rows.slice(0, visibleLimit) : table.getRowModel().rows)?.length ? (
+                            (table.getState().pagination.pageSize === 999999 ? table.getRowModel().rows.slice(0, visibleLimit) : table.getRowModel().rows).map((row) => (
                                 <TableRow
                                     key={row.id}
                                     data-state={row.getIsSelected() && "selected"}
@@ -186,6 +191,24 @@ export function DataTable({
                         )}
                     </TableBody>
             </Table>
+            {table.getState().pagination.pageSize === 999999 && table.getRowModel().rows.length > visibleLimit && (
+                <div className="flex justify-center py-3 border-t border-gray-100 bg-gray-50/60 rounded-b-md">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setVisibleLimit((prev) => prev + 100)}
+                        className="bg-white hover:bg-gray-100 text-gray-800 font-semibold text-xs px-5 h-8 rounded-md border-gray-300 shadow-xs transition-all cursor-pointer"
+                    >
+                        Load More Orders (Showing {visibleLimit} of {table.getRowModel().rows.length})
+                    </Button>
+                </div>
+            )}
+            {table.getState().pagination.pageSize === 999999 && table.getRowModel().rows.length > 100 && table.getRowModel().rows.length <= visibleLimit && (
+                <div className="flex justify-center py-2 border-t border-gray-100 bg-emerald-50/60 rounded-b-md text-emerald-700 text-xs font-medium">
+                    ✓ All {table.getRowModel().rows.length} entries loaded and displayed
+                </div>
+            )}
             <div className="flex items-center justify-between px-2">
                 <div className="flex-1 text-sm text-muted-foreground">
                     {table.getFilteredSelectedRowModel().rows.length > 0 ? (
@@ -195,54 +218,60 @@ export function DataTable({
                         </span>
                     ) : (
                         <span>
-                            Showing {table.getFilteredRowModel().rows.length > 0 ? table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1 : 0} to {Math.min((table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize, table.getFilteredRowModel().rows.length)} of {table.getFilteredRowModel().rows.length} entries
+                            {table.getState().pagination.pageSize === 999999 ? (
+                                `Showing 1 to ${Math.min(visibleLimit, table.getRowModel().rows.length)} of ${table.getRowModel().rows.length} entries`
+                            ) : (
+                                `Showing ${table.getFilteredRowModel().rows.length > 0 ? table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1 : 0} to ${Math.min((table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize, table.getFilteredRowModel().rows.length)} of ${table.getFilteredRowModel().rows.length} entries`
+                            )}
                         </span>
                     )}
                 </div>
-                <div className="flex items-center space-x-6 lg:space-x-8">
-                    <div className="flex w-[100px] items-center justify-center text-sm font-medium text-gray-700">
-                        Page {table.getState().pagination.pageIndex + 1} of{" "}
-                        {table.getPageCount()}
+                {table.getState().pagination.pageSize !== 999999 && (
+                    <div className="flex items-center space-x-6 lg:space-x-8">
+                        <div className="flex w-[100px] items-center justify-center text-sm font-medium text-gray-700">
+                            Page {table.getState().pagination.pageIndex + 1} of{" "}
+                            {table.getPageCount()}
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <Button
+                                variant="outline"
+                                className="hidden h-8 w-8 p-0 lg:flex"
+                                onClick={() => table.setPageIndex(0)}
+                                disabled={!table.getCanPreviousPage()}
+                            >
+                                <span className="sr-only">Go to first page</span>
+                                <span className="h-4 w-4">{'<<'}</span>
+                            </Button>
+                            <Button
+                                variant="outline"
+                                className="h-8 w-8 p-0"
+                                onClick={() => table.previousPage()}
+                                disabled={!table.getCanPreviousPage()}
+                            >
+                                <span className="sr-only">Go to previous page</span>
+                                <span className="h-4 w-4">{'<'}</span>
+                            </Button>
+                            <Button
+                                variant="outline"
+                                className="h-8 w-8 p-0"
+                                onClick={() => table.nextPage()}
+                                disabled={!table.getCanNextPage()}
+                            >
+                                <span className="sr-only">Go to next page</span>
+                                <span className="h-4 w-4">{'>'}</span>
+                            </Button>
+                            <Button
+                                variant="outline"
+                                className="hidden h-8 w-8 p-0 lg:flex"
+                                onClick={() => table.setPageIndex(table.getPageCount() - 1)}
+                                disabled={!table.getCanNextPage()}
+                            >
+                                <span className="sr-only">Go to last page</span>
+                                <span className="h-4 w-4">{'>>'}</span>
+                            </Button>
+                        </div>
                     </div>
-                    <div className="flex items-center space-x-2">
-                        <Button
-                            variant="outline"
-                            className="hidden h-8 w-8 p-0 lg:flex"
-                            onClick={() => table.setPageIndex(0)}
-                            disabled={!table.getCanPreviousPage()}
-                        >
-                            <span className="sr-only">Go to first page</span>
-                            <span className="h-4 w-4">{'<<'}</span>
-                        </Button>
-                        <Button
-                            variant="outline"
-                            className="h-8 w-8 p-0"
-                            onClick={() => table.previousPage()}
-                            disabled={!table.getCanPreviousPage()}
-                        >
-                            <span className="sr-only">Go to previous page</span>
-                            <span className="h-4 w-4">{'<'}</span>
-                        </Button>
-                        <Button
-                            variant="outline"
-                            className="h-8 w-8 p-0"
-                            onClick={() => table.nextPage()}
-                            disabled={!table.getCanNextPage()}
-                        >
-                            <span className="sr-only">Go to next page</span>
-                            <span className="h-4 w-4">{'>'}</span>
-                        </Button>
-                        <Button
-                            variant="outline"
-                            className="hidden h-8 w-8 p-0 lg:flex"
-                            onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-                            disabled={!table.getCanNextPage()}
-                        >
-                            <span className="sr-only">Go to last page</span>
-                            <span className="h-4 w-4">{'>>'}</span>
-                        </Button>
-                    </div>
-                </div>
+                )}
             </div>
         </div>
     )
