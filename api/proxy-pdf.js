@@ -9,11 +9,16 @@ export default async function handler(req, res) {
     }
 
     try {
+        let targetUrl = url;
+        if (typeof targetUrl === 'string' && (targetUrl.startsWith('rder Archive/') || targetUrl.indexOf('/rder Archive/') !== -1 || targetUrl.indexOf('?url=rder Archive/') !== -1)) {
+            targetUrl = targetUrl.replace('rder Archive/', 'Order Archive/');
+        }
+
         let buffer = null;
 
         // 1. Try standard fetch first (for external or public URLs)
         try {
-            const response = await fetch(url);
+            const response = await fetch(targetUrl);
             if (response.ok) {
                 buffer = await response.arrayBuffer();
             }
@@ -23,17 +28,13 @@ export default async function handler(req, res) {
 
         // 2. If standard fetch failed (e.g. 404 or 403 on private R2 bucket or mismatched domain), fetch from R2 using S3 credentials!
         if (!buffer) {
-            let key = url;
-            // Auto-correct typo where 'Order Archive' became 'rder Archive'
-            if (url.includes('rder Archive/')) {
-                url = url.replace('rder Archive/', 'Order Archive/');
-            }
-            const archiveIdx = url.indexOf('Order Archive/');
+            let key = targetUrl;
+            const archiveIdx = targetUrl.indexOf('Order Archive/');
             if (archiveIdx !== -1) {
-                key = decodeURIComponent(url.substring(archiveIdx).split('?')[0]);
+                key = decodeURIComponent(targetUrl.substring(archiveIdx).split('?')[0]);
             } else {
-                // Also handle cases where url is just the key without domain
-                key = decodeURIComponent(url.split('?')[0]);
+                // Also handle cases where targetUrl is just the key without domain
+                key = decodeURIComponent(targetUrl.split('?')[0]);
                 // Remove leading slash if any
                 if (key.startsWith('/')) key = key.substring(1);
             }
@@ -63,8 +64,20 @@ export default async function handler(req, res) {
                     });
                     const s3Res = await S3.send(command);
                     if (s3Res && s3Res.Body) {
-                        const byteArray = await s3Res.Body.transformToByteArray();
-                        buffer = byteArray.buffer;
+                        if (typeof s3Res.Body.transformToByteArray === 'function') {
+                            const byteArray = await s3Res.Body.transformToByteArray();
+                            buffer = byteArray.buffer || byteArray;
+                        } else if (typeof s3Res.Body.arrayBuffer === 'function') {
+                            buffer = await s3Res.Body.arrayBuffer();
+                        } else if (s3Res.Body[Symbol.asyncIterator]) {
+                            const chunks = [];
+                            for await (const chunk of s3Res.Body) {
+                                chunks.push(chunk);
+                            }
+                            buffer = Buffer.concat(chunks);
+                        } else {
+                            buffer = s3Res.Body;
+                        }
                         break;
                     }
                 } catch (err) {
