@@ -129,10 +129,10 @@ export async function MergeAndPrintAwbs(OrdersList) {
     for (const Order of ValidOrders) {
         try {
             const pdfUrl = `/api/proxy-pdf?url=${encodeURIComponent(Order.AwbUrl)}`;
-            const Response = await fetch(pdfUrl);
-            if (!Response.ok) throw new Error(`Failed to fetch AWB (HTTP ${Response.status})`);
-            const ArrayBuffer = await Response.arrayBuffer();
-            const SourcePdf = await PDFDocument.load(ArrayBuffer);
+            const fetchRes = await fetch(pdfUrl);
+            if (!fetchRes.ok) throw new Error(`Failed to fetch AWB (HTTP ${fetchRes.status})`);
+            const pdfArrayBuffer = await fetchRes.arrayBuffer();
+            const SourcePdf = await PDFDocument.load(pdfArrayBuffer);
             const CopiedPages = await MergedPdf.copyPages(SourcePdf, SourcePdf.getPageIndices());
             CopiedPages.forEach(Page => MergedPdf.addPage(Page));
             SuccessfulOrderIds.push(Order.ImportedOrderID);
@@ -146,8 +146,8 @@ export async function MergeAndPrintAwbs(OrdersList) {
     }
 
     const MergedPdfBytes = await MergedPdf.save();
-    const Blob = new Blob([MergedPdfBytes], { type: 'application/pdf' });
-    const BlobUrl = URL.createObjectURL(Blob);
+    const PdfBlob = new Blob([MergedPdfBytes], { type: 'application/pdf' });
+    const BlobUrl = URL.createObjectURL(PdfBlob);
 
     // Open print window / dialog
     const PrintWindow = window.open(BlobUrl, '_blank');

@@ -24,6 +24,10 @@ export default async function handler(req, res) {
         // 2. If standard fetch failed (e.g. 404 or 403 on private R2 bucket or mismatched domain), fetch from R2 using S3 credentials!
         if (!buffer) {
             let key = url;
+            // Auto-correct typo where 'Order Archive' became 'rder Archive'
+            if (url.includes('rder Archive/')) {
+                url = url.replace('rder Archive/', 'Order Archive/');
+            }
             const archiveIdx = url.indexOf('Order Archive/');
             if (archiveIdx !== -1) {
                 key = decodeURIComponent(url.substring(archiveIdx).split('?')[0]);
