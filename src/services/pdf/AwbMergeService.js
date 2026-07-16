@@ -1,5 +1,3 @@
-import { PDFDocument } from 'pdf-lib';
-
 /**
  * Service to sort and merge AWB PDF documents using client-side pdf-lib.
  * Follows HGH physical operation rules (Longgokan 1, 2, and 3).
@@ -122,6 +120,7 @@ export async function MergeAndPrintAwbs(OrdersList) {
         throw new Error('No valid AWB PDF files found in selected orders.');
     }
 
+    const { PDFDocument } = await import('pdf-lib');
     const MergedPdf = await PDFDocument.create();
     const SuccessfulOrderIds = [];
 

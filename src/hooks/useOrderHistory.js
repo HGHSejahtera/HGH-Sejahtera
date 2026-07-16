@@ -76,6 +76,7 @@ export function useOrderHistory(filters = {}) {
                     Items: mappedItems,
                     Platform: order.Platform,
                     Source: parent?.Source,
+                    AccountName: parent?.AccountName || 'Main Account',
                     AgentName: agentName,
                     DisplayAmount: displayAmount,
                     TotalAmount: displayAmount,

@@ -33,12 +33,13 @@ export function AllOrders() {
     const [IsPrinting, SetIsPrinting] = useState(false);
     const [FilterAgent, SetFilterAgent] = useState('All');
     const [FilterPlatform, SetFilterPlatform] = useState('All');
+    const [FilterAccount, SetFilterAccount] = useState('All');
     const [RowSelection, SetRowSelection] = useState({});
 
     // Reset selection when changing tabs or filters
     useEffect(() => {
         SetRowSelection({});
-    }, [ActiveTab, FilterAgent, FilterPlatform, SortBy]);
+    }, [ActiveTab, FilterAgent, FilterPlatform, FilterAccount, SortBy]);
 
     // Unique options for filters
     const UniqueAgents = useMemo(() => {
@@ -49,6 +50,11 @@ export function AllOrders() {
     const UniquePlatforms = useMemo(() => {
         const platforms = new Set(orders.filter(o => o.Platform).map(o => o.Platform));
         return ['All', ...Array.from(platforms).sort()];
+    }, [orders]);
+
+    const UniqueAccounts = useMemo(() => {
+        const accounts = new Set(orders.filter(o => o.AccountName).map(o => o.AccountName));
+        return ['All', ...Array.from(accounts).sort()];
     }, [orders]);
 
     // Drawer state
@@ -74,15 +80,17 @@ export function AllOrders() {
         let Unprinted = orders.filter(Order => !Order.IsPrinted);
         if (FilterAgent !== 'All') Unprinted = Unprinted.filter(o => o.AgentName === FilterAgent);
         if (FilterPlatform !== 'All') Unprinted = Unprinted.filter(o => o.Platform === FilterPlatform);
+        if (FilterAccount !== 'All') Unprinted = Unprinted.filter(o => o.AccountName === FilterAccount);
         return SortOrders(Unprinted, SortBy);
-    }, [orders, SortBy, FilterAgent, FilterPlatform]);
+    }, [orders, SortBy, FilterAgent, FilterPlatform, FilterAccount]);
 
     const CompleteOrders = useMemo(() => {
         let Printed = orders.filter(Order => Order.IsPrinted);
         if (FilterAgent !== 'All') Printed = Printed.filter(o => o.AgentName === FilterAgent);
         if (FilterPlatform !== 'All') Printed = Printed.filter(o => o.Platform === FilterPlatform);
+        if (FilterAccount !== 'All') Printed = Printed.filter(o => o.AccountName === FilterAccount);
         return SortOrders(Printed, SortBy);
-    }, [orders, SortBy, FilterAgent, FilterPlatform]);
+    }, [orders, SortBy, FilterAgent, FilterPlatform, FilterAccount]);
 
     const DisplayOrders = ActiveTab === 'Queue' ? QueueOrders : CompleteOrders;
 
@@ -260,6 +268,19 @@ export function AllOrders() {
                     <SelectContent side="bottom" className="rounded-md shadow-lg border-gray-200">
                         {UniquePlatforms.map(platform => (
                             <SelectItem key={platform} value={platform}>{platform}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+            <div className="flex items-center gap-1 text-xs ml-2">
+                <span className="text-gray-500 font-medium mr-1">Account:</span>
+                <Select value={FilterAccount} onValueChange={SetFilterAccount}>
+                    <SelectTrigger className="h-8 w-[110px] bg-white text-xs font-medium rounded-md border-gray-200 hover:border-gray-300 shadow-xs transition-colors">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent side="bottom" className="rounded-md shadow-lg border-gray-200">
+                        {UniqueAccounts.map(account => (
+                            <SelectItem key={account} value={account}>{account}</SelectItem>
                         ))}
                     </SelectContent>
                 </Select>
