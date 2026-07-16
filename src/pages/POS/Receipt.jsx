@@ -14,23 +14,26 @@ export function Receipt({ saleData }) {
                         size: A4;
                         margin: 15mm;
                     }
-                    body * {
-                        visibility: hidden !important;
-                    }
-                    .receipt-container, .receipt-container * {
-                        visibility: visible !important;
+                    html, body, #root {
+                        background: white !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        height: auto !important;
+                        min-height: 0 !important;
+                        overflow: visible !important;
                     }
                     .receipt-container {
                         position: absolute !important;
                         left: 0 !important;
                         top: 0 !important;
                         width: 100% !important;
-                        max-width: none !important;
+                        max-width: 100% !important;
                         margin: 0 !important;
                         padding: 0 !important;
                         border: none !important;
                         box-shadow: none !important;
                         background: white !important;
+                        z-index: 999999 !important;
                     }
                 }
             `}</style>

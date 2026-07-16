@@ -170,8 +170,18 @@ export function POS() {
     const updateQuantity = (productId, delta) => {
         setCart(prev => prev.map(item => {
             if (item.ProductID === productId) {
-                const newQty = item.quantity + delta;
+                const currentQty = typeof item.quantity === 'number' && !isNaN(item.quantity) ? item.quantity : (parseInt(item.quantity, 10) || 1);
+                const newQty = currentQty + delta;
                 return newQty > 0 ? { ...item, quantity: newQty } : item;
+            }
+            return item;
+        }));
+    };
+
+    const setQuantityManual = (productId, val) => {
+        setCart(prev => prev.map(item => {
+            if (item.ProductID === productId) {
+                return { ...item, quantity: val };
             }
             return item;
         }));
@@ -184,7 +194,8 @@ export function POS() {
     const handleCompleteSale = async () => {
         if (!paymentMethod) return;
 
-        const subtotalCalc = cart.reduce((sum, item) => sum + (getPrice(item) * item.quantity), 0);
+        const getSafeQty = (q) => typeof q === 'number' && !isNaN(q) && q > 0 ? q : (parseInt(q, 10) || 1);
+        const subtotalCalc = cart.reduce((sum, item) => sum + (getPrice(item) * getSafeQty(item.quantity)), 0);
         const changeCalc = paymentMethod === 'cash' ? parseFloat(amountReceived || 0) - subtotalCalc : 0;
 
         try {
@@ -199,13 +210,16 @@ export function POS() {
                 CustomerName: null,
                 CustomerCompany: null,
                 CustomerPhone: null,
-                Items: cart.map(item => ({
-                    ProductID: item.ProductID,
-                    Quantity: item.quantity,
-                    UnitPrice: getPrice(item),
-                    Subtotal: getPrice(item) * item.quantity,
-                    IsPriceOverride: item.customPrice !== undefined
-                }))
+                Items: cart.map(item => {
+                    const safeQty = typeof item.quantity === 'number' && !isNaN(item.quantity) && item.quantity > 0 ? item.quantity : (parseInt(item.quantity, 10) || 1);
+                    return {
+                        ProductID: item.ProductID,
+                        Quantity: safeQty,
+                        UnitPrice: getPrice(item),
+                        Subtotal: getPrice(item) * safeQty,
+                        IsPriceOverride: item.customPrice !== undefined
+                    };
+                })
             });
 
             const finalSaleId = result?.SaleID || result?.sale_id;
@@ -232,7 +246,8 @@ export function POS() {
         }
     };
 
-    const subtotal = cart.reduce((sum, item) => sum + (getPrice(item) * item.quantity), 0);
+    const getSafeQty = (q) => typeof q === 'number' && !isNaN(q) && q > 0 ? q : (parseInt(q, 10) || 1);
+    const subtotal = cart.reduce((sum, item) => sum + (getPrice(item) * getSafeQty(item.quantity)), 0);
     const total = subtotal; // No tax logic for now
     const change = parseFloat(amountReceived || 0) - total;
 
@@ -251,9 +266,9 @@ export function POS() {
     if (isLoading) return <div className="p-6">Loading...</div>;
 
     return (
-        <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
+        <div className="flex flex-col lg:flex-row flex-1 overflow-hidden print:block print:overflow-visible print:h-auto">
             {/* Left: Product Search & Scanning */}
-            <div className="w-full lg:w-2/3 p-4 md:p-6 flex flex-col border-r h-full overflow-hidden bg-gray-50">
+            <div className="w-full lg:w-2/3 p-4 md:p-6 flex flex-col border-r h-full overflow-hidden bg-gray-50 print:hidden">
                 <div className="mb-6 shrink-0 flex items-center gap-3">
                     <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -403,7 +418,7 @@ export function POS() {
             </div>
 
             {/* Right: Cart & Checkout */}
-            <div className="w-full lg:w-1/3 flex flex-col h-full bg-white">
+            <div className="w-full lg:w-1/3 flex flex-col h-full bg-white print:hidden">
                 <div className="p-4 border-b flex justify-between items-center bg-white z-10 shadow-sm shrink-0">
                     <h3 className="font-bold text-lg">Order</h3>
                     <DropdownMenu>
@@ -490,7 +505,24 @@ export function POS() {
                                             <button onClick={() => updateQuantity(item.ProductID, -1)} className="w-8 h-full flex items-center justify-center hover:bg-gray-50 text-gray-600 border-r border-gray-100 transition-colors">
                                                 <Minus className="h-3.5 w-3.5" />
                                             </button>
-                                            <span className="w-10 text-center text-sm font-medium text-gray-900">{item.quantity}</span>
+                                            <input 
+                                                type="number" 
+                                                min="1" 
+                                                value={item.quantity} 
+                                                onChange={(e) => {
+                                                    const val = e.target.value === '' ? '' : parseInt(e.target.value, 10);
+                                                    if (val === '' || (!isNaN(val) && val >= 1)) {
+                                                        setQuantityManual(item.ProductID, val);
+                                                    }
+                                                }}
+                                                onBlur={(e) => {
+                                                    const val = parseInt(e.target.value, 10);
+                                                    if (isNaN(val) || val < 1) {
+                                                        setQuantityManual(item.ProductID, 1);
+                                                    }
+                                                }}
+                                                className="w-12 text-center text-sm font-medium text-gray-900 border-none focus:outline-none bg-transparent py-1 appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                            />
                                             <button onClick={() => updateQuantity(item.ProductID, 1)} className="w-8 h-full flex items-center justify-center hover:bg-gray-50 text-gray-600 border-l border-gray-100 transition-colors">
                                                 <Plus className="h-3.5 w-3.5" />
                                             </button>
@@ -528,28 +560,41 @@ export function POS() {
 
             {/* Payment Modal */}
             {paymentModalOpen && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                    <div className={`bg-white rounded-none shadow-xl w-full ${showReceipt ? 'max-w-3xl' : 'max-w-md'} max-h-[95vh] overflow-hidden flex flex-col`}>
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 print:static print:inset-auto print:bg-transparent print:p-0 print:block print:overflow-visible print:z-auto">
+                    <div className={`bg-white rounded-none shadow-xl w-full ${showReceipt ? 'max-w-3xl' : 'max-w-md'} max-h-[95vh] overflow-hidden flex flex-col print:max-w-none print:max-h-none print:shadow-none print:border-none print:w-full print:overflow-visible print:block print:m-0 print:p-0`}>
                         <div className="p-6 border-b flex justify-between items-center print:hidden">
-                            <h2 className="text-xl font-bold">Payment</h2>
+                            <div className="flex items-center gap-3">
+                                <h2 className="text-xl font-bold">Payment</h2>
+                            </div>
                             <span className="text-xl font-bold text-indigo-600">RM {total.toFixed(2)}</span>
                         </div>
                         
-                        <div className="p-6 space-y-4 flex-1 overflow-hidden flex flex-col">
+                        <div className="p-6 space-y-4 flex-1 overflow-hidden flex flex-col print:p-0 print:overflow-visible print:block print:space-y-0">
                             {showReceipt ? (
-                                <div className="flex flex-col h-full overflow-hidden">
-                                    <div className="flex items-center justify-center mb-4 shrink-0">
+                                <div className="flex flex-col h-full overflow-hidden print:overflow-visible print:block print:h-auto">
+                                    <div className="flex items-center justify-center mb-4 shrink-0 print:hidden">
                                         <CheckCircle className="h-6 w-6 text-green-600 mr-2 print:hidden" />
                                         <span className="text-lg font-bold text-gray-900 print:hidden">Payment Successful</span>
                                     </div>
-                                    <div className="w-full border rounded-lg p-2 bg-gray-50 overflow-y-auto flex-1 print:overflow-visible print:border-none print:p-0 print:bg-white custom-scrollbar">
+                                    <div className="w-full border rounded-lg p-2 bg-gray-50 overflow-y-auto flex-1 print:overflow-visible print:border-none print:p-0 print:bg-white custom-scrollbar print:block print:flex-none">
                                         <Receipt saleData={saleData} />
                                     </div>
-                                    <div className="flex gap-4 w-full mt-4 shrink-0 print:hidden">
-                                        <Button variant="outline" className="flex-1 h-12" onClick={() => window.print()}>
+                                    <div className="flex flex-wrap gap-3 w-full mt-4 shrink-0 print:hidden">
+                                        <Button 
+                                            variant="outline" 
+                                            className="flex-1 h-12 border-gray-300 text-gray-700 hover:bg-gray-100 font-semibold" 
+                                            onClick={() => {
+                                                setShowReceipt(false);
+                                                setPaymentSuccess(false);
+                                                setPaymentModalOpen(false);
+                                            }}
+                                        >
+                                            Back
+                                        </Button>
+                                        <Button variant="outline" className="flex-1 h-12 border-indigo-600 text-indigo-600 hover:bg-indigo-50 font-semibold" onClick={() => window.print()}>
                                             Print Receipt
                                         </Button>
-                                        <Button className="flex-1 h-12" onClick={handleNewSale}>
+                                        <Button className="flex-1 h-12 bg-indigo-600 hover:bg-indigo-700 text-white font-bold" onClick={handleNewSale}>
                                             Complete
                                         </Button>
                                     </div>
@@ -621,14 +666,31 @@ export function POS() {
                             ) : null}
                         </div>
 
-                        {!paymentSuccess && (
-                            <div className="p-4 border-t bg-gray-50 flex justify-between">
-                                {paymentMethod !== '' ? (
-                                    <Button variant="ghost" onClick={() => setPaymentMethod('')}>Back</Button>
-                                ) : (
-                                    <div />
-                                )}
-                                <Button variant="ghost" onClick={() => { setPaymentModalOpen(false); setPaymentMethod(''); }}>Cancel</Button>
+                        {!showReceipt && (
+                            <div className="p-4 border-t bg-gray-50 flex justify-between items-center print:hidden">
+                                <Button 
+                                    variant="outline" 
+                                    className="border-gray-300 text-gray-700 font-medium"
+                                    onClick={() => {
+                                        if (paymentMethod !== '') {
+                                            setPaymentMethod('');
+                                        } else {
+                                            setPaymentModalOpen(false);
+                                        }
+                                    }}
+                                >
+                                    Back
+                                </Button>
+                                <Button 
+                                    variant="ghost" 
+                                    className="text-red-600 hover:text-red-700 hover:bg-red-50 font-medium"
+                                    onClick={() => { 
+                                        setPaymentModalOpen(false); 
+                                        setPaymentMethod(''); 
+                                    }}
+                                >
+                                    Cancel Order
+                                </Button>
                             </div>
                         )}
                     </div>
