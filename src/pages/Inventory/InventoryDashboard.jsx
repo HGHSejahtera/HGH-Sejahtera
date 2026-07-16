@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Archive, Barcode, Boxes, ChevronDown, ChevronUp, ChevronsUpDown, Edit, MoreHorizontal, Package, PackagePlus, Plus, RefreshCw, Trash2, AlertTriangle, XCircle, Square, Maximize, Minimize, Download, X } from 'lucide-react';
-import * as XLSX from 'xlsx-js-style';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DataTable } from '@/components/common/DataTable';
@@ -198,7 +197,8 @@ export function InventoryDashboard() {
         }
     };
 
-    const handleExportExcel = () => {
+    const handleExportExcel = async () => {
+        const XLSX = await import('xlsx-js-style');
         const Headers = [];
         if (exportColumns.masterSKU) Headers.push('Master SKU');
         if (exportColumns.barcode) Headers.push('Barcode');

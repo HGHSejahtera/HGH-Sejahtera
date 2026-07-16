@@ -63,8 +63,8 @@ export default async function handler(req, res) {
                         buffer = byteArray.buffer;
                         break;
                     }
-                } catch {
-                    // Try next bucket
+                } catch (err) {
+                    console.warn(`R2 lookup failed for bucket [${bucket}] and key [${key}]:`, err.message || err);
                 }
             }
         }

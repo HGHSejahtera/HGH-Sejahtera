@@ -4,7 +4,6 @@ import { CheckCircle, AlertTriangle, Table as TableIcon, ChevronDown, ExternalLi
 import { Button } from '@/components/ui/button';
 import { useDropzone } from 'react-dropzone';
 import { useQueryClient } from '@tanstack/react-query';
-import * as XLSX from 'xlsx';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/hooks/useAuth';
 import { AgentTabs } from './AgentTabs';
@@ -28,6 +27,7 @@ export function TikTokCatalogSync() {
         let totalFilesProcessed = 0;
 
         try {
+            const XLSX = await import('xlsx');
             for (const file of acceptedFiles) {
                 const data = await new Promise((resolve, reject) => {
                     const reader = new FileReader();

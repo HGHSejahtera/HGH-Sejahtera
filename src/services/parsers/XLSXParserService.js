@@ -1,5 +1,3 @@
-import * as XLSX from 'xlsx';
-
 /**
  * Parses Shopee XLSX files.
  */
@@ -8,8 +6,9 @@ export const XLSXParserService = {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
             
-            reader.onload = (e) => {
+            reader.onload = async (e) => {
                 try {
+                    const XLSX = await import('xlsx');
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array' });
                     

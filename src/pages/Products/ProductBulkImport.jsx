@@ -4,7 +4,6 @@ import { UploadCloud, FileType, CheckCircle, AlertCircle, Copy } from 'lucide-re
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabase';
 import Papa from 'papaparse';
-import * as XLSX from 'xlsx';
 
 const EXPECTED_HEADERS = ['ProductName', 'Brand', 'Category', 'Variation', 'Barcode', 'SellerSKU', 'GTIN', 'CostPrice'];
 
@@ -111,8 +110,9 @@ Rules:
             });
         } else if (fileExt === 'xlsx' || fileExt === 'xls') {
             const reader = new FileReader();
-            reader.onload = (e) => {
+            reader.onload = async (e) => {
                 try {
+                    const XLSX = await import('xlsx');
                     const data = e.target.result;
                     const workbook = XLSX.read(data, { type: 'binary' });
                     const firstSheetName = workbook.SheetNames[0];
