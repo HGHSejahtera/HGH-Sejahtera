@@ -1,5 +1,6 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
+import { LoadPdfLib } from '@/lib/pdfLib';
 
 // Set the worker source for pdfjs
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
@@ -173,7 +174,7 @@ export const TikTokPdfParser = {
             }
 
             // Step 4: Split PDF using pdf-lib based on grouped pageIndices
-            const { PDFDocument } = await import('pdf-lib');
+            const { PDFDocument } = await LoadPdfLib();
             const srcDoc = await PDFDocument.load(arrayBuffer);
             
             for (const orderData of orderMap.values()) {
