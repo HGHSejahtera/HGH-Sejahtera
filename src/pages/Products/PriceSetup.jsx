@@ -65,7 +65,7 @@ export function PriceSetup() {
         const updates = Object.keys(edits).map(productId => {
             const original = pricingData.find(p => p.ProductID === productId);
             const changes = edits[productId];
-            
+
             return {
                 ProductID: productId,
                 PricingModel: original.PricingModel || 'HQ_DISCOUNT',
@@ -130,7 +130,7 @@ export function PriceSetup() {
                 </div>
                 <div className="flex items-center gap-3">
                     {hasChanges && (
-                        <Button 
+                        <Button
                             variant="outline"
                             onClick={() => setIsModalOpen(true)}
                             className="relative border-indigo-200 text-indigo-700 hover:bg-indigo-50"
@@ -141,8 +141,8 @@ export function PriceSetup() {
                             </span>
                         </Button>
                     )}
-                    <Button 
-                        onClick={handleSave} 
+                    <Button
+                        onClick={handleSave}
                         disabled={!hasChanges || updatePricing.isPending}
                         className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white"
                     >
@@ -169,7 +169,7 @@ export function PriceSetup() {
                         {filteredData.map((product) => {
                             const isEdited = !!edits[product.ProductID];
                             const currentEdits = edits[product.ProductID] || {};
-                            
+
                             const dCostPrice = currentEdits.CostPrice ?? product.CostPrice;
                             const dFakeCostPrice = currentEdits.FakeCostPrice ?? product.FakeCostPrice;
                             const dStockistPrice = currentEdits.StockistPrice ?? product.StockistPrice;
@@ -177,56 +177,55 @@ export function PriceSetup() {
                             const dAgent = currentEdits.AgentMarkup ?? product.AgentMarkup; // Acts as Agent Price
                             const dRetail = currentEdits.RetailRule ?? product.RetailRule;
                             const formattedName = [product.Brand, product.ProductName, product.Variation, product.Size].filter(Boolean).join(' ');
-                            
                             return (
                                 <tr key={product.ProductID} className={isEdited ? 'bg-indigo-50/30' : 'hover:bg-gray-50/50'}>
                                     <td className="px-4 py-3">
                                         <div className="font-medium text-gray-900">{formattedName}</div>
-                                        <div className="text-xs text-gray-500">{product.SellerSKU}</div>
+                                        <div className="text-xs text-gray-500">{product.Barcode}</div>
                                     </td>
-                                    
+
                                     {isHGHMode && (
                                         <td className="px-4 py-3 text-right">
-                                            <PriceInput 
-                                                value={dFakeCostPrice} 
-                                                onChange={(val) => handlePriceChange(product.ProductID, 'FakeCostPrice', val)} 
+                                            <PriceInput
+                                                value={dFakeCostPrice}
+                                                onChange={(val) => handlePriceChange(product.ProductID, 'FakeCostPrice', val)}
                                             />
                                         </td>
                                     )}
                                     {isHGHMode && (
                                         <td className="px-4 py-3 text-right">
-                                            <PriceInput 
-                                                value={dCostPrice} 
-                                                onChange={(val) => handlePriceChange(product.ProductID, 'CostPrice', val)} 
+                                            <PriceInput
+                                                value={dCostPrice}
+                                                onChange={(val) => handlePriceChange(product.ProductID, 'CostPrice', val)}
                                             />
                                         </td>
                                     )}
-                                    
+
                                     <td className="px-4 py-3 text-right">
-                                        <PriceInput 
-                                            value={dStockistPrice} 
-                                            onChange={(val) => handlePriceChange(product.ProductID, 'StockistPrice', val)} 
+                                        <PriceInput
+                                            value={dStockistPrice}
+                                            onChange={(val) => handlePriceChange(product.ProductID, 'StockistPrice', val)}
                                         />
                                     </td>
                                     <td className="px-4 py-3 text-right">
-                                        <PriceInput 
-                                            value={dWholesale} 
-                                            onChange={(val) => handlePriceChange(product.ProductID, 'WholesaleRule', val)} 
+                                        <PriceInput
+                                            value={dWholesale}
+                                            onChange={(val) => handlePriceChange(product.ProductID, 'WholesaleRule', val)}
                                         />
                                     </td>
                                     <td className="px-4 py-3 text-right">
-                                        <PriceInput 
-                                            value={dAgent} 
-                                            onChange={(val) => handlePriceChange(product.ProductID, 'AgentMarkup', val)} 
+                                        <PriceInput
+                                            value={dAgent}
+                                            onChange={(val) => handlePriceChange(product.ProductID, 'AgentMarkup', val)}
                                         />
                                     </td>
                                     <td className="px-4 py-3 text-right">
-                                        <PriceInput 
-                                            value={dRetail} 
+                                        <PriceInput
+                                            value={dRetail}
                                             onChange={(val) => {
                                                 handlePriceChange(product.ProductID, 'RetailRule', val);
-                                                handlePriceChange(product.ProductID, 'BasePrice', val); 
-                                            }} 
+                                                handlePriceChange(product.ProductID, 'BasePrice', val);
+                                            }}
                                         />
                                     </td>
                                 </tr>
@@ -265,7 +264,7 @@ export function PriceSetup() {
                                         const product = pricingData?.find(p => p.ProductID === productId);
                                         if (!product) return null;
                                         const formattedName = [product.Brand, product.ProductName, product.Variation, product.Size].filter(Boolean).join(' ');
-                                        
+
                                         return Object.entries(changes).map(([field, newValue]) => {
                                             const oldValue = product[field] || 0;
                                             // Format field name for better readability
@@ -281,7 +280,7 @@ export function PriceSetup() {
                                                 <tr key={`${productId}-${field}`} className="hover:bg-gray-50/50">
                                                     <td className="px-4 py-3">
                                                         <div className="font-medium text-gray-900">{formattedName}</div>
-                                                        <div className="text-xs text-gray-500">{product.MasterSKU}</div>
+                                                        <div className="text-xs text-gray-500">{product.Barcode}</div>
                                                     </td>
                                                     <td className="px-4 py-3 text-gray-600">{displayField}</td>
                                                     <td className="px-4 py-3 text-right text-gray-500 line-through">RM {Number(oldValue).toFixed(2)}</td>
@@ -295,11 +294,11 @@ export function PriceSetup() {
                         </div>
                         <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
                             <Button variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-                            <Button 
+                            <Button
                                 onClick={() => {
                                     handleSave();
                                     setIsModalOpen(false);
-                                }} 
+                                }}
                                 disabled={updatePricing.isPending}
                                 className="bg-indigo-600 hover:bg-indigo-700 text-white"
                             >
