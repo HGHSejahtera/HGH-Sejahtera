@@ -132,28 +132,6 @@
   }
 }
 
-/* POS Receipt Print Styles */
-@media print {
-  body {
-    visibility: hidden;
-    margin: 0;
-    padding: 0;
-    background: white;
-  }
-  
-  .receipt-container, .receipt-container * {
-    visibility: visible;
-  }
-  
-  .receipt-container {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 80mm;
-    margin: 0;
-    padding: 0;
-  }
-}
 
 /* Custom Minimalist Scrollbar */
 ::-webkit-scrollbar {
@@ -268,21 +246,39 @@ input[type=number] {
     }
 
     #printable-statement,
-    #printable-statement * {
+    #printable-statement *,
+    #printable-receipt,
+    #printable-receipt *,
+    .receipt-container,
+    .receipt-container *,
+    #printable-barcodes,
+    #printable-barcodes * {
         visibility: visible !important;
     }
 
-    #printable-statement {
+    #printable-statement,
+    #printable-receipt,
+    .receipt-container,
+    #printable-barcodes {
         position: absolute !important;
         left: 0 !important;
         top: 0 !important;
         width: 100% !important;
         max-width: 100% !important;
         margin: 0 !important;
-        padding: 15mm !important;
         border: none !important;
         box-shadow: none !important;
         background: white !important;
+    }
+
+    #printable-statement,
+    #printable-receipt,
+    .receipt-container {
+        padding: 15mm !important;
+    }
+
+    #printable-barcodes {
+        padding: 10mm !important;
     }
 
     .print\:hidden {

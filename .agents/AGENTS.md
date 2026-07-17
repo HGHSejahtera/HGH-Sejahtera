@@ -31,3 +31,19 @@
 # Search Input Placeholders
 - **NEVER use lengthy words or verbose text in search placeholders or input boxes** (e.g., NEVER use `"Search payouts and ledger..."`, `"Search orders..."`, `"Search products by name..."`).
 - **ALWAYS use `"Search"` ONLY** across all search boxes, tables (`DataTable`), and inputs in the entire application. Keep it strictly concise.
+
+# Definitive & Direct Naming Convention
+- **Never name things non-definitively or with lengthy/slash names.**
+- NEVER use `"Unmatched Product / Platform Item"` in table columns or headers; ALWAYS use `"Unmatched Product"`.
+- NEVER use `"Impact / Affected Orders"`; ALWAYS use `"Affected Orders"`.
+- NEVER use `"Map To Internal Product"`; ALWAYS use direct, concise terms like `"Link Product"` or `"Target Product"`.
+- Keep every title, label, and header strictly definitive, direct, and concise without slash (`/`) options or ambiguous alternatives.
+
+# Implementation Plan Review Output Rule
+- **When the user reviews an `implementation_plan.md` artifact or provides feedback/comments on a plan, DO NOT output lengthy answers, discussions, explanations, or reviews directly in the chat.**
+- ALWAYS write/update your answers directly inside the `implementation_plan.md` artifact and keep your chat response strictly minimal (pointing to the updated plan).
+
+# Strict Form & Input Box Placeholders Prohibition
+- **NEVER add verbose or dummy data `placeholder=""` attributes in form inputs or settings fields** (e.g., NEVER use `placeholder="+60 3-1234 5678"`, `placeholder="support@hghsejahtera.com"`, or dummy addresses).
+- Form input boxes should either have NO `placeholder` attribute at all, or strictly concise, non-dummy utility descriptors if absolutely required.
+- When designing address entry forms, prioritize **structured regional inputs** (Address Line 1, Address Line 2, Address Line 3, Country, State/Negeri, City, Postcode/ZIP Code) with regional defaults (e.g., Malaysia and Malaysia States list) rather than raw unstructured textareas with long dummy placeholders.

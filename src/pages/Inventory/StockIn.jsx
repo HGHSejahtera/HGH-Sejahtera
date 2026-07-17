@@ -164,7 +164,7 @@ export function StockIn() {
                             <Input
                                 value={SearchTerm}
                                 onChange={(Event) => setSearchTerm(Event.target.value)}
-                                placeholder="Scan or search product..."
+                                placeholder="Search"
                                 className="pl-9"
                             />
                         </div>

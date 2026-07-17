@@ -48,7 +48,7 @@ export function BarcodeGenerator() {
             </div>
 
             {/* Print Grid */}
-            <div className="bg-white print:p-0 p-6 rounded-xl border shadow-sm">
+            <div id="printable-barcodes" className="bg-white print:p-0 p-6 rounded-xl border shadow-sm">
                 {!internalProducts || internalProducts.length === 0 ? (
                     <div className="text-center py-12 text-gray-500 print:hidden">
                         No products with internal barcodes currently available.

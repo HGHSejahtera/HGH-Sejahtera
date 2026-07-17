@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { PageLayout } from './components/layout/PageLayout';
 import { useAuthStore } from './hooks/useAuth';
+import { Toaster } from 'sonner';
 
 import { ProductBulkImport } from './pages/Products/ProductBulkImport';
 import { BarcodeGenerator } from './pages/Products/Barcode';
@@ -108,6 +109,7 @@ export default function App() {
                     <Route path="*" element={<Navigate to="/login" replace />} />
                 )}
             </Routes>
+            <Toaster position="top-center" richColors duration={2500} />
         </BrowserRouter>
     );
 }

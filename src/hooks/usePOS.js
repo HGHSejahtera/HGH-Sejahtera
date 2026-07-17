@@ -13,10 +13,11 @@ export const usePOS = () => {
                 // Simulate network delay
                 await new Promise(resolve => setTimeout(resolve, 1000));
                 
-                // Return mock success response
+                const mockReceiptNo = `HGH-${new Date().getFullYear()}-${String(Math.floor(100000 + Math.random() * 900000))}`;
                 return {
                     success: true,
                     sale_id: `TEST-${Date.now()}`,
+                    ReceiptNumber: mockReceiptNo,
                     message: "Test sale completed successfully"
                 };
             }

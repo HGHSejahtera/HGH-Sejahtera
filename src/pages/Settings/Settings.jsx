@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Save, Building2, CreditCard, Package, Settings as SettingsIcon, Users, UserRound, Zap, Lock, Unlock } from 'lucide-react';
+import { Save, Building2, CreditCard, Package, Settings as SettingsIcon, Users, UserRound, Zap, Lock, Unlock, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/lib/supabase';
 import { useSettings, useUpdateSettings } from '@/hooks/useSettings';
 import { ImageDropzone } from '@/components/ui/image-dropzone';
 import { Loader2 } from 'lucide-react';
 import { useAuthStore } from '@/hooks/useAuth';
+import { toast } from 'sonner';
 
 const SETTINGS_TABS = [
     { name: 'My Account', path: '/Settings/Account', icon: UserRound, roles: ['Founder', 'Manager', 'Developer', 'Staff', 'Agent'] },
@@ -59,6 +61,76 @@ export function Settings() {
     return <SettingsForm settingsData={settingsData} />;
 }
 
+const MALAYSIA_STATES = [
+    "Johor",
+    "Kedah",
+    "Kelantan",
+    "Melaka",
+    "Negeri Sembilan",
+    "Pahang",
+    "Perak",
+    "Perlis",
+    "Pulau Pinang",
+    "Sabah",
+    "Sarawak",
+    "Selangor",
+    "Terengganu",
+    "W.P. Kuala Lumpur",
+    "W.P. Labuan",
+    "W.P. Putrajaya"
+];
+
+function parseAddressStr(str) {
+    if (!str) {
+        return {
+            addressLine1: '',
+            addressLine2: '',
+            addressLine3: '',
+            country: 'Malaysia',
+            state: 'Selangor',
+            city: '',
+            postcode: ''
+        };
+    }
+    const lines = str.includes('\n') ? str.split('\n').map(l => l.trim()).filter(Boolean) : str.split(',').map(l => l.trim()).filter(Boolean);
+    
+    let country = 'Malaysia';
+    let state = 'Selangor';
+    let postcode = '';
+    let city = '';
+    let line1 = lines[0] || '';
+    let line2 = lines[1] || '';
+    let line3 = lines.length > 4 ? lines[2] : '';
+    
+    const lastLine = lines[lines.length - 1];
+    if (lastLine && (lastLine.toLowerCase() === 'malaysia' || lastLine.toLowerCase() === 'united states' || lastLine.toLowerCase() === 'singapore')) {
+        country = lastLine;
+    }
+    
+    lines.forEach(l => {
+        const foundState = MALAYSIA_STATES.find(s => l.toLowerCase().includes(s.toLowerCase()));
+        if (foundState) state = foundState;
+    });
+    
+    lines.forEach(l => {
+        const match = l.match(/\b\d{5}\b/);
+        if (match) {
+            postcode = match[0];
+            city = l.replace(/\b\d{5}\b/, '').replace(/,/g, '').trim();
+        }
+    });
+
+    return {
+        addressLine1: line1,
+        addressLine2: line2,
+        addressLine3: line3,
+        country: country || 'Malaysia',
+        state: state || 'Selangor',
+        city: city,
+        postcode: postcode
+    };
+}
+
 function SettingsForm({ settingsData }) {
     const updateSettingsMutation = useUpdateSettings();
 
@@ -67,6 +139,7 @@ function SettingsForm({ settingsData }) {
         companyAddress: settingsData.CompanyAddress || '',
         companySSM: settingsData.CompanySSM || '',
         supportEmail: settingsData.SupportEmail || '',
+        companyPhone: settingsData.CompanyPhone || '',
         costPerParcel: settingsData.CostPerParcel || '0.80',
         settlementCycle: settingsData.SettlementCycle || 'monthly',
         defaultPlatformFee: settingsData.DefaultPlatformFee || '25',
@@ -74,9 +147,27 @@ function SettingsForm({ settingsData }) {
         orderIngestionPipeline: settingsData.OrderIngestionPipeline || 'Manual'
     });
 
+    const [addressFields, setAddressFields] = useState(() => parseAddressStr(settingsData.CompanyAddress));
+
     const [secretPhrase, setSecretPhrase] = useState('');
     const [isPipelineUnlocked, setIsPipelineUnlocked] = useState(false);
     const [isVerifying, setIsVerifying] = useState(false);
+    const [saveStatus, setSaveStatus] = useState('idle');
+
+    const handleAddressChange = (field, value) => {
+        const nextFields = { ...addressFields, [field]: value };
+        setAddressFields(nextFields);
+        
+        const lines = [];
+        if (nextFields.addressLine1) lines.push(nextFields.addressLine1);
+        if (nextFields.addressLine2) lines.push(nextFields.addressLine2);
+        if (nextFields.addressLine3) lines.push(nextFields.addressLine3);
+        const cityLine = [nextFields.postcode, nextFields.city].filter(Boolean).join(' ');
+        if (cityLine || nextFields.state) lines.push([cityLine, nextFields.state].filter(Boolean).join(', '));
+        if (nextFields.country) lines.push(nextFields.country);
+        
+        setSettings(prev => ({ ...prev, companyAddress: lines.join('\n') }));
+    };
 
     const handleVerifySecret = async () => {
         if (!secretPhrase) return;
@@ -89,12 +180,12 @@ function SettingsForm({ settingsData }) {
             if (data === true) {
                 setIsPipelineUnlocked(true);
                 setSecretPhrase('');
-                alert('Pipeline Settings Unlocked!');
+                toast.success('Pipeline Settings Unlocked!');
             } else {
-                alert('Invalid secret phrase.');
+                toast.error('Invalid secret phrase');
             }
         } catch (err) {
-            alert('Verification failed: ' + err.message);
+            toast.error('Verification failed: ' + (err.message || 'Unknown error'));
         } finally {
             setIsVerifying(false);
         }
@@ -105,16 +196,30 @@ function SettingsForm({ settingsData }) {
     };
 
     const handleSave = () => {
+        setSaveStatus('loading');
         updateSettingsMutation.mutate({
             CompanyName: settings.companyName,
             CompanyAddress: settings.companyAddress,
             CompanySSM: settings.companySSM,
             SupportEmail: settings.supportEmail,
+            CompanyPhone: settings.companyPhone,
             CostPerParcel: settings.costPerParcel,
             SettlementCycle: settings.settlementCycle,
             DefaultPlatformFee: settings.defaultPlatformFee,
             DuitNowQRImage: settings.duitNowQRImage,
             OrderIngestionPipeline: settings.orderIngestionPipeline
+        }, {
+            onSuccess: () => {
+                setSaveStatus('success');
+                toast.success('Settings saved successfully');
+                setTimeout(() => setSaveStatus('idle'), 3000);
+            },
+            onError: (error) => {
+                console.error('Failed to save settings:', error);
+                setSaveStatus('error');
+                toast.error('Failed to save settings: ' + (error.message || 'Unknown error'));
+                setTimeout(() => setSaveStatus('idle'), 4000);
+            }
         });
     };
 
@@ -124,18 +229,20 @@ function SettingsForm({ settingsData }) {
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight mb-2">System Settings</h1>
                 </div>
-                <Button 
-                    className="h-10" 
-                    onClick={handleSave}
-                    disabled={updateSettingsMutation.isPending}
-                >
-                    {updateSettingsMutation.isPending ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                        <Save className="w-4 h-4 mr-2" />
-                    )}
-                    {updateSettingsMutation.isPending ? 'Saving...' : 'Save Settings'}
-                </Button>
+                <div className="flex items-center gap-3">
+                    <Button 
+                        className="h-10 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold" 
+                        onClick={handleSave}
+                        disabled={updateSettingsMutation.isPending || saveStatus === 'loading'}
+                    >
+                        {updateSettingsMutation.isPending || saveStatus === 'loading' ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                            <Save className="w-4 h-4 mr-2" />
+                        )}
+                        {updateSettingsMutation.isPending || saveStatus === 'loading' ? 'Saving...' : 'Save Settings'}
+                    </Button>
+                </div>
             </div>
 
             <SettingsTabs />
@@ -162,11 +269,90 @@ function SettingsForm({ settingsData }) {
                                 value={settings.companySSM} onChange={handleChange} 
                             />
                         </div>
-                        <div className="space-y-2 md:col-span-2">
-                            <Label htmlFor="companyAddress">Company Address</Label>
+                        <div className="space-y-4 md:col-span-2 bg-gray-50/60 p-4 rounded-lg border border-gray-200">
+                            <Label className="font-semibold text-gray-900 text-sm block">Company Address</Label>
+                            
+                            <div className="space-y-3">
+                                <div className="space-y-1">
+                                    <Label htmlFor="addressLine1" className="text-xs text-gray-600">Address Line 1:</Label>
+                                    <Input 
+                                        id="addressLine1" 
+                                        value={addressFields.addressLine1} 
+                                        onChange={(e) => handleAddressChange('addressLine1', e.target.value)} 
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="addressLine2" className="text-xs text-gray-600">Address Line 2:</Label>
+                                    <Input 
+                                        id="addressLine2" 
+                                        value={addressFields.addressLine2} 
+                                        onChange={(e) => handleAddressChange('addressLine2', e.target.value)} 
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="addressLine3" className="text-xs text-gray-600">Address Line 3:</Label>
+                                    <Input 
+                                        id="addressLine3" 
+                                        value={addressFields.addressLine3} 
+                                        onChange={(e) => handleAddressChange('addressLine3', e.target.value)} 
+                                    />
+                                </div>
+                                
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div className="space-y-1">
+                                        <Label className="text-xs text-gray-600">Country:</Label>
+                                        <Select value={addressFields.country} onValueChange={(val) => handleAddressChange('country', val)}>
+                                            <SelectTrigger className="w-full bg-white h-10 text-sm font-normal">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="Malaysia">Malaysia</SelectItem>
+                                                <SelectItem value="Singapore">Singapore</SelectItem>
+                                                <SelectItem value="Brunei">Brunei</SelectItem>
+                                                <SelectItem value="Indonesia">Indonesia</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-xs text-gray-600">State:</Label>
+                                        <Select value={addressFields.state} onValueChange={(val) => handleAddressChange('state', val)}>
+                                            <SelectTrigger className="w-full bg-white h-10 text-sm font-normal">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent className="max-h-60">
+                                                {MALAYSIA_STATES.map(s => (
+                                                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div className="space-y-1">
+                                        <Label htmlFor="city" className="text-xs text-gray-600">City:</Label>
+                                        <Input 
+                                            id="city" 
+                                            value={addressFields.city} 
+                                            onChange={(e) => handleAddressChange('city', e.target.value)} 
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label htmlFor="postcode" className="text-xs text-gray-600">ZIP Code:</Label>
+                                        <Input 
+                                            id="postcode" 
+                                            value={addressFields.postcode} 
+                                            onChange={(e) => handleAddressChange('postcode', e.target.value)} 
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="companyPhone">Company Phone</Label>
                             <Input 
-                                id="companyAddress" name="companyAddress" 
-                                value={settings.companyAddress} onChange={handleChange} 
+                                id="companyPhone" name="companyPhone" 
+                                value={settings.companyPhone} onChange={handleChange} 
                             />
                         </div>
                         <div className="space-y-2">
@@ -198,7 +384,6 @@ function SettingsForm({ settingsData }) {
                             <Input 
                                 id="settlementCycle" name="settlementCycle" 
                                 value={settings.settlementCycle} onChange={handleChange} 
-                                placeholder="e.g. monthly, weekly"
                             />
                         </div>
                         <div className="space-y-2">

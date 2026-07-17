@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useProducts } from '@/hooks/useProducts';
 import { GenerateMasterSKU } from '@/utils/MasterSKUGenerator';
 import { useBrands } from '@/hooks/useBrands';
@@ -41,7 +41,7 @@ const formatSizeStr = (str) => {
     return str.toUpperCase().replace(/(\d+)\s*([A-Z]+)/g, '$1 $2').trim();
 };
 
-export function ProductModal({ isOpen, onClose, product = null }) {
+export function ProductModal({ isOpen, onClose, product = null, prefilledName = '', onSuccess = null }) {
     const { t } = useTranslation();
     const { data: allProducts = [], addProduct, updateProduct } = useProducts();
     const { data: brands = [] } = useBrands();
@@ -57,7 +57,7 @@ export function ProductModal({ isOpen, onClose, product = null }) {
     const [formData, setFormData] = useState({
         ImageURL: product?.ImageURL || '',
         MasterSKU: product?.MasterSKU || '',
-        ProductName: product?.ProductName || '',
+        ProductName: product?.ProductName || prefilledName || '',
         Brand: product?.Brand || '',
         Category: product?.Category || '',
         Variation: product?.Variation || '',
@@ -79,6 +79,52 @@ export function ProductModal({ isOpen, onClose, product = null }) {
         WholesaleRule: pricing.WholesaleRule ?? '',
         AgentMarkup: pricing.AgentMarkup ?? '',
     });
+
+    useEffect(() => {
+        if (isOpen) {
+            const pricingObj = product?.ProductPricing;
+            const pricing = Array.isArray(pricingObj) ? (pricingObj[0] || {}) : (pricingObj || {});
+
+            setFormData({
+                ImageURL: product?.ImageURL || '',
+                MasterSKU: product?.MasterSKU || '',
+                ProductName: product?.ProductName || prefilledName || '',
+                Brand: product?.Brand || '',
+                Category: product?.Category || '',
+                Variation: product?.Variation || '',
+                Size: product?.Size || '',
+                Barcode: product?.Barcode || '',
+                SellerSKU: product?.SellerSKU || '',
+                GTIN: product?.GTIN || '',
+                CostPrice: product?.CostPrice || '',
+                FakeCostPrice: product?.FakeCostPrice || '',
+                StockistPrice: product?.StockistPrice || '',
+                Stock: product?.Stock || 0,
+                WeightG: product?.WeightG || '',
+                LengthCM: product?.LengthCM || '',
+                WidthCM: product?.WidthCM || '',
+                HeightCM: product?.HeightCM || '',
+                PlatformData: formatPlatformData(product?.PlatformData),
+                PricingModel: pricing.PricingModel || 'HQ_DISCOUNT',
+                RetailRule: pricing.RetailRule ?? product?.Price ?? '',
+                WholesaleRule: pricing.WholesaleRule ?? '',
+                AgentMarkup: pricing.AgentMarkup ?? '',
+            });
+            setErrorMsg('');
+            setFieldErrors({});
+        }
+    }, [isOpen, product, prefilledName]);
+
+    const potentialDuplicate = useMemo(() => {
+        if (product || !formData.ProductName) return null;
+        const cleanTarget = `${formData.Brand || ''} ${formData.ProductName || ''} ${formData.Variation || ''} ${formData.Size || ''}`.toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (cleanTarget.length < 4) return null;
+
+        return allProducts.find(p => {
+            const cleanExisting = `${p.Brand || ''} ${p.ProductName || ''} ${p.Variation || ''} ${p.Size || ''}`.toLowerCase().replace(/[^a-z0-9]/g, '');
+            return cleanExisting === cleanTarget || (cleanTarget.length > 10 && cleanExisting.includes(cleanTarget));
+        });
+    }, [product, formData.Brand, formData.ProductName, formData.Variation, formData.Size, allProducts]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -247,6 +293,10 @@ export function ProductModal({ isOpen, onClose, product = null }) {
                 await updatePricing.mutateAsync([pricingData]);
             }
 
+            if (onSuccess && typeof onSuccess === 'function') {
+                await onSuccess(savedProductId, productData);
+            }
+
             onClose();
         } catch (error) {
             console.error('Failed to save product:', error);
@@ -277,6 +327,23 @@ export function ProductModal({ isOpen, onClose, product = null }) {
                 </div>
 
                 <div className="overflow-y-auto flex-1 p-10">
+                    {prefilledName && !product && (
+                        <div className="mb-6 p-4 bg-indigo-50 border border-indigo-200 flex items-start gap-3">
+                            <div className="text-sm text-indigo-900 flex-1">
+                                <span className="font-bold">Creating Product for Unmatched Item:</span><br />
+                                E-commerce Platform Item: <span className="font-semibold italic">"{prefilledName}"</span><br />
+                                <span className="text-xs text-indigo-700 mt-1 block">Please enter the Brand, Product Name, Variation, Size, and Barcode (Seller SKU). Once saved, all orders with this unmatched item will be automatically mapped and resolved!</span>
+                            </div>
+                        </div>
+                    )}
+                    {potentialDuplicate && (
+                        <div className="mb-6 p-4 bg-amber-50 border border-amber-300 flex items-start gap-3">
+                            <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                            <div className="text-sm text-amber-900 flex-1">
+                                <span className="font-bold">Potential Duplicate Detected:</span> A similar product already exists in inventory — <span className="font-semibold">"{`${potentialDuplicate.Brand || ''} ${potentialDuplicate.ProductName} ${potentialDuplicate.Variation || ''} ${potentialDuplicate.Size || ''}`.trim()}"</span> (Barcode: <span className="font-mono font-semibold">{potentialDuplicate.Barcode || potentialDuplicate.SellerSKU || '-'}</span>). Ensure you aren't creating a duplicate product.
+                            </div>
+                        </div>
+                    )}
                     <form id="product-form" onSubmit={handleSubmit} className="space-y-10">
                         {errorMsg && (
                             <div className="bg-amber-50 text-amber-800 p-4 rounded-lg text-sm border border-amber-200 flex items-start gap-3">

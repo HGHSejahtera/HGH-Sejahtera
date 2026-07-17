@@ -1,20 +1,22 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useOrderHistory } from '@/hooks/useOrderHistory';
 import { AwbPdfViewer } from '@/components/common/AwbPdfViewer';
-import { SortOrders, MergeAndPrintAwbs } from '@/services/pdf/AwbMergeService';
+import { SortOrders } from '@/services/pdf/AwbMergeService';
 import { useAwbPrintStore } from '@/hooks/useAwbPrintStore';
+import { ProductModal } from '@/pages/Inventory/ProductModal';
+import { OrderMatchModal } from '@/pages/Orders/OrderMatchModal';
+import { useProductMatcher } from '@/hooks/useProductMatcher';
 
-import { Clock, ChevronRight, Package, X, Printer, CheckCircle2, AlertTriangle, ArrowRight, Calendar } from 'lucide-react';
+import { Clock, ChevronRight, Package, X, Printer, AlertTriangle, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/common/DataTable';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/hooks/useAuth';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 
 const formatCurrency = (value) => new Intl.NumberFormat('ms-MY', {
     style: 'currency',
@@ -38,14 +40,13 @@ const MonthOptions = [
 ];
 
 export function AllOrders() {
-    const navigate = useNavigate();
     const { user } = useAuthStore();
     const role = user?.role || 'Staff';
     const isAgent = role === 'Agent';
     const isStaff = role === 'Staff';
 
-    const { orders, isLoading, MarkAsPrinted, IsMarkingPrinted } = useOrderHistory();
-    
+    const { orders, isLoading, MarkAsPrinted } = useOrderHistory();
+
     // UI state - PascalCase for all variables per MemoryCore
     const [ActiveTab, SetActiveTab] = useState('Queue');
     const [QueueSortBy, SetQueueSortBy] = useState('DateNewest');
@@ -60,7 +61,9 @@ export function AllOrders() {
 
     // Reset selection when changing tabs or filters
     useEffect(() => {
-        SetRowSelection({});
+        queueMicrotask(() => {
+            SetRowSelection({});
+        });
     }, [ActiveTab, FilterAgent, FilterPlatform, FilterAccount, QueueSortBy, HistorySortBy, FilterMonth, DateRange.from, DateRange.to]);
 
     // Unique options for filters
@@ -83,6 +86,49 @@ export function AllOrders() {
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [isClosing, setIsClosing] = useState(false);
     const [viewAwbUrl, setViewAwbUrl] = useState(null);
+
+    const { resolveBatch, uniqueUnmatched } = useProductMatcher();
+    const [IsProductModalOpen, SetIsProductModalOpen] = useState(false);
+    const [SkuReviewItem, SetSkuReviewItem] = useState(null);
+    const [MatchOrderModalData, SetMatchOrderModalData] = useState(null);
+
+    const handleOpenSkuReviewModal = (order) => {
+        SetMatchOrderModalData(order);
+    };
+
+    const handleOpenProductCreateModal = (order, targetItem = null) => {
+        const items = order.Items || order.ImportedOrderItems || [];
+        const unmatchedItem = targetItem || items.find(i => !i.ProductID || i.PlatformSKU === '-' || i.MatchStatus === 'Unmatched');
+
+        if (!unmatchedItem) {
+            return;
+        }
+
+        SetSkuReviewItem(unmatchedItem);
+        SetIsProductModalOpen(true);
+    };
+
+    const handleProductModalSuccess = async (newProductId) => {
+        if (!SkuReviewItem || !newProductId) return;
+
+        try {
+            const targetSku = SkuReviewItem.PlatformSKU && SkuReviewItem.PlatformSKU !== '-' ? SkuReviewItem.PlatformSKU : '';
+            const targetName = SkuReviewItem.ProductName || '';
+            const targetKey = `${targetSku}_${targetName.trim()}`;
+
+            const group = (uniqueUnmatched || []).find(g => g.key === targetKey);
+            const itemIdsToResolve = group?.ItemIDs?.length > 0 ? group.ItemIDs : [SkuReviewItem.ItemID].filter(Boolean);
+
+            if (itemIdsToResolve.length > 0) {
+                await resolveBatch({ itemIds: itemIdsToResolve, productId: newProductId });
+            }
+        } catch (error) {
+            console.error("Failed to auto-resolve items after product creation:", error);
+        } finally {
+            SetSkuReviewItem(null);
+            SetIsProductModalOpen(false);
+        }
+    };
 
     const handleOpenDrawer = (order) => {
         setIsClosing(false);
@@ -132,13 +178,13 @@ export function AllOrders() {
     const HandlePrintAll = async () => {
         const selectedIndices = Object.keys(RowSelection).filter(k => RowSelection[k]);
         let ordersToPrint = QueueOrders;
-        
+
         if (selectedIndices.length > 0) {
             ordersToPrint = selectedIndices.map(index => QueueOrders[index]);
         }
-        
+
         if (ordersToPrint.length === 0) return;
-        
+
         SetIsPrinting(true);
         try {
             await useAwbPrintStore.getState().startBatchPrint(ordersToPrint, MarkAsPrinted);
@@ -169,46 +215,46 @@ export function AllOrders() {
             cell: ({ row }) => {
                 const isMissingAwb = !row.original.AwbUrl || row.original.AwbUrl.trim() === '';
                 return (
-                <div className="flex justify-center items-center px-2">
-                    <Checkbox
-                        checked={row.getIsSelected()}
-                        onCheckedChange={(value) => row.toggleSelected(!!value)}
-                        aria-label="Select row"
-                        className="border-gray-300"
-                        disabled={isMissingAwb}
-                    />
-                </div>
+                    <div className="flex justify-center items-center px-2">
+                        <Checkbox
+                            checked={row.getIsSelected()}
+                            onCheckedChange={(value) => row.toggleSelected(!!value)}
+                            aria-label="Select row"
+                            className="border-gray-300"
+                            disabled={isMissingAwb}
+                        />
+                    </div>
                 );
             },
             enableSorting: false,
             enableHiding: false,
         },
-        { 
-            header: 'Date', 
+        {
+            header: 'Date',
             accessorKey: 'CreatedAt',
             cell: ({ row }) => {
                 const date = new Date(row.original.CreatedAt);
                 return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
             }
         },
-        { 
-            header: 'Time', 
+        {
+            header: 'Time',
             id: 'time',
             cell: ({ row }) => {
                 const date = new Date(row.original.CreatedAt);
                 return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
             }
         },
-        { 
-            header: 'Order ID', 
+        {
+            header: 'Order ID',
             accessorKey: 'PlatformOrderID',
             cell: ({ row }) => {
                 const isMissingAwb = !row.original.AwbUrl || row.original.AwbUrl.trim() === '';
                 return (
                     <div className="flex items-center space-x-2">
                         {row.original.IsPrinted && (
-                            <span 
-                                className={`inline-block h-2 w-2 rounded-full shadow-sm shrink-0 ${isMissingAwb ? 'bg-amber-400' : 'bg-emerald-500'}`} 
+                            <span
+                                className={`inline-block h-2 w-2 rounded-full shadow-sm shrink-0 ${isMissingAwb ? 'bg-amber-400' : 'bg-emerald-500'}`}
                                 title={isMissingAwb ? "Missing AWB" : "Print Done"}
                             ></span>
                         )}
@@ -217,8 +263,8 @@ export function AllOrders() {
                 );
             }
         },
-        { 
-            header: () => <div className="text-center">Platform</div>, 
+        {
+            header: () => <div className="text-center">Platform</div>,
             accessorKey: 'Platform',
             cell: ({ row }) => (
                 <div className="flex justify-center">
@@ -228,8 +274,8 @@ export function AllOrders() {
                 </div>
             )
         },
-        { 
-            header: 'Agent', 
+        {
+            header: 'Agent',
             accessorKey: 'AgentName',
             cell: ({ row }) => (
                 <div className="flex flex-col">
@@ -237,8 +283,8 @@ export function AllOrders() {
                 </div>
             )
         },
-        { 
-            header: () => <div className="text-right">Amount</div>, 
+        {
+            header: () => <div className="text-right">Amount</div>,
             accessorKey: 'DisplayAmount',
             cell: ({ row }) => (
                 <div className="text-right font-medium text-emerald-600">
@@ -263,9 +309,16 @@ export function AllOrders() {
                             </span>
                         )}
                         {hasUnmatched && (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-300 shadow-2xs">
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenSkuReviewModal(row.original);
+                                }}
+                                className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-800 bg-amber-100 hover:bg-amber-200 px-2 py-0.5 rounded border border-amber-300 shadow-2xs cursor-pointer transition-colors"
+                            >
                                 <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" /> SKU Review
-                            </span>
+                            </button>
                         )}
                         {!isMissingAwb && !hasUnmatched && (
                             <span className="text-gray-400 text-xs font-medium">-</span>
@@ -279,10 +332,10 @@ export function AllOrders() {
             id: 'actions',
             cell: ({ row }) => (
                 <div className="flex justify-center">
-                    <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => handleOpenDrawer(row.original)} 
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenDrawer(row.original)}
                         className="h-7 px-3 border-gray-200 bg-white hover:bg-gray-50 text-gray-700 hover:border-gray-300 font-medium text-xs rounded-md shadow-xs transition-all cursor-pointer"
                     >
                         View <ChevronRight className="w-3.5 h-3.5 ml-1 text-gray-400" />
@@ -308,38 +361,38 @@ export function AllOrders() {
             cell: ({ row }) => {
                 const isMissingAwb = !row.original.AwbUrl || row.original.AwbUrl.trim() === '';
                 return (
-                <div className="flex justify-center items-center px-2">
-                    <Checkbox
-                        checked={row.getIsSelected()}
-                        onCheckedChange={(value) => row.toggleSelected(!!value)}
-                        aria-label="Select row"
-                        className="border-gray-300"
-                        disabled={isMissingAwb}
-                    />
-                </div>
+                    <div className="flex justify-center items-center px-2">
+                        <Checkbox
+                            checked={row.getIsSelected()}
+                            onCheckedChange={(value) => row.toggleSelected(!!value)}
+                            aria-label="Select row"
+                            className="border-gray-300"
+                            disabled={isMissingAwb}
+                        />
+                    </div>
                 );
             },
             enableSorting: false,
             enableHiding: false,
         },
-        { 
-            header: 'Date', 
+        {
+            header: 'Date',
             accessorKey: 'CreatedAt',
             cell: ({ row }) => {
                 const date = new Date(row.original.CreatedAt);
                 return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
             }
         },
-        { 
-            header: 'Time', 
+        {
+            header: 'Time',
             id: 'time',
             cell: ({ row }) => {
                 const date = new Date(row.original.CreatedAt);
                 return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
             }
         },
-        { 
-            header: 'Order ID', 
+        {
+            header: 'Order ID',
             accessorKey: 'PlatformOrderID',
             cell: ({ row }) => (
                 <div className="flex items-center space-x-2">
@@ -347,8 +400,8 @@ export function AllOrders() {
                 </div>
             )
         },
-        { 
-            header: () => <div className="text-center">Platform</div>, 
+        {
+            header: () => <div className="text-center">Platform</div>,
             accessorKey: 'Platform',
             cell: ({ row }) => (
                 <div className="flex justify-center">
@@ -358,8 +411,8 @@ export function AllOrders() {
                 </div>
             )
         },
-        { 
-            header: 'Agent', 
+        {
+            header: 'Agent',
             accessorKey: 'AgentName',
             cell: ({ row }) => (
                 <div className="flex flex-col">
@@ -367,8 +420,8 @@ export function AllOrders() {
                 </div>
             )
         },
-        { 
-            header: () => <div className="text-right">Amount</div>, 
+        {
+            header: () => <div className="text-right">Amount</div>,
             accessorKey: 'DisplayAmount',
             cell: ({ row }) => (
                 <div className="text-right font-medium text-emerald-600">
@@ -387,9 +440,17 @@ export function AllOrders() {
                 return (
                     <div className="flex justify-center items-center">
                         {hasUnmatched ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-full border border-amber-300 shadow-2xs" title="Order contains unmatched items without Seller SKU">
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenSkuReviewModal(row.original);
+                                }}
+                                className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-800 bg-amber-100 hover:bg-amber-200 px-2.5 py-0.5 rounded-full border border-amber-300 shadow-2xs cursor-pointer transition-colors"
+                                title="Order contains unmatched items without Seller SKU. Click to create product & resolve."
+                            >
                                 <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" /> SKU Review
-                            </span>
+                            </button>
                         ) : (
                             <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-300 shadow-2xs">
                                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-600"></span>
@@ -405,10 +466,10 @@ export function AllOrders() {
             id: 'actions',
             cell: ({ row }) => (
                 <div className="flex justify-center">
-                    <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => handleOpenDrawer(row.original)} 
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenDrawer(row.original)}
                         className="h-7 px-3 border-gray-200 bg-white hover:bg-gray-50 text-gray-700 hover:border-gray-300 font-medium text-xs rounded-md shadow-xs transition-all cursor-pointer"
                     >
                         View <ChevronRight className="w-3.5 h-3.5 ml-1 text-gray-400" />
@@ -474,9 +535,9 @@ export function AllOrders() {
                     </SelectContent>
                 </Select>
             </div>
-            <Button 
-                variant="default" 
-                size="sm" 
+            <Button
+                variant="default"
+                size="sm"
                 onClick={HandlePrintAll}
                 disabled={IsPrinting || QueueOrders.length === 0}
                 className="bg-purple-600 hover:bg-purple-700 text-white font-medium text-xs rounded-md h-8 px-3.5 shadow-sm transition-all cursor-pointer ml-2 border border-purple-600 hover:border-purple-700"
@@ -546,8 +607,8 @@ export function AllOrders() {
             <div className="flex items-center ml-1">
                 <Popover>
                     <PopoverTrigger asChild>
-                        <Button 
-                            variant="outline" 
+                        <Button
+                            variant="outline"
                             size="sm"
                             className={cn(
                                 "h-8 px-2.5 rounded-md border-gray-200 bg-white hover:bg-gray-50 text-xs font-medium shadow-xs transition-colors flex items-center gap-2 cursor-pointer",
@@ -555,13 +616,13 @@ export function AllOrders() {
                             )}
                         >
                             <Calendar className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                            {DateRange.from && DateRange.to 
+                            {DateRange.from && DateRange.to
                                 ? `${new Date(DateRange.from).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} — ${new Date(DateRange.to).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`
-                                : DateRange.from 
-                                ? `${new Date(DateRange.from).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} — Select To Date`
-                                : "Select Dates"}
+                                : DateRange.from
+                                    ? `${new Date(DateRange.from).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} — Select To Date`
+                                    : "Select Dates"}
                             {(DateRange.from || DateRange.to) && (
-                                <span 
+                                <span
                                     className="p-0.5 rounded-md hover:bg-indigo-200/60 text-indigo-500 transition-colors ml-0.5 cursor-pointer"
                                     onClick={(e) => { e.stopPropagation(); SetDateRange({ from: '', to: '' }); }}
                                     title="Clear dates"
@@ -582,18 +643,18 @@ export function AllOrders() {
                             <div className="grid grid-cols-2 gap-2 p-1 bg-gray-50 border border-gray-200 rounded-md">
                                 <div className="p-2 border-r border-gray-200">
                                     <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">FROM</label>
-                                    <input 
-                                        type="date" 
-                                        value={DateRange.from} 
+                                    <input
+                                        type="date"
+                                        value={DateRange.from}
                                         onChange={(e) => SetDateRange(prev => ({ ...prev, from: e.target.value }))}
                                         className="w-full bg-transparent text-xs font-semibold text-gray-900 outline-hidden cursor-pointer"
                                     />
                                 </div>
                                 <div className="p-2">
                                     <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">TO</label>
-                                    <input 
-                                        type="date" 
-                                        value={DateRange.to} 
+                                    <input
+                                        type="date"
+                                        value={DateRange.to}
                                         onChange={(e) => SetDateRange(prev => ({ ...prev, to: e.target.value }))}
                                         className="w-full bg-transparent text-xs font-semibold text-gray-900 outline-hidden cursor-pointer"
                                     />
@@ -604,7 +665,7 @@ export function AllOrders() {
                             <div className="space-y-1.5">
                                 <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Quick shortcuts</span>
                                 <div className="flex flex-wrap gap-1.5">
-                                    <button 
+                                    <button
                                         type="button"
                                         onClick={() => {
                                             const today = new Date().toISOString().split('T')[0];
@@ -614,22 +675,22 @@ export function AllOrders() {
                                     >
                                         Today
                                     </button>
-                                    <button 
+                                    <button
                                         type="button"
                                         onClick={() => {
                                             const today = new Date();
                                             const last7 = new Date();
                                             last7.setDate(today.getDate() - 6);
-                                            SetDateRange({ 
-                                                from: last7.toISOString().split('T')[0], 
-                                                to: today.toISOString().split('T')[0] 
+                                            SetDateRange({
+                                                from: last7.toISOString().split('T')[0],
+                                                to: today.toISOString().split('T')[0]
                                             });
                                         }}
                                         className="px-2.5 py-1 text-xs font-medium rounded-md bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors cursor-pointer"
                                     >
                                         Last 7 Days
                                     </button>
-                                    <button 
+                                    <button
                                         type="button"
                                         onClick={() => {
                                             const now = new Date();
@@ -641,7 +702,7 @@ export function AllOrders() {
                                     >
                                         This Month
                                     </button>
-                                    <button 
+                                    <button
                                         type="button"
                                         onClick={() => SetDateRange({ from: '', to: '' })}
                                         className="px-2.5 py-1 text-xs font-medium rounded-md bg-rose-50 hover:bg-rose-100 text-rose-600 transition-colors cursor-pointer ml-auto"
@@ -711,12 +772,12 @@ export function AllOrders() {
 
             <div className="bg-white rounded-none shadow-xs border overflow-hidden">
                 <div className="p-4">
-                    <DataTable 
+                    <DataTable
                         key={ActiveTab}
-                        columns={ActiveTab === 'Queue' ? queueColumns : completeColumns} 
-                        data={DisplayOrders} 
-                        isLoading={isLoading} 
-                        searchPlaceholder="Search" 
+                        columns={ActiveTab === 'Queue' ? queueColumns : completeColumns}
+                        data={DisplayOrders}
+                        isLoading={isLoading}
+                        searchPlaceholder="Search"
                         actionElement={ActiveTab === 'Queue' ? QueueActionElement : CompleteActionElement}
                         rowSelection={RowSelection}
                         onRowSelectionChange={SetRowSelection}
@@ -730,7 +791,7 @@ export function AllOrders() {
                 <div className="fixed inset-0 z-50 overflow-hidden">
                     <div className={`absolute inset-0 bg-black/20 backdrop-blur-xs ${isClosing ? 'animate-backdrop-fade-out' : 'animate-backdrop-fade'}`} onClick={handleCloseDrawer} />
                     <div className={`absolute inset-y-0 right-0 max-w-xl w-full bg-white shadow-xl flex flex-col z-10 ${isClosing ? 'animate-drawer-slide-out' : 'animate-drawer-slide'}`}>
-                        
+
                         {/* Header */}
                         <div className="p-6 border-b flex justify-between items-center bg-gray-50">
                             <div>
@@ -759,7 +820,7 @@ export function AllOrders() {
                                                 <div className="flex-1 text-xs">
                                                     <p className="font-bold text-sm">Action Required: Missing AWB PDF</p>
                                                     <p className="mt-1 text-rose-800 leading-relaxed">
-                                                        This order was recorded but the AWB PDF failed to upload. 
+                                                        This order was recorded but the AWB PDF failed to upload.
                                                         You cannot print this order. Please upload the PDF via <b>Upload AWB (PC)</b> to attach it to this order.
                                                     </p>
                                                 </div>
@@ -769,20 +830,17 @@ export function AllOrders() {
                                             <div className="bg-amber-50 border border-amber-200/80 p-4 rounded-xl flex items-start space-x-3 text-amber-900 shadow-xs">
                                                 <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                                                 <div className="flex-1 text-xs">
-                                                    <p className="font-bold text-sm">Action Required: SKU Review (RM 0.00)</p>
+                                                    <p className="font-bold text-sm">Action Required</p>
                                                     <p className="mt-1 text-amber-800 leading-relaxed">
                                                         One or more items in this order have no Seller SKU (<code>SKU: -</code>). Commission and Total Amount will remain RM 0.00 until matched.
                                                     </p>
                                                     <Button
                                                         variant="outline"
                                                         size="sm"
-                                                        onClick={() => {
-                                                            handleCloseDrawer();
-                                                            navigate('/Orders/Product-Matcher');
-                                                        }}
-                                                        className="mt-2.5 h-7 text-xs font-semibold border-amber-300 bg-white hover:bg-amber-100/50 text-amber-900"
+                                                        onClick={() => handleOpenSkuReviewModal(selectedOrder)}
+                                                        className="mt-2.5 h-7 text-xs font-semibold border-amber-300 bg-white hover:bg-amber-100/50 text-amber-900 cursor-pointer"
                                                     >
-                                                        Open Product Matcher <ArrowRight className="ml-1.5 w-3.5 h-3.5" />
+                                                        SKU Review
                                                     </Button>
                                                 </div>
                                             </div>
@@ -805,7 +863,7 @@ export function AllOrders() {
                                             {selectedOrder.AwbUrl && (
                                                 <div>
                                                     <p className="text-gray-500 mb-1">AWB Document</p>
-                                                    <button 
+                                                    <button
                                                         type="button"
                                                         onClick={() => setViewAwbUrl(selectedOrder.AwbUrl)}
                                                         className="px-3.5 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium text-xs tracking-wide rounded-none shadow-xs hover:shadow-sm transition-all duration-200 cursor-pointer"
@@ -876,9 +934,22 @@ export function AllOrders() {
                                                                 <div className="flex items-center text-xs text-gray-500 mt-1 space-x-2">
                                                                     <span>SKU: {item.PlatformSKU || '-'}</span>
                                                                     {isUnmatched && (
-                                                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                                                                            SKU Review
-                                                                        </span>
+                                                                        <div className="flex items-center space-x-1.5">
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handleOpenSkuReviewModal(selectedOrder)}
+                                                                                className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-300 cursor-pointer transition-colors"
+                                                                            >
+                                                                                Match Product
+                                                                            </button>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handleOpenProductCreateModal(selectedOrder, item)}
+                                                                                className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 hover:bg-gray-200 text-gray-800 border border-gray-300 cursor-pointer transition-colors"
+                                                                            >
+                                                                                + Create & Map
+                                                                            </button>
+                                                                        </div>
                                                                     )}
                                                                 </div>
                                                             </div>
@@ -901,12 +972,34 @@ export function AllOrders() {
 
 
 
-            <AwbPdfViewer 
-                url={viewAwbUrl} 
-                open={!!viewAwbUrl} 
+            <AwbPdfViewer
+                url={viewAwbUrl}
+                open={!!viewAwbUrl}
                 onOpenChange={(open) => {
                     if (!open) setViewAwbUrl(null);
-                }} 
+                }}
+            />
+
+            <ProductModal
+                isOpen={IsProductModalOpen}
+                onClose={() => {
+                    SetIsProductModalOpen(false);
+                    SetSkuReviewItem(null);
+                }}
+                product={null}
+                prefilledName={SkuReviewItem?.ProductName || ''}
+                onSuccess={handleProductModalSuccess}
+            />
+
+            <OrderMatchModal
+                isOpen={!!MatchOrderModalData}
+                onClose={() => SetMatchOrderModalData(null)}
+                order={MatchOrderModalData}
+                onOpenCreate={(item) => {
+                    SetMatchOrderModalData(null);
+                    SetSkuReviewItem(item);
+                    SetIsProductModalOpen(true);
+                }}
             />
         </div>
     );

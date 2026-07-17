@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabase';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useAuthStore } from '@/hooks/useAuth';
+import { toast } from 'sonner';
 
 import { SettingsTabs } from './Settings';
 
@@ -106,8 +107,9 @@ export function UserManagement() {
             
         if (error) {
             console.error('Error approving user:', error);
-            alert('Gagal approve user.');
+            toast.error('Failed to approve user');
         } else {
+            toast.success(`User Approved (${NewStaffID})`);
             fetchUsers();
         }
     };
@@ -121,8 +123,9 @@ export function UserManagement() {
                 
             if (error) {
                 console.error('Error rejecting user:', error);
-                alert('Gagal reject user.');
+                toast.error('Failed to reject user');
             } else {
+                toast.success('User Rejected');
                 fetchUsers();
             }
         }

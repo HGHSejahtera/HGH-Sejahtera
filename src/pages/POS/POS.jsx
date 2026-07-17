@@ -37,7 +37,7 @@ export function POS() {
     const [paymentMethod, setPaymentMethod] = useState(''); // '', 'cash', 'duitnow'
     const [amountReceived, setAmountReceived] = useState('');
     const [referenceNumber, setReferenceNumber] = useState('');
-    const [paymentSuccess, setPaymentSuccess] = useState(false);
+    const [, setPaymentSuccess] = useState(false);
     const [showReceipt, setShowReceipt] = useState(false);
     const [saleData, setSaleData] = useState(null);
     const [editingPriceItemId, setEditingPriceItemId] = useState(null);
@@ -223,6 +223,7 @@ export function POS() {
             });
 
             const finalSaleId = result?.SaleID || result?.sale_id;
+            const finalReceiptNumber = result?.ReceiptNumber || result?.receipt_number || (`HGH-${new Date().getFullYear()}-${(finalSaleId || '').slice(-6).toUpperCase()}`);
 
             setSaleData({
                 customerTier: TIER_OPTIONS.find(t => t.id === pricingTier)?.label || 'Retail',
@@ -237,6 +238,7 @@ export function POS() {
                 amountReceived: paymentMethod === 'cash' ? parseFloat(amountReceived || 0) : subtotalCalc,
                 isTestMode,
                 saleId: finalSaleId,
+                receiptNumber: finalReceiptNumber,
                 date: new Date()
             });
             setPaymentSuccess(true);
@@ -563,19 +565,24 @@ export function POS() {
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 print:static print:inset-auto print:bg-transparent print:p-0 print:block print:overflow-visible print:z-auto">
                     <div className={`bg-white rounded-none shadow-xl w-full ${showReceipt ? 'max-w-3xl' : 'max-w-md'} max-h-[95vh] overflow-hidden flex flex-col print:max-w-none print:max-h-none print:shadow-none print:border-none print:w-full print:overflow-visible print:block print:m-0 print:p-0`}>
                         <div className="p-6 border-b flex justify-between items-center print:hidden">
-                            <div className="flex items-center gap-3">
-                                <h2 className="text-xl font-bold">Payment</h2>
-                            </div>
-                            <span className="text-xl font-bold text-indigo-600">RM {total.toFixed(2)}</span>
+                            {showReceipt ? (
+                                <div className="flex items-center justify-center gap-2 w-full">
+                                    <CheckCircle className="h-6 w-6 text-green-600" />
+                                    <h2 className="text-xl font-bold text-gray-900">Payment Successful</h2>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="flex items-center gap-3">
+                                        <h2 className="text-xl font-bold">Payment</h2>
+                                    </div>
+                                    <span className="text-xl font-bold text-indigo-600">RM {total.toFixed(2)}</span>
+                                </>
+                            )}
                         </div>
                         
                         <div className="p-6 space-y-4 flex-1 overflow-hidden flex flex-col print:p-0 print:overflow-visible print:block print:space-y-0">
                             {showReceipt ? (
                                 <div className="flex flex-col h-full overflow-hidden print:overflow-visible print:block print:h-auto">
-                                    <div className="flex items-center justify-center mb-4 shrink-0 print:hidden">
-                                        <CheckCircle className="h-6 w-6 text-green-600 mr-2 print:hidden" />
-                                        <span className="text-lg font-bold text-gray-900 print:hidden">Payment Successful</span>
-                                    </div>
                                     <div className="w-full border rounded-lg p-2 bg-gray-50 overflow-y-auto flex-1 print:overflow-visible print:border-none print:p-0 print:bg-white custom-scrollbar print:block print:flex-none">
                                         <Receipt saleData={saleData} />
                                     </div>
@@ -689,7 +696,7 @@ export function POS() {
                                         setPaymentMethod(''); 
                                     }}
                                 >
-                                    Cancel Order
+                                    Cancel
                                 </Button>
                             </div>
                         )}
