@@ -91,10 +91,16 @@ export function PriceSetup() {
 
     const filteredData = useMemo(() => {
         if (!pricingData) return [];
-        return pricingData.filter(item => 
-            item.ProductName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            (item.MasterSKU && item.MasterSKU.toLowerCase().includes(searchQuery.toLowerCase()))
-        );
+        return pricingData.filter(item => {
+            const formattedName = [item.Brand, item.ProductName, item.Variation, item.Size].filter(Boolean).join(' ').toLowerCase();
+            const query = searchQuery.toLowerCase();
+            return (
+                formattedName.includes(query) ||
+                (item.SellerSKU && item.SellerSKU.toLowerCase().includes(query)) ||
+                (item.Barcode && item.Barcode.toLowerCase().includes(query)) ||
+                (item.GTIN && item.GTIN.toLowerCase().includes(query))
+            );
+        });
     }, [pricingData, searchQuery]);
 
     const hasChanges = Object.keys(edits).length > 0;
@@ -171,12 +177,15 @@ export function PriceSetup() {
                             const dAgent = currentEdits.AgentMarkup ?? product.AgentMarkup; // Acts as Agent Price
                             const dRetail = currentEdits.RetailRule ?? product.RetailRule;
                             const formattedName = [product.Brand, product.ProductName, product.Variation, product.Size].filter(Boolean).join(' ');
+                            const identityCodes = [product.SellerSKU, product.Barcode, product.GTIN].filter(Boolean).join(' • ');
                             
                             return (
                                 <tr key={product.ProductID} className={isEdited ? 'bg-indigo-50/30' : 'hover:bg-gray-50/50'}>
                                     <td className="px-4 py-3">
                                         <div className="font-medium text-gray-900">{formattedName}</div>
-                                        <div className="text-xs text-gray-500">{product.MasterSKU}</div>
+                                        {identityCodes && (
+                                            <div className="text-xs text-gray-500 font-mono mt-0.5">{identityCodes}</div>
+                                        )}
                                     </td>
                                     
                                     {isHGHMode && (
