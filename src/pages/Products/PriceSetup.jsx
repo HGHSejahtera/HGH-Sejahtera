@@ -5,6 +5,7 @@ import { useSecretMode } from '@/hooks/useSecretMode';
 import { Search, Save, AlertCircle, RefreshCw, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 
 const PriceInput = ({ value, onChange, disabled }) => {
@@ -46,6 +47,7 @@ export function PriceSetup() {
     const { isHGHMode } = useSecretMode();
 
     const [searchQuery, setSearchQuery] = useState('');
+    const [sortBy, setSortBy] = useState('name-asc');
     const [edits, setEdits] = useState({});
     const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -91,17 +93,36 @@ export function PriceSetup() {
 
     const filteredData = useMemo(() => {
         if (!pricingData) return [];
-        return pricingData.filter(item => {
-            const formattedName = [item.Brand, item.ProductName, item.Variation, item.Size].filter(Boolean).join(' ').toLowerCase();
-            const query = searchQuery.toLowerCase();
+        const query = searchQuery.toLowerCase();
+
+        const prepared = pricingData.map(item => ({
+            ...item,
+            _name: [item.Brand, item.ProductName, item.Variation, item.Size].filter(Boolean).join(' '),
+            _lowerName: [item.Brand, item.ProductName, item.Variation, item.Size].filter(Boolean).join(' ').toLowerCase()
+        }));
+
+        const filtered = prepared.filter(item => {
             return (
-                formattedName.includes(query) ||
+                item._lowerName.includes(query) ||
                 (item.SellerSKU && item.SellerSKU.toLowerCase().includes(query)) ||
                 (item.Barcode && item.Barcode.toLowerCase().includes(query)) ||
                 (item.GTIN && item.GTIN.toLowerCase().includes(query))
             );
         });
-    }, [pricingData, searchQuery]);
+
+        return filtered.sort((a, b) => {
+            if (sortBy === 'name-asc') {
+                return a._name.localeCompare(b._name);
+            } else if (sortBy === 'name-desc') {
+                return b._name.localeCompare(a._name);
+            } else if (sortBy === 'brand') {
+                const brandCompare = (a.Brand || '').localeCompare(b.Brand || '');
+                if (brandCompare !== 0) return brandCompare;
+                return a._name.localeCompare(b._name);
+            }
+            return 0;
+        });
+    }, [pricingData, searchQuery, sortBy]);
 
     const hasChanges = Object.keys(edits).length > 0;
 
@@ -126,7 +147,16 @@ export function PriceSetup() {
                             onChange={(e) => setSearchQuery(e.target.value)}
                         />
                     </div>
-
+                    <Select value={sortBy} onValueChange={setSortBy}>
+                        <SelectTrigger className="h-9 w-[120px] bg-white text-xs font-medium rounded-md border-gray-200 hover:border-gray-300 shadow-xs transition-colors">
+                            <SelectValue placeholder="Sort by" />
+                        </SelectTrigger>
+                        <SelectContent side="bottom" className="rounded-md shadow-lg border-gray-200">
+                            <SelectItem value="name-asc">A-Z</SelectItem>
+                            <SelectItem value="name-desc">Z-A</SelectItem>
+                            <SelectItem value="brand">Brand</SelectItem>
+                        </SelectContent>
+                    </Select>
                 </div>
                 <div className="flex items-center gap-3">
                     {hasChanges && (
@@ -176,7 +206,7 @@ export function PriceSetup() {
                             const dWholesale = currentEdits.WholesaleRule ?? product.WholesaleRule;
                             const dAgent = currentEdits.AgentMarkup ?? product.AgentMarkup; // Acts as Agent Price
                             const dRetail = currentEdits.RetailRule ?? product.RetailRule;
-                            const formattedName = [product.Brand, product.ProductName, product.Variation, product.Size].filter(Boolean).join(' ');
+                            const formattedName = product._name || [product.Brand, product.ProductName, product.Variation, product.Size].filter(Boolean).join(' ');
                             return (
                                 <tr key={product.ProductID} className={isEdited ? 'bg-indigo-50/30' : 'hover:bg-gray-50/50'}>
                                     <td className="px-4 py-3">

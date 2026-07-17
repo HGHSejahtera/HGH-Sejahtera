@@ -165,8 +165,8 @@ export function ProductModal({ isOpen, onClose, product = null }) {
             if (!finalBarcode || finalBarcode.trim() === '') {
                 finalBarcode = generateInternalBarcode();
             } else {
-                if (!/^\d{8,14}$/.test(finalBarcode)) {
-                    setFieldErrors({ Barcode: 'Barcode must be between 8 to 14 digits (e.g. UPC or EAN).' });
+                if (!/^\d{8,50}$/.test(finalBarcode)) {
+                    setFieldErrors({ Barcode: 'Barcode must be between 8 to 50 digits (e.g. UPC, EAN, or GTIN).' });
                     setIsLoading(false);
                     return;
                 }
@@ -252,6 +252,8 @@ export function ProductModal({ isOpen, onClose, product = null }) {
             console.error('Failed to save product:', error);
             if (error.code === '23505' || error.message?.includes('duplicate key') || error.message?.includes('unique constraint')) {
                 setFieldErrors({ Barcode: 'This barcode is already registered to another product.' });
+            } else if (error.code === '22001' || error.message?.includes('too long for type')) {
+                setErrorMsg('One of the fields is too long. Please shorten and try again.');
             } else {
                 setErrorMsg(error.message || 'Failed to save product.');
             }
@@ -378,7 +380,7 @@ export function ProductModal({ isOpen, onClose, product = null }) {
                                                         setFieldErrors({});
                                                         handleChange({ target: { name: 'Barcode', value: e.target.value.replace(/\D/g, '') } });
                                                     }}
-                                                    maxLength="14"
+                                                    maxLength="50"
                                                     className={`pr-12 ${fieldErrors.Barcode ? 'border-red-500 focus-visible:ring-red-500 bg-red-50' : 'bg-gray-50/50 focus:bg-white'}`}
                                                 />
                                                 <button
