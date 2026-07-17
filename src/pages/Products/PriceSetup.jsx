@@ -177,15 +177,12 @@ export function PriceSetup() {
                             const dAgent = currentEdits.AgentMarkup ?? product.AgentMarkup; // Acts as Agent Price
                             const dRetail = currentEdits.RetailRule ?? product.RetailRule;
                             const formattedName = [product.Brand, product.ProductName, product.Variation, product.Size].filter(Boolean).join(' ');
-                            const identityCodes = [product.SellerSKU, product.Barcode, product.GTIN].filter(Boolean).join(' • ');
                             
                             return (
                                 <tr key={product.ProductID} className={isEdited ? 'bg-indigo-50/30' : 'hover:bg-gray-50/50'}>
                                     <td className="px-4 py-3">
                                         <div className="font-medium text-gray-900">{formattedName}</div>
-                                        {identityCodes && (
-                                            <div className="text-xs text-gray-500 font-mono mt-0.5">{identityCodes}</div>
-                                        )}
+                                        <div className="text-xs text-gray-500">{product.SellerSKU}</div>
                                     </td>
                                     
                                     {isHGHMode && (
