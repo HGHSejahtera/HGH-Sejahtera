@@ -10,10 +10,9 @@
 - ALWAYS construct the internal product name using the format: `{Brand} {ProductName} {Variation} {Size}` from the `Products` table.
 
 # AWB Upload Architecture (Server-Side)
-- TikTok AWB PDF uploads from mobile are processed completely Server-Side via Vercel Serverless API (`api/share-awb.js`).
-- When an Agent shares a PDF from the iOS Shortcut, the backend API uses `pdfjs-dist` to parse text and `pdf-lib` to split the PDF into individual orders.
+- TikTok AWB PDF uploads from mobile are processed Server-Side via the Telegram Bot webhook (`api/telegram-webhook.js`), which uses `pdfjs-dist` to parse text and `pdf-lib` to split multi-page PDFs into individual orders.
 - **IMPORTANT**: The PDF parser helper MUST be placed in `api/_utils/pdfParserNode.js` (with an underscore) to prevent Vercel from treating it as a standalone serverless endpoint.
-- **IMPORTANT**: Do NOT use `export const config = { ... }` (e.g., `maxDuration`) in `api/share-awb.js` because Vercel Hobby Tier rejects it immediately with a `FUNCTION_INVOCATION_FAILED` error. Use dynamic `await import()` inside a `try...catch` block in serverless functions to capture any module loading errors safely.
+- **IMPORTANT**: Use dynamic `await import()` inside a `try...catch` block in serverless functions to capture any module loading errors safely. Vercel Hobby Tier rejects `export const config = { ... }` with `FUNCTION_INVOCATION_FAILED`.
 - The backend API uploads the split PDFs directly to Cloudflare R2 and calls the `process_agent_order_upload` RPC to insert them into `ImportedOrders`.
 - For manual PC drag-and-drop uploads, `/Agent/Upload` (Upload AWB 💻) is used and processed locally in the browser.
 

@@ -84,15 +84,30 @@ export default async function handler(req, res) {
             targetUrl = targetUrl.replace('rder Archive/', 'Order Archive/');
         }
 
-        let key = targetUrl;
-        const archiveIdx = targetUrl.indexOf('Order Archive/');
-        if (archiveIdx !== -1) {
-            key = decodeURIComponent(targetUrl.substring(archiveIdx).split('?')[0]);
-        } else {
-            key = decodeURIComponent(targetUrl.split('?')[0]);
-            if (key.startsWith('/')) key = key.substring(1);
+        function extractR2Key(urlStr) {
+            let s = decodeURIComponent(String(urlStr).split('?')[0]);
+            if (s.startsWith('rder Archive/') || s.indexOf('/rder Archive/') !== -1) {
+                s = s.replace('rder Archive/', 'Order Archive/');
+            }
+            const archiveIdx = s.indexOf('Order Archive/');
+            if (archiveIdx !== -1) {
+                return s.substring(archiveIdx);
+            }
+            if (s.startsWith('http://') || s.startsWith('https://')) {
+                try {
+                    const parsed = new URL(s);
+                    let pathname = parsed.pathname;
+                    if (pathname.startsWith('/')) pathname = pathname.substring(1);
+                    return pathname;
+                } catch {
+                    // fallback
+                }
+            }
+            if (s.startsWith('/')) s = s.substring(1);
+            return s;
         }
 
+        const key = extractR2Key(targetUrl);
         const S3 = getS3Client();
         const bucketsToTry = [
             process.env.R2_PRIVATE_BUCKET_NAME || 'hgh-awb',
@@ -101,16 +116,22 @@ export default async function handler(req, res) {
 
         let buffer = null;
         let matchedBucket = null;
+        let fetchedViaHttp = false;
 
-        // Try downloading directly from R2 via S3Client
+        // Try downloading directly from R2 via S3Client using the clean key
         for (const bucket of bucketsToTry) {
             if (!bucket) continue;
             try {
                 const command = new GetObjectCommand({ Bucket: bucket, Key: key });
                 const response = await S3.send(command);
                 if (response.Body) {
-                    const byteArray = await response.Body.transformToByteArray();
-                    buffer = Buffer.from(byteArray);
+                    if (typeof response.Body.transformToByteArray === 'function') {
+                        const byteArray = await response.Body.transformToByteArray();
+                        buffer = Buffer.from(byteArray);
+                    } else if (typeof response.Body.arrayBuffer === 'function') {
+                        const arrayBuf = await response.Body.arrayBuffer();
+                        buffer = Buffer.from(arrayBuf);
+                    }
                     matchedBucket = bucket;
                     break;
                 }
@@ -126,7 +147,8 @@ export default async function handler(req, res) {
                 if (response.ok) {
                     const arrayBuf = await response.arrayBuffer();
                     buffer = Buffer.from(arrayBuf);
-                    matchedBucket = bucketsToTry[0]; // Default to primary bucket for overwrite
+                    matchedBucket = bucketsToTry[0];
+                    fetchedViaHttp = true;
                 }
             } catch {
                 // Ignore
@@ -271,13 +293,28 @@ export default async function handler(req, res) {
         const stampedBuffer = Buffer.from(stampedBytes);
 
         // 4. Overwrite original in R2
-        const putCommand = new PutObjectCommand({
-            Bucket: matchedBucket,
-            Key: key,
-            ContentType: 'application/pdf',
-            Body: stampedBuffer
-        });
-        await S3.send(putCommand);
+        if (fetchedViaHttp) {
+            for (const bucket of bucketsToTry) {
+                if (!bucket) continue;
+                try {
+                    await S3.send(new PutObjectCommand({
+                        Bucket: bucket,
+                        Key: key,
+                        ContentType: 'application/pdf',
+                        Body: stampedBuffer
+                    }));
+                } catch (e) {
+                    console.error(`PutObjectCommand failed for fallback bucket ${bucket}:`, e.message);
+                }
+            }
+        } else {
+            await S3.send(new PutObjectCommand({
+                Bucket: matchedBucket,
+                Key: key,
+                ContentType: 'application/pdf',
+                Body: stampedBuffer
+            }));
+        }
 
         return res.status(200).json({
             success: true,

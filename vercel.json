@@ -6,7 +6,13 @@
     }
   ],
   "functions": {
+    "api/*.js": {
+      "includeFiles": "node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs"
+    },
     "api/telegram-webhook.js": {
+      "includeFiles": "node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs"
+    },
+    "api/stamp-awb.js": {
       "includeFiles": "node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs"
     }
   }
