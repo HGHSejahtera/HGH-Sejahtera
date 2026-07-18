@@ -37,6 +37,7 @@
 - NEVER use `"Impact / Affected Orders"`; ALWAYS use `"Affected Orders"`.
 - NEVER use `"Map To Internal Product"`; ALWAYS use direct, concise terms like `"Link Product"` or `"Target Product"`.
 - Keep every title, label, and header strictly definitive, direct, and concise without slash (`/`) options or ambiguous alternatives.
+- **Dynamic & Accurate Titles**: Do not hardcode `"Batch ..."` across modals if the action can be triggered for a single item (e.g., from a detail viewer). Adapt titles dynamically based on item count (e.g., `"AWB SKU Sync"` for single item vs `"Batch AWB SKU Sync"` for multiple).
 
 # Implementation Plan Review Output Rule
 - **When the user reviews an `implementation_plan.md` artifact or provides feedback/comments on a plan, DO NOT output lengthy answers, discussions, explanations, or reviews directly in the chat.**
@@ -51,3 +52,12 @@
 - **NEVER invent, auto-generate, or create descriptive commit names/messages** (e.g., NEVER use `"Add AWB Seller SKU..."`, `"Fix bug in..."`, `"Update UI..."`).
 - **ALWAYS use the `"Version X.X.X"` convention** (e.g., `"Version 1.0.3"`).
 - **ALWAYS ask the user first what commit name/version number to put before running `git commit`**, unless the user has explicitly stated the exact commit name (`Version X.X.X`) in their prompt.
+
+# Strict Concise UI Subtitles & Explanations Rule
+- **NEVER use lengthy, verbose, or redundant descriptive sentences in modal subtitles, headers, or descriptions** (e.g., NEVER use `"Updating PDF documents in Cloudflare R2 archive with matched Seller SKU."`).
+- Keep dialog subtitles and header descriptions strictly concise or omit them completely if the main title is already self-explanatory.
+
+# Modal Space Optimization & Anti-Truncation Rule
+- **NEVER create cramped, narrow dialog boxes (`max-w-xl` or smaller) when displaying lists, queues, tables, or long identifiers (Order IDs, SKUs, Nicknames).**
+- ALWAYS utilize available screen real estate (`max-w-3xl`, `max-w-4xl`, or `max-w-5xl`) so that data columns and target items fit comfortably without truncating critical text (`...`).
+- Never truncate (`truncate` class) critical identifiers like Target SKUs, Seller SKUs, or Barcodes inside review lists/queues unless absolutely unavoidable on mobile screens.

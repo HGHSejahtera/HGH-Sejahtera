@@ -143,7 +143,8 @@ export default async function handler(req, res) {
         // Fallback: If S3 direct fetch didn't find it, try standard HTTP fetch (e.g. public URL)
         if (!buffer) {
             try {
-                const response = await fetch(targetUrl);
+                const fetchUrl = targetUrl + (targetUrl.includes('?') ? '&' : '?') + 't=' + Date.now();
+                const response = await fetch(fetchUrl);
                 if (response.ok) {
                     const arrayBuf = await response.arrayBuffer();
                     buffer = Buffer.from(arrayBuf);

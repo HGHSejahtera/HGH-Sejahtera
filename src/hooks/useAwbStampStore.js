@@ -4,6 +4,7 @@ export const useAwbStampStore = create((set) => ({
     isOpen: false,
     isMinimized: false,
     status: 'idle', // 'idle' | 'processing' | 'completed' | 'error'
+    syncTimestamp: null,
     progress: { current: 0, total: 0, stamped: 0, matched: 0, mismatched: 0, failed: 0, statusText: '' },
     queue: [], // Array of { orderId, awbUrl, platformOrderId, targetSku, status: 'pending'|'processing'|'stamped'|'match'|'mismatch'|'error', existingSku?: string, message?: string }
     
@@ -143,6 +144,7 @@ export const useAwbStampStore = create((set) => ({
 
         set({
             status: 'completed',
+            syncTimestamp: Date.now(),
             progress: {
                 current: queueState.length,
                 total: queueState.length,
@@ -150,7 +152,7 @@ export const useAwbStampStore = create((set) => ({
                 matched: matchedCount,
                 mismatched: mismatchedCount,
                 failed: failedCount,
-                statusText: 'Batch sync complete.'
+                statusText: queueState.length <= 1 ? 'Sync complete.' : 'Batch sync complete.'
             }
         });
     }

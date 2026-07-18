@@ -18,7 +18,8 @@ export default async function handler(req, res) {
 
         // 1. Try standard fetch first (for external or public URLs)
         try {
-            const response = await fetch(targetUrl);
+            const fetchUrl = targetUrl + (targetUrl.includes('?') ? '&' : '?') + 't=' + (req.query.t || Date.now());
+            const response = await fetch(fetchUrl);
             if (response.ok) {
                 buffer = await response.arrayBuffer();
             }
@@ -94,7 +95,7 @@ export default async function handler(req, res) {
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
         
         res.status(200).send(Buffer.from(buffer));
     } catch (error) {

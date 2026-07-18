@@ -71,7 +71,7 @@ export function SyncAwbModal() {
                 setOpen(true);
             }
         }}>
-            <DialogContent className="max-w-xl p-0 overflow-hidden bg-white rounded-none border border-gray-200 shadow-2xl [&>button]:hidden">
+            <DialogContent className="max-w-3xl p-0 overflow-hidden bg-white rounded-none border border-gray-200 shadow-2xl [&>button]:hidden">
                 {/* Header */}
                 <div className="bg-gray-900 text-white px-6 py-5 flex items-center justify-between border-b border-gray-800">
                     <div className="flex items-center gap-3.5">
@@ -86,13 +86,13 @@ export function SyncAwbModal() {
                         </div>
                         <div>
                             <DialogTitle className="text-base font-bold tracking-tight text-white">
-                                Batch AWB Seller SKU Sync
+                                {totalCount <= 1 ? 'AWB SKU Sync' : 'Batch AWB SKU Sync'}
                             </DialogTitle>
-                            <DialogDescription className="text-xs text-gray-400 mt-0.5">
-                                {status === 'processing' 
-                                    ? progress.statusText 
-                                    : 'Updating PDF documents in Cloudflare R2 archive with matched Seller SKU.'}
-                            </DialogDescription>
+                            {status === 'processing' && (
+                                <DialogDescription className="text-xs text-gray-400 mt-0.5">
+                                    {progress.statusText}
+                                </DialogDescription>
+                            )}
                         </div>
                     </div>
                     
@@ -159,9 +159,9 @@ export function SyncAwbModal() {
                 )}
 
                 {/* Queue List */}
-                <div className="p-6 max-h-[320px] overflow-y-auto space-y-2.5 divide-y divide-gray-100">
+                <div className="p-6 max-h-[380px] overflow-y-auto space-y-3 divide-y divide-gray-100">
                     {queue.map((item, idx) => (
-                        <div key={`${item.orderId}-${idx}`} className="pt-2.5 first:pt-0 flex items-start justify-between gap-4 text-xs">
+                        <div key={`${item.orderId}-${idx}`} className="pt-3 first:pt-0 flex items-start justify-between gap-6 text-xs">
                             <div className="flex items-start gap-3 min-w-0 flex-1">
                                 <div className="mt-0.5 shrink-0">
                                     {item.status === 'processing' ? (
@@ -179,17 +179,17 @@ export function SyncAwbModal() {
                                     )}
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex flex-wrap items-center gap-2">
                                         <span className="font-bold text-gray-900 font-mono">
                                             #{item.platformOrderId}
                                         </span>
                                         <span className="text-gray-400">•</span>
-                                        <span className="font-semibold text-gray-700 truncate">
+                                        <span className="font-semibold text-gray-700 break-all">
                                             Target SKU: <span className="font-mono text-indigo-700">{item.targetSku}</span>
                                         </span>
                                     </div>
                                     {item.message && (
-                                        <p className={`mt-0.5 text-[11px] leading-snug ${
+                                        <p className={`mt-1 text-[11px] leading-relaxed ${
                                             item.status === 'mismatch' ? 'text-amber-700 font-medium' :
                                             item.status === 'error' ? 'text-rose-600 font-medium' :
                                             item.status === 'stamped' ? 'text-emerald-700' : 'text-gray-500'

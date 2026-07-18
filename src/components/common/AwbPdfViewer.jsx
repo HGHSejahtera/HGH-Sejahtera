@@ -11,11 +11,13 @@ import 'react-pdf/dist/Page/TextLayer.css';
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 export function AwbPdfViewer({ url, open, onOpenChange }) {
+    const syncTimestamp = useAwbStampStore(state => state.syncTimestamp);
     const [numPages, setNumPages] = useState(null);
     const [pageNumber, setPageNumber] = useState(1);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
     const [syncing, setSyncing] = useState(false);
+    const [viewerTimestamp, setViewerTimestamp] = useState(Date.now());
     const [viewport, setViewport] = useState({
         w: window.innerWidth,
         h: window.innerHeight,
@@ -28,6 +30,13 @@ export function AwbPdfViewer({ url, open, onOpenChange }) {
         return () => window.removeEventListener('resize', onResize);
     }, []);
 
+    // Refresh viewer timestamp when global sync completes or url changes
+    useEffect(() => {
+        if (syncTimestamp) {
+            setViewerTimestamp(syncTimestamp);
+        }
+    }, [syncTimestamp]);
+
     // Reset state when dialog opens or url changes
     useEffect(() => {
         if (open) {
@@ -36,6 +45,7 @@ export function AwbPdfViewer({ url, open, onOpenChange }) {
                 setError(false);
                 setPageNumber(1);
                 setNumPages(null);
+                setViewerTimestamp(Date.now());
             });
         }
     }, [url, open]);
@@ -60,7 +70,7 @@ export function AwbPdfViewer({ url, open, onOpenChange }) {
         setError(true);
     }
 
-    const handleOpen = () => window.open(url ? `/api/proxy-pdf?url=${encodeURIComponent(url)}` : '', '_blank');
+    const handleOpen = () => window.open(url ? `/api/proxy-pdf?url=${encodeURIComponent(url)}&t=${viewerTimestamp}` : '', '_blank');
     const handleClose = () => onOpenChange(false);
 
     const handleSyncSku = async () => {
@@ -159,7 +169,7 @@ export function AwbPdfViewer({ url, open, onOpenChange }) {
                             </button>
 
                             <Document
-                                file={`/api/proxy-pdf?url=${encodeURIComponent(url)}`}
+                                file={`/api/proxy-pdf?url=${encodeURIComponent(url)}&t=${viewerTimestamp}`}
                                 onLoadSuccess={onDocumentLoadSuccess}
                                 onLoadError={onDocumentLoadError}
                                 loading={null}
