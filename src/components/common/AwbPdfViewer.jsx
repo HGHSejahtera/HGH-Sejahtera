@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { Loader2, AlertCircle, ExternalLink, X } from 'lucide-react';
+import { useAwbStampStore } from '@/hooks/useAwbStampStore';
+import { supabase } from '@/lib/supabase';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
@@ -13,6 +15,7 @@ export function AwbPdfViewer({ url, open, onOpenChange }) {
     const [pageNumber, setPageNumber] = useState(1);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
+    const [syncing, setSyncing] = useState(false);
     const [viewport, setViewport] = useState({
         w: window.innerWidth,
         h: window.innerHeight,
@@ -59,6 +62,43 @@ export function AwbPdfViewer({ url, open, onOpenChange }) {
 
     const handleOpen = () => window.open(url ? `/api/proxy-pdf?url=${encodeURIComponent(url)}` : '', '_blank');
     const handleClose = () => onOpenChange(false);
+
+    const handleSyncSku = async () => {
+        if (!url || syncing) return;
+        setSyncing(true);
+        try {
+            const { data: order } = await supabase
+                .from('ImportedOrders')
+                .select('ImportedOrderID, PlatformOrderID, AwbUrl, ImportedOrderItems(ProductID, PlatformSKU, Products(SellerSKU, Barcode))')
+                .eq('AwbUrl', url)
+                .maybeSingle();
+
+            if (!order) {
+                alert('Could not locate order associated with this AWB URL in database.');
+                setSyncing(false);
+                return;
+            }
+
+            const item = order.ImportedOrderItems?.[0];
+            const targetSku = item?.Products?.SellerSKU || item?.Products?.Barcode || item?.PlatformSKU;
+            if (!targetSku) {
+                alert('Please match/link the product before syncing Seller SKU.');
+                setSyncing(false);
+                return;
+            }
+
+            useAwbStampStore.getState().startSyncQueue([{
+                orderId: order.ImportedOrderID,
+                platformOrderId: order.PlatformOrderID,
+                awbUrl: url,
+                targetSku
+            }]);
+        } catch (err) {
+            alert('Error syncing: ' + (err.message || 'Unknown error'));
+        } finally {
+            setSyncing(false);
+        }
+    };
 
     if (!open) return null;
 
@@ -132,15 +172,26 @@ export function AwbPdfViewer({ url, open, onOpenChange }) {
                                 />
                             </Document>
 
-                            {/* Open Button — bottom-left corner of PDF */}
-                            <button
-                                onClick={handleOpen}
-                                className="absolute bottom-2 left-2 z-10 bg-black/40 hover:bg-black/70 text-white text-xs font-medium px-3 py-1.5 rounded-none transition-colors backdrop-blur-sm flex items-center gap-1.5"
-                                title="Open in new tab"
-                            >
-                                <ExternalLink className="h-3 w-3" />
-                                Open
-                            </button>
+                            {/* Open and Sync Buttons — bottom-left corner of PDF */}
+                            <div className="absolute bottom-2 left-2 z-10 flex items-center gap-1.5">
+                                <button
+                                    onClick={handleOpen}
+                                    className="bg-black/40 hover:bg-black/70 text-white text-xs font-medium px-3 py-1.5 rounded-none transition-colors backdrop-blur-sm flex items-center gap-1.5 cursor-pointer"
+                                    title="Open in new tab"
+                                >
+                                    <ExternalLink className="h-3 w-3" />
+                                    Open
+                                </button>
+                                <button
+                                    onClick={handleSyncSku}
+                                    disabled={syncing}
+                                    className="bg-emerald-600/80 hover:bg-emerald-600 text-white text-xs font-medium px-3 py-1.5 rounded-none transition-colors backdrop-blur-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                    title="Stamp Seller SKU onto AWB in R2"
+                                >
+                                    {syncing ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+                                    Sync SKU
+                                </button>
+                            </div>
 
                             {/* Pagination — bottom-right, only when more than 1 page */}
                             {numPages > 1 && (

@@ -47,3 +47,8 @@
 - **NEVER add verbose or dummy data `placeholder=""` attributes in form inputs or settings fields** (e.g., NEVER use `placeholder="+60 3-1234 5678"`, `placeholder="support@hghsejahtera.com"`, or dummy addresses).
 - Form input boxes should either have NO `placeholder` attribute at all, or strictly concise, non-dummy utility descriptors if absolutely required.
 - When designing address entry forms, prioritize **structured regional inputs** (Address Line 1, Address Line 2, Address Line 3, Country, State/Negeri, City, Postcode/ZIP Code) with regional defaults (e.g., Malaysia and Malaysia States list) rather than raw unstructured textareas with long dummy placeholders.
+
+# Strict Git Commit Naming Convention
+- **NEVER invent, auto-generate, or create descriptive commit names/messages** (e.g., NEVER use `"Add AWB Seller SKU..."`, `"Fix bug in..."`, `"Update UI..."`).
+- **ALWAYS use the `"Version X.X.X"` convention** (e.g., `"Version 1.0.3"`).
+- **ALWAYS ask the user first what commit name/version number to put before running `git commit`**, unless the user has explicitly stated the exact commit name (`Version X.X.X`) in their prompt.
