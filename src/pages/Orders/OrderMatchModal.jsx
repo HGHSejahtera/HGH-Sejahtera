@@ -33,6 +33,11 @@ export function OrderMatchModal({ isOpen, onClose, order, onOpenCreate }) {
                 itemIds: [item.ItemID].filter(Boolean),
                 productId: product.ProductID
             });
+            if (order?.ImportedOrderID) {
+                const resolvedSessionIds = new Set(JSON.parse(localStorage.getItem('HGH_ResolvedStatusOrders') || '[]'));
+                resolvedSessionIds.add(order.ImportedOrderID);
+                localStorage.setItem('HGH_ResolvedStatusOrders', JSON.stringify(Array.from(resolvedSessionIds)));
+            }
             setSelectedIds(prev => ({ ...prev, [item.ItemID]: product.ProductID }));
         } catch (error) {
             console.error("Failed to match product:", error);

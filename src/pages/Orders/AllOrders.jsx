@@ -7,7 +7,7 @@ import { ProductModal } from '@/pages/Inventory/ProductModal';
 import { OrderMatchModal } from '@/pages/Orders/OrderMatchModal';
 import { useProductMatcher } from '@/hooks/useProductMatcher';
 
-import { Clock, ChevronRight, Package, X, Printer, AlertTriangle, Calendar } from 'lucide-react';
+import { Clock, ChevronRight, Package, X, Printer, AlertTriangle, Calendar, ArrowUp, ArrowDown, ArrowUpDown, CheckCircle2, ShieldAlert, RotateCcw, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/common/DataTable';
 import { Badge } from '@/components/ui/badge';
@@ -48,9 +48,13 @@ export function AllOrders() {
     const { orders, isLoading, MarkAsPrinted } = useOrderHistory();
 
     // UI state - PascalCase for all variables per MemoryCore
-    const [ActiveTab, SetActiveTab] = useState('Queue');
+    const [ActiveTab, SetActiveTab] = useState(() => {
+        return localStorage.getItem('HGH_Orders_ActiveTab') || 'Queue';
+    });
     const [QueueSortBy, SetQueueSortBy] = useState('DateNewest');
     const [HistorySortBy, SetHistorySortBy] = useState('DateNewest');
+    const [HeaderSort, SetHeaderSort] = useState({ column: null, direction: 'asc' });
+    const [StatusFilterPill, SetStatusFilterPill] = useState('All');
     const [IsPrinting, SetIsPrinting] = useState(false);
     const [FilterAgent, SetFilterAgent] = useState('All');
     const [FilterPlatform, SetFilterPlatform] = useState('All');
@@ -59,12 +63,33 @@ export function AllOrders() {
     const [DateRange, SetDateRange] = useState({ from: '', to: '' });
     const [RowSelection, SetRowSelection] = useState({});
 
+    const handleTabChange = (tab) => {
+        SetActiveTab(tab);
+        localStorage.setItem('HGH_Orders_ActiveTab', tab);
+        SetRowSelection({});
+    };
+
+    const handleHeaderClick = (columnName) => {
+        SetHeaderSort(prev => {
+            if (prev.column === columnName) {
+                if (prev.direction === 'asc') return { column: columnName, direction: 'desc' };
+                return { column: null, direction: 'asc' };
+            }
+            return { column: columnName, direction: 'asc' };
+        });
+    };
+
+    const handleHistorySortChange = (value) => {
+        SetHistorySortBy(value);
+        SetHeaderSort({ column: null, direction: 'asc' });
+    };
+
     // Reset selection when changing tabs or filters
     useEffect(() => {
         queueMicrotask(() => {
             SetRowSelection({});
         });
-    }, [ActiveTab, FilterAgent, FilterPlatform, FilterAccount, QueueSortBy, HistorySortBy, FilterMonth, DateRange.from, DateRange.to]);
+    }, [ActiveTab, FilterAgent, FilterPlatform, FilterAccount, QueueSortBy, HistorySortBy, HeaderSort.column, HeaderSort.direction, StatusFilterPill, FilterMonth, DateRange.from, DateRange.to]);
 
     // Unique options for filters
     const UniqueAgents = useMemo(() => {
@@ -112,6 +137,12 @@ export function AllOrders() {
         if (!SkuReviewItem || !newProductId) return;
 
         try {
+            if (SkuReviewItem.ImportedOrderID) {
+                const resolvedSessionIds = new Set(JSON.parse(localStorage.getItem('HGH_ResolvedStatusOrders') || '[]'));
+                resolvedSessionIds.add(SkuReviewItem.ImportedOrderID);
+                localStorage.setItem('HGH_ResolvedStatusOrders', JSON.stringify(Array.from(resolvedSessionIds)));
+            }
+
             const targetSku = SkuReviewItem.PlatformSKU && SkuReviewItem.PlatformSKU !== '-' ? SkuReviewItem.PlatformSKU : '';
             const targetName = SkuReviewItem.ProductName || '';
             const targetKey = `${targetSku}_${targetName.trim()}`;
@@ -144,6 +175,35 @@ export function AllOrders() {
         }, 240);
     };
 
+    const statusCounts = useMemo(() => {
+        const resolvedSessionIds = new Set(JSON.parse(localStorage.getItem('HGH_ResolvedStatusOrders') || '[]'));
+        let skuReview = 0;
+        let missingAwb = 0;
+        let ready = 0;
+
+        orders.forEach(o => {
+            const isMissingAwb = !o.AwbUrl || o.AwbUrl.trim() === '';
+            const hasUnmatched = (o.Items || o.ImportedOrderItems)?.some(
+                i => !i.ProductID || i.PlatformSKU === '-' || i.MatchStatus === 'Unmatched'
+            ) || (Number(o.DisplayAmount || 0) === 0 && (o.Items?.length > 0 || o.ImportedOrderItems?.length > 0));
+            const isResolvedProblem = (o.Items || o.ImportedOrderItems)?.some(i => i.MatchStatus === 'ManualMatch') || resolvedSessionIds.has(o.ImportedOrderID);
+
+            const isProblemOrResolved = isMissingAwb || hasUnmatched || isResolvedProblem;
+            if (!isProblemOrResolved) return;
+
+            if (isMissingAwb) missingAwb++;
+            else if (hasUnmatched) skuReview++;
+            else if (isResolvedProblem) ready++;
+        });
+
+        return {
+            total: skuReview + missingAwb + ready,
+            skuReview,
+            missingAwb,
+            ready
+        };
+    }, [orders]);
+
     const QueueOrders = useMemo(() => {
         let Unprinted = orders.filter(Order => !Order.IsPrinted);
         if (FilterAgent !== 'All') Unprinted = Unprinted.filter(o => o.AgentName === FilterAgent);
@@ -157,7 +217,6 @@ export function AllOrders() {
         if (FilterAgent !== 'All') Printed = Printed.filter(o => o.AgentName === FilterAgent);
         if (FilterPlatform !== 'All') Printed = Printed.filter(o => o.Platform === FilterPlatform);
         if (FilterAccount !== 'All') Printed = Printed.filter(o => o.AccountName === FilterAccount);
-        // If DateRange is active, bypass FilterMonth so specific dates take precedence without collision
         const hasDateRange = Boolean(DateRange.from || DateRange.to);
         if (!hasDateRange && FilterMonth !== 'All') {
             Printed = Printed.filter(o => new Date(o.CreatedAt || 0).getMonth() === Number(FilterMonth));
@@ -170,10 +229,78 @@ export function AllOrders() {
             const ToTime = new Date(`${DateRange.to}T23:59:59`).getTime();
             Printed = Printed.filter(o => new Date(o.CreatedAt || 0).getTime() <= ToTime);
         }
-        return SortOrders(Printed, HistorySortBy);
-    }, [orders, HistorySortBy, FilterAgent, FilterPlatform, FilterAccount, FilterMonth, DateRange.from, DateRange.to]);
 
-    const DisplayOrders = ActiveTab === 'Queue' ? QueueOrders : CompleteOrders;
+        if (HeaderSort.column === 'Date') {
+            Printed.sort((a, b) => {
+                const timeA = new Date(a.CreatedAt || 0).getTime();
+                const timeB = new Date(b.CreatedAt || 0).getTime();
+                return HeaderSort.direction === 'asc' ? timeA - timeB : timeB - timeA;
+            });
+        } else if (HeaderSort.column === 'Status') {
+            Printed.sort((a, b) => {
+                const getWeight = (o) => {
+                    if (!o.AwbUrl || o.AwbUrl.trim() === '') return 1;
+                    const hasUnmatched = (o.Items || o.ImportedOrderItems)?.some(i => !i.ProductID || i.PlatformSKU === '-' || i.MatchStatus === 'Unmatched') || Number(o.DisplayAmount || 0) === 0;
+                    if (hasUnmatched) return 2;
+                    return 3;
+                };
+                const wA = getWeight(a), wB = getWeight(b);
+                return HeaderSort.direction === 'asc' ? wA - wB : wB - wA;
+            });
+        } else {
+            Printed = SortOrders(Printed, HistorySortBy);
+        }
+
+        return Printed;
+    }, [orders, HistorySortBy, HeaderSort.column, HeaderSort.direction, FilterAgent, FilterPlatform, FilterAccount, FilterMonth, DateRange.from, DateRange.to]);
+
+    const StatusOrders = useMemo(() => {
+        const resolvedSessionIds = new Set(JSON.parse(localStorage.getItem('HGH_ResolvedStatusOrders') || '[]'));
+        let filtered = orders.filter(o => {
+            const isMissingAwb = !o.AwbUrl || o.AwbUrl.trim() === '';
+            const hasUnmatched = (o.Items || o.ImportedOrderItems)?.some(
+                i => !i.ProductID || i.PlatformSKU === '-' || i.MatchStatus === 'Unmatched'
+            ) || (Number(o.DisplayAmount || 0) === 0 && (o.Items?.length > 0 || o.ImportedOrderItems?.length > 0));
+            const isResolvedProblem = (o.Items || o.ImportedOrderItems)?.some(i => i.MatchStatus === 'ManualMatch') || resolvedSessionIds.has(o.ImportedOrderID);
+
+            const isProblemOrResolved = isMissingAwb || hasUnmatched || isResolvedProblem;
+            if (!isProblemOrResolved) return false;
+
+            if (StatusFilterPill === 'MissingAWB') return isMissingAwb;
+            if (StatusFilterPill === 'SKUReview') return !isMissingAwb && hasUnmatched;
+            if (StatusFilterPill === 'Ready') return !isMissingAwb && !hasUnmatched && isResolvedProblem;
+            return true;
+        });
+
+        if (FilterAgent !== 'All') filtered = filtered.filter(o => o.AgentName === FilterAgent);
+        if (FilterPlatform !== 'All') filtered = filtered.filter(o => o.Platform === FilterPlatform);
+        if (FilterAccount !== 'All') filtered = filtered.filter(o => o.AccountName === FilterAccount);
+
+        if (HeaderSort.column === 'Date') {
+            filtered.sort((a, b) => {
+                const timeA = new Date(a.CreatedAt || 0).getTime();
+                const timeB = new Date(b.CreatedAt || 0).getTime();
+                return HeaderSort.direction === 'asc' ? timeA - timeB : timeB - timeA;
+            });
+        } else if (HeaderSort.column === 'Status') {
+            filtered.sort((a, b) => {
+                const getWeight = (o) => {
+                    if (!o.AwbUrl || o.AwbUrl.trim() === '') return 1;
+                    const hasUnmatched = (o.Items || o.ImportedOrderItems)?.some(i => !i.ProductID || i.PlatformSKU === '-' || i.MatchStatus === 'Unmatched') || Number(o.DisplayAmount || 0) === 0;
+                    if (hasUnmatched) return 2;
+                    return 3;
+                };
+                const wA = getWeight(a), wB = getWeight(b);
+                return HeaderSort.direction === 'asc' ? wA - wB : wB - wA;
+            });
+        } else {
+            filtered = SortOrders(filtered, 'DateNewest');
+        }
+
+        return filtered;
+    }, [orders, HeaderSort.column, HeaderSort.direction, StatusFilterPill, FilterAgent, FilterPlatform, FilterAccount]);
+
+    const DisplayOrders = ActiveTab === 'Queue' ? QueueOrders : ActiveTab === 'Complete' ? CompleteOrders : StatusOrders;
 
     const HandlePrintAll = async () => {
         const selectedIndices = Object.keys(RowSelection).filter(k => RowSelection[k]);
@@ -255,7 +382,7 @@ export function AllOrders() {
                         {row.original.IsPrinted && (
                             <span
                                 className={`inline-block h-2 w-2 rounded-full shadow-sm shrink-0 ${isMissingAwb ? 'bg-amber-400' : 'bg-emerald-500'}`}
-                                title={isMissingAwb ? "Missing AWB" : "Print Done"}
+                                title={isMissingAwb ? "AWB Action" : "Print Done"}
                             ></span>
                         )}
                         <span className="font-semibold text-gray-900">{row.original.PlatformOrderID}</span>
@@ -304,8 +431,8 @@ export function AllOrders() {
                 return (
                     <div className="flex justify-center items-center gap-1.5 flex-wrap">
                         {isMissingAwb && (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-rose-800 bg-rose-100 px-2 py-0.5 rounded border border-rose-300 shadow-2xs">
-                                <AlertTriangle className="w-3 h-3 text-rose-600 shrink-0" /> Missing AWB
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-rose-800 bg-rose-100 px-2 py-0.5 rounded border border-rose-300 shadow-2xs select-none">
+                                <AlertTriangle className="w-3 h-3 text-rose-600 shrink-0" /> AWB Action
                             </span>
                         )}
                         {hasUnmatched && (
@@ -315,7 +442,8 @@ export function AllOrders() {
                                     e.stopPropagation();
                                     handleOpenSkuReviewModal(row.original);
                                 }}
-                                className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-800 bg-amber-100 hover:bg-amber-200 px-2 py-0.5 rounded border border-amber-300 shadow-2xs cursor-pointer transition-colors"
+                                className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-800 bg-amber-100 hover:bg-amber-200 px-2 py-0.5 rounded border border-amber-300 shadow-2xs cursor-pointer transition-colors select-none"
+                                title="Click to open SKU Review modal & link product"
                             >
                                 <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" /> SKU Review
                             </button>
@@ -376,7 +504,15 @@ export function AllOrders() {
             enableHiding: false,
         },
         {
-            header: 'Date',
+            header: () => (
+                <button
+                    type="button"
+                    onClick={() => handleHeaderClick('Date')}
+                    className="font-semibold hover:text-indigo-600 transition-colors cursor-pointer"
+                >
+                    Date
+                </button>
+            ),
             accessorKey: 'CreatedAt',
             cell: ({ row }) => {
                 const date = new Date(row.original.CreatedAt);
@@ -430,7 +566,17 @@ export function AllOrders() {
             )
         },
         {
-            header: () => <div className="text-center">Status</div>,
+            header: () => (
+                <div className="flex justify-center">
+                    <button
+                        type="button"
+                        onClick={() => handleHeaderClick('Status')}
+                        className="font-semibold hover:text-indigo-600 transition-colors cursor-pointer"
+                    >
+                        Status
+                    </button>
+                </div>
+            ),
             id: 'status',
             cell: ({ row }) => {
                 const hasUnmatched = (row.original.Items || row.original.ImportedOrderItems)?.some(
@@ -466,6 +612,160 @@ export function AllOrders() {
             id: 'actions',
             cell: ({ row }) => (
                 <div className="flex justify-center">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenDrawer(row.original)}
+                        className="h-7 px-3 border-gray-200 bg-white hover:bg-gray-50 text-gray-700 hover:border-gray-300 font-medium text-xs rounded-md shadow-xs transition-all cursor-pointer"
+                    >
+                        View <ChevronRight className="w-3.5 h-3.5 ml-1 text-gray-400" />
+                    </Button>
+                </div>
+            )
+        }
+    ];
+
+    const statusColumns = [
+        {
+            id: 'select',
+            header: ({ table }) => (
+                <div className="flex justify-center items-center px-2">
+                    <Checkbox
+                        checked={table.getIsAllPageRowsSelected()}
+                        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+                        aria-label="Select all"
+                        className="border-gray-300"
+                    />
+                </div>
+            ),
+            cell: ({ row }) => (
+                <div className="flex justify-center items-center px-2">
+                    <Checkbox
+                        checked={row.getIsSelected()}
+                        onCheckedChange={(value) => row.toggleSelected(!!value)}
+                        aria-label="Select row"
+                        className="border-gray-300"
+                    />
+                </div>
+            ),
+            enableSorting: false,
+            enableHiding: false,
+        },
+        {
+            header: () => (
+                <button
+                    type="button"
+                    onClick={() => handleHeaderClick('Date')}
+                    className="font-semibold hover:text-indigo-600 transition-colors cursor-pointer"
+                >
+                    Date
+                </button>
+            ),
+            accessorKey: 'CreatedAt',
+            cell: ({ row }) => {
+                const date = new Date(row.original.CreatedAt);
+                return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+            }
+        },
+        {
+            header: 'Time',
+            id: 'time',
+            cell: ({ row }) => {
+                const date = new Date(row.original.CreatedAt);
+                return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+            }
+        },
+        {
+            header: 'Order ID',
+            accessorKey: 'PlatformOrderID',
+            cell: ({ row }) => (
+                <div className="flex items-center space-x-2">
+                    <span className="font-semibold text-gray-900">{row.original.PlatformOrderID}</span>
+                </div>
+            )
+        },
+        {
+            header: () => <div className="text-center">Platform</div>,
+            accessorKey: 'Platform',
+            cell: ({ row }) => (
+                <div className="flex justify-center">
+                    <Badge variant="outline" className="bg-white rounded-md font-medium text-xs border-gray-200 px-2.5 py-0.5 shadow-xs">
+                        {row.original.Platform}
+                    </Badge>
+                </div>
+            )
+        },
+        {
+            header: 'Agent',
+            accessorKey: 'AgentName',
+            cell: ({ row }) => (
+                <div className="flex flex-col">
+                    <span className="font-medium text-gray-900">{row.original.AgentName}</span>
+                </div>
+            )
+        },
+        {
+            header: () => <div className="text-right">Amount</div>,
+            accessorKey: 'DisplayAmount',
+            cell: ({ row }) => (
+                <div className="text-right font-medium text-emerald-600">
+                    {formatCurrency(row.original.DisplayAmount)}
+                </div>
+            )
+        },
+        {
+            header: () => (
+                <div className="flex justify-center">
+                    <button
+                        type="button"
+                        onClick={() => handleHeaderClick('Status')}
+                        className="font-semibold hover:text-indigo-600 transition-colors cursor-pointer"
+                    >
+                        Status
+                    </button>
+                </div>
+            ),
+            id: 'status',
+            cell: ({ row }) => {
+                const isMissingAwb = !row.original.AwbUrl || row.original.AwbUrl.trim() === '';
+                const hasUnmatched = (row.original.Items || row.original.ImportedOrderItems)?.some(
+                    i => !i.ProductID || i.PlatformSKU === '-' || i.MatchStatus === 'Unmatched'
+                ) || (Number(row.original.DisplayAmount || 0) === 0 && (row.original.Items?.length > 0 || row.original.ImportedOrderItems?.length > 0));
+
+                return (
+                    <div className="flex justify-center items-center gap-1.5 flex-wrap py-0.5">
+                        {isMissingAwb && (
+                            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-900 bg-rose-50 px-2.5 py-1 rounded-md border border-rose-300 shadow-2xs select-none">
+                                <ShieldAlert className="w-3.5 h-3.5 text-rose-600 shrink-0" /> AWB Action
+                            </span>
+                        )}
+                        {hasUnmatched && (
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenSkuReviewModal(row.original);
+                                }}
+                                className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-900 bg-amber-50 hover:bg-amber-100 px-2.5 py-1 rounded-md border border-amber-300 hover:border-amber-400 shadow-2xs cursor-pointer transition-all select-none"
+                                title="Click to open SKU Review modal & link product"
+                            >
+                                <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" /> SKU Review
+                            </button>
+                        )}
+                        {!isMissingAwb && !hasUnmatched && (
+                            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-900 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-300 shadow-2xs select-none">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" /> Resolve
+                            </span>
+                        )}
+                    </div>
+                );
+            }
+        },
+        {
+            header: () => <div className="text-center">Action</div>,
+            id: 'actions',
+            cell: ({ row }) => (
+                <div className="flex justify-center items-center gap-1.5">
                     <Button
                         variant="outline"
                         size="sm"
@@ -735,13 +1035,15 @@ export function AllOrders() {
         </div>
     ) : null;
 
+    const StatusActionElement = null;
+
     return (
         <div className="space-y-6">
             {/* Tabs Navigation */}
             <div className="flex border-b border-gray-200">
                 <button
                     type="button"
-                    onClick={() => SetActiveTab('Queue')}
+                    onClick={() => handleTabChange('Queue')}
                     className={cn(
                         "py-3 px-6 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 cursor-pointer",
                         ActiveTab === 'Queue'
@@ -758,7 +1060,7 @@ export function AllOrders() {
                 </button>
                 <button
                     type="button"
-                    onClick={() => SetActiveTab('Complete')}
+                    onClick={() => handleTabChange('Complete')}
                     className={cn(
                         "py-3 px-6 text-sm font-bold border-b-2 transition-colors cursor-pointer",
                         ActiveTab === 'Complete'
@@ -768,17 +1070,161 @@ export function AllOrders() {
                 >
                     Order History
                 </button>
+                <button
+                    type="button"
+                    onClick={() => handleTabChange('Status')}
+                    className={cn(
+                        "py-3 px-6 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 cursor-pointer",
+                        ActiveTab === 'Status'
+                            ? "border-indigo-600 text-indigo-600"
+                            : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                    )}
+                >
+                    Order Status
+                    {(statusCounts.skuReview + statusCounts.missingAwb) > 0 && (
+                        <span className="bg-amber-500 text-white text-xs px-2 py-0.5 rounded-full font-bold shadow-xs">
+                            {statusCounts.skuReview + statusCounts.missingAwb}
+                        </span>
+                    )}
+                </button>
             </div>
+
+            {ActiveTab === 'Status' && (
+                <div className="bg-white border rounded-none p-4 shadow-2xs space-y-3">
+                    <div className="flex items-center justify-between flex-wrap gap-4 w-full">
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <button
+                                type="button"
+                                onClick={() => SetStatusFilterPill('All')}
+                                className={cn(
+                                    "px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer border shadow-2xs flex items-center gap-1.5 select-none",
+                                    StatusFilterPill === 'All'
+                                        ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
+                                        : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                                )}
+                            >
+                                All Problem
+                                <span className={cn(
+                                    "px-1.5 py-0.5 rounded text-[10px] font-bold",
+                                    StatusFilterPill === 'All' ? "bg-indigo-700 text-white" : "bg-gray-100 text-gray-700"
+                                )}>
+                                    {statusCounts.total}
+                                </span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => SetStatusFilterPill('SKUReview')}
+                                className={cn(
+                                    "px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer border shadow-2xs flex items-center gap-1.5 select-none",
+                                    StatusFilterPill === 'SKUReview'
+                                        ? "bg-amber-600 text-white border-amber-600 shadow-xs"
+                                        : "bg-white text-amber-800 border-amber-300 hover:bg-amber-50"
+                                )}
+                            >
+                                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                                SKU Review
+                                {statusCounts.skuReview > 0 && (
+                                    <span className={cn(
+                                        "px-1.5 py-0.5 rounded text-[10px] font-bold",
+                                        StatusFilterPill === 'SKUReview' ? "bg-amber-700 text-white" : "bg-amber-100 text-amber-800"
+                                    )}>
+                                        {statusCounts.skuReview}
+                                    </span>
+                                )}
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => SetStatusFilterPill('MissingAWB')}
+                                className={cn(
+                                    "px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer border shadow-2xs flex items-center gap-1.5 select-none",
+                                    StatusFilterPill === 'MissingAWB'
+                                        ? "bg-rose-600 text-white border-rose-600 shadow-xs"
+                                        : "bg-white text-rose-800 border-rose-300 hover:bg-rose-50"
+                                )}
+                            >
+                                <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
+                                AWB Action
+                                {statusCounts.missingAwb > 0 && (
+                                    <span className={cn(
+                                        "px-1.5 py-0.5 rounded text-[10px] font-bold",
+                                        StatusFilterPill === 'MissingAWB' ? "bg-rose-700 text-white" : "bg-rose-100 text-rose-800"
+                                    )}>
+                                        {statusCounts.missingAwb}
+                                    </span>
+                                )}
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => SetStatusFilterPill('Ready')}
+                                className={cn(
+                                    "px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer border shadow-2xs flex items-center gap-1.5 select-none",
+                                    StatusFilterPill === 'Ready'
+                                        ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
+                                        : "bg-white text-emerald-800 border-emerald-300 hover:bg-emerald-50"
+                                )}
+                            >
+                                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                                Resolve
+                            </button>
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-wrap ml-auto">
+                            <div className="flex items-center gap-1 text-xs">
+                                <span className="text-gray-500 font-medium mr-1">Platform:</span>
+                                <Select value={FilterPlatform} onValueChange={SetFilterPlatform}>
+                                    <SelectTrigger className="h-8 w-[110px] bg-white text-xs font-medium rounded-md border-gray-200 hover:border-gray-300 shadow-xs transition-colors">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent side="bottom" className="rounded-md shadow-lg border-gray-200">
+                                        {UniquePlatforms.map(platform => (
+                                            <SelectItem key={platform} value={platform}>{platform}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="flex items-center gap-1 text-xs ml-1">
+                                <span className="text-gray-500 font-medium mr-1">Account:</span>
+                                <Select value={FilterAccount} onValueChange={SetFilterAccount}>
+                                    <SelectTrigger className="h-8 w-[110px] bg-white text-xs font-medium rounded-md border-gray-200 hover:border-gray-300 shadow-xs transition-colors">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent side="bottom" className="rounded-md shadow-lg border-gray-200">
+                                        {UniqueAccounts.map(account => (
+                                            <SelectItem key={account} value={account}>{account}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="flex items-center gap-1 text-xs ml-1">
+                                <span className="text-gray-500 font-medium mr-1">Agent:</span>
+                                <Select value={FilterAgent} onValueChange={SetFilterAgent}>
+                                    <SelectTrigger className="h-8 w-[110px] bg-white text-xs font-medium rounded-md border-gray-200 hover:border-gray-300 shadow-xs transition-colors">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent side="bottom" className="rounded-md shadow-lg border-gray-200">
+                                        {UniqueAgents.map(agent => (
+                                            <SelectItem key={agent} value={agent}>{agent}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <div className="bg-white rounded-none shadow-xs border overflow-hidden">
                 <div className="p-4">
                     <DataTable
                         key={ActiveTab}
-                        columns={ActiveTab === 'Queue' ? queueColumns : completeColumns}
+                        columns={ActiveTab === 'Queue' ? queueColumns : ActiveTab === 'Complete' ? completeColumns : statusColumns}
                         data={DisplayOrders}
                         isLoading={isLoading}
                         searchPlaceholder="Search"
-                        actionElement={ActiveTab === 'Queue' ? QueueActionElement : CompleteActionElement}
+                        actionElement={ActiveTab === 'Queue' ? QueueActionElement : ActiveTab === 'Complete' ? CompleteActionElement : StatusActionElement}
                         rowSelection={RowSelection}
                         onRowSelectionChange={SetRowSelection}
                         defaultPageSize={999999}
@@ -832,7 +1278,7 @@ export function AllOrders() {
                                                 <div className="flex-1 text-xs">
                                                     <p className="font-bold text-sm">Action Required</p>
                                                     <p className="mt-1 text-amber-800 leading-relaxed">
-                                                        One or more items in this order have no Seller SKU (<code>SKU: -</code>). Commission and Total Amount will remain RM 0.00 until matched.
+                                                        One or more items in this order have no Seller SKU. Commission and Total Amount will remain RM 0.00 until matched.
                                                     </p>
                                                     <Button
                                                         variant="outline"
