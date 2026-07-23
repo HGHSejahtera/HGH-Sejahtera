@@ -6,7 +6,6 @@ import { Badge } from '@/components/ui/badge';
 import { DataTable } from '@/components/common/DataTable';
 import { Input } from '@/components/ui/input';
 import { useInventoryLogs, useInventoryProducts } from '@/hooks/useInventory';
-import { calculateFinalPrices } from '@/hooks/usePricing';
 import { useProducts } from '@/hooks/useProducts';
 import { useSecretMode } from '@/hooks/useSecretMode';
 import { useProductMatcher } from '@/hooks/useProductMatcher';
@@ -61,10 +60,6 @@ const getStockStatus = (Stock) => {
     };
 };
 
-const getProductPricing = (Product) => {
-    const PricingObject = Product.ProductPricing;
-    return Array.isArray(PricingObject) ? (PricingObject[0] || {}) : (PricingObject || {});
-};
 
 const SortableHeader = ({ column, children }) => (
     <Button
@@ -225,7 +220,6 @@ export function InventoryDashboard() {
 
         // Row 2+: Data
         InventoryProducts.forEach((Product) => {
-            const Pricing = getProductPricing(Product);
             const formattedName = [Product.Brand, Product.ProductName, Product.Variation, Product.Size]
                 .filter(Boolean)
                 .join(' ')
@@ -241,9 +235,9 @@ export function InventoryDashboard() {
                 else if (header === 'Current Stock') row.push(Product.Stock || 0);
                 else if (header === 'Cost Price') row.push(isHGHMode ? (Product.CostPrice || 0) : (Product.FakeCostPrice || 0));
                 else if (header === 'Stockist Price') row.push(Product.StockistPrice || 0);
-                else if (header === 'Retail Price') row.push(Pricing.RetailRule || 0);
-                else if (header === 'Wholesale Price') row.push(Pricing.WholesaleRule || 0);
-                else if (header === 'Agent Price') row.push(Pricing.AgentMarkup || 0);
+                else if (header === 'Retail Price') row.push(Product.RetailPrice || 0);
+                else if (header === 'Wholesale Price') row.push(Product.WholesalePrice || 0);
+                else if (header === 'Agent Price') row.push(Product.AgentPrice || 0);
                 else if (header === 'Weight (g)') row.push(Product.WeightG || '');
                 else if (header === 'Dimensions') row.push(Product.Dimensions || '');
                 else if (header === 'Platform Data') row.push(Product.PlatformData ? JSON.stringify(Product.PlatformData) : '');
@@ -575,33 +569,21 @@ export function InventoryDashboard() {
             id: 'RetailPrice',
             header: () => <div className="text-right w-full">Retail</div>,
             meta: { className: 'min-w-[120px] max-w-[120px] w-[120px] text-right' },
-            cell: ({ row }) => {
-                const Pricing = getProductPricing(row.original);
-                const { RetailPrice } = calculateFinalPrices(Pricing);
-                return <PriceCell value={RetailPrice} />;
-            },
+            cell: ({ row }) => <PriceCell value={row.original.RetailPrice} />,
         };
 
         const WholesalePriceColumn = {
             id: 'WholesalePrice',
             header: () => <div className="text-right w-full">Wholesale</div>,
             meta: { className: 'min-w-[120px] max-w-[120px] w-[120px] text-right' },
-            cell: ({ row }) => {
-                const Pricing = getProductPricing(row.original);
-                const { WholesalePrice } = calculateFinalPrices(Pricing);
-                return <PriceCell value={WholesalePrice} />;
-            },
+            cell: ({ row }) => <PriceCell value={row.original.WholesalePrice} />,
         };
 
         const AgentPriceColumn = {
             id: 'AgentPrice',
             header: () => <div className="text-right w-full">Agent</div>,
             meta: { className: 'min-w-[120px] max-w-[120px] w-[120px] text-right' },
-            cell: ({ row }) => {
-                const Pricing = getProductPricing(row.original);
-                const { AgentPrice } = calculateFinalPrices(Pricing);
-                return <PriceCell value={AgentPrice} />;
-            },
+            cell: ({ row }) => <PriceCell value={row.original.AgentPrice} />,
         };
 
         const SellerSKUColumn = {

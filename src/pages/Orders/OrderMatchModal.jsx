@@ -24,7 +24,7 @@ export function OrderMatchModal({ isOpen, onClose, order, onOpenCreate }) {
 
     if (!isOpen || !order) return null;
 
-    const items = order.Items || order.ImportedOrderItems || [];
+    const items = order.Items || order.ImportOrderItems || [];
     const unmatchedItems = items.filter(i => !i.ProductID || i.PlatformSKU === '-' || i.MatchStatus === 'Unmatched');
 
     const handleMatchProduct = async (item, product) => {
@@ -33,9 +33,9 @@ export function OrderMatchModal({ isOpen, onClose, order, onOpenCreate }) {
                 itemIds: [item.ItemID].filter(Boolean),
                 productId: product.ProductID
             });
-            if (order?.ImportedOrderID) {
+            if (order?.ImportOrderID) {
                 const resolvedSessionIds = new Set(JSON.parse(localStorage.getItem('HGH_ResolvedStatusOrders') || '[]'));
-                resolvedSessionIds.add(order.ImportedOrderID);
+                resolvedSessionIds.add(order.ImportOrderID);
                 localStorage.setItem('HGH_ResolvedStatusOrders', JSON.stringify(Array.from(resolvedSessionIds)));
             }
             setSelectedIds(prev => ({ ...prev, [item.ItemID]: product.ProductID }));
@@ -55,7 +55,7 @@ export function OrderMatchModal({ isOpen, onClose, order, onOpenCreate }) {
                         </div>
                         <div>
                             <h2 className="text-lg font-bold tracking-tight text-gray-900">
-                                SKU Review: Order #{order.OrderID || order.AWBNumber || order.PlatformOrderID || order.ImportedOrderID || '-'}
+                                SKU Review: Order #{order.OrderID || order.AWBNumber || order.PlatformOrderID || order.ImportOrderID || '-'}
                             </h2>
                         </div>
                     </div>

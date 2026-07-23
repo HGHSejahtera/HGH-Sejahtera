@@ -7,7 +7,7 @@ export function useInventoryProducts() {
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('Products')
-                .select('*, ProductPricing(*)')
+                .select('*')
                 .eq('IsActive', true)
                 .order('CreatedAt', { ascending: false });
 

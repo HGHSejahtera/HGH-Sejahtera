@@ -78,8 +78,8 @@ export function AwbPdfViewer({ url, open, onOpenChange }) {
         setSyncing(true);
         try {
             const { data: order } = await supabase
-                .from('ImportedOrders')
-                .select('ImportedOrderID, PlatformOrderID, AwbUrl, ImportedOrderItems(ProductID, PlatformSKU, Products(SellerSKU, Barcode))')
+                .from('ImportOrders')
+                .select('ImportOrderID, PlatformOrderID, AwbUrl, ImportOrderItems(ProductID, PlatformSKU, Products(SellerSKU, Barcode))')
                 .eq('AwbUrl', url)
                 .maybeSingle();
 
@@ -89,7 +89,7 @@ export function AwbPdfViewer({ url, open, onOpenChange }) {
                 return;
             }
 
-            const item = order.ImportedOrderItems?.[0];
+            const item = order.ImportOrderItems?.[0];
             const targetSku = item?.Products?.SellerSKU || item?.Products?.Barcode || item?.PlatformSKU;
             if (!targetSku) {
                 alert('Please match/link the product before syncing Seller SKU.');
@@ -98,7 +98,7 @@ export function AwbPdfViewer({ url, open, onOpenChange }) {
             }
 
             useAwbStampStore.getState().startSyncQueue([{
-                orderId: order.ImportedOrderID,
+                orderId: order.ImportOrderID,
                 platformOrderId: order.PlatformOrderID,
                 awbUrl: url,
                 targetSku

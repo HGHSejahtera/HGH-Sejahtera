@@ -176,11 +176,11 @@ export function AgentDetails() {
             )
         },
         { 
-            header: () => <div className="text-right">Amount</div>, 
-            accessorKey: 'OrderAmount', 
+            header: () => <div className="text-right">Profit</div>, 
+            accessorKey: 'DisplayProfit', 
             cell: ({ row }) => (
                 <div className="text-right font-medium text-emerald-600">
-                    RM {parseFloat(row.original.OrderAmount || 0).toFixed(2)}
+                    RM {parseFloat(row.original.DisplayProfit || row.original.OrderProfit || 0).toFixed(2)}
                 </div>
             )
         },
@@ -256,8 +256,8 @@ export function AgentDetails() {
 
         return [...list].sort((a, b) => {
             if (ordersSortBy === 'oldest') return new Date(a.CreatedAt || 0) - new Date(b.CreatedAt || 0);
-            if (ordersSortBy === 'amount_desc') return (parseFloat(b.OrderAmount || b.DisplayAmount || 0)) - (parseFloat(a.OrderAmount || a.DisplayAmount || 0));
-            if (ordersSortBy === 'amount_asc') return (parseFloat(a.OrderAmount || a.DisplayAmount || 0)) - (parseFloat(b.OrderAmount || b.DisplayAmount || 0));
+            if (ordersSortBy === 'amount_desc') return (parseFloat(b.OrderProfit || b.DisplayProfit || 0)) - (parseFloat(a.OrderProfit || a.DisplayProfit || 0));
+            if (ordersSortBy === 'amount_asc') return (parseFloat(a.OrderProfit || a.DisplayProfit || 0)) - (parseFloat(b.OrderProfit || b.DisplayProfit || 0));
             return new Date(b.CreatedAt || 0) - new Date(a.CreatedAt || 0);
         });
     }, [recentOrders, filterPlatform, filterAccount, filterMonth, dateRange.from, dateRange.to, ordersSortBy]);
@@ -287,10 +287,10 @@ export function AgentDetails() {
         });
     }, [agent?.ledger, filterEntryType, ledgerMonth, ledgerDateRange.from, ledgerDateRange.to, ledgerSortBy]);
 
-    const displayTotalSales = useMemo(() => {
+    const displayTotalProfit = useMemo(() => {
         let list = recentOrders || [];
         if (activeTab === 'orders') {
-            return filteredOrders.reduce((sum, o) => sum + (parseFloat(o.OrderAmount || o.DisplayAmount || 0)), 0);
+            return filteredOrders.reduce((sum, o) => sum + (parseFloat(o.OrderProfit || o.DisplayProfit || 0)), 0);
         } else {
             const hasDateRange = Boolean(ledgerDateRange.from || ledgerDateRange.to);
             if (!hasDateRange && ledgerMonth !== 'All') {
@@ -304,7 +304,7 @@ export function AgentDetails() {
                 const toTime = new Date(`${ledgerDateRange.to}T23:59:59`).getTime();
                 list = list.filter(o => new Date(o.CreatedAt || 0).getTime() <= toTime);
             }
-            return list.reduce((sum, o) => sum + (parseFloat(o.OrderAmount || o.DisplayAmount || 0)), 0);
+            return list.reduce((sum, o) => sum + (parseFloat(o.OrderProfit || o.DisplayProfit || 0)), 0);
         }
     }, [recentOrders, filteredOrders, activeTab, ledgerMonth, ledgerDateRange.from, ledgerDateRange.to]);
 
@@ -683,12 +683,12 @@ export function AgentDetails() {
                     <div className="mt-6 flex space-x-8">
                         <div>
                             <p className="text-sm text-gray-500 font-medium flex items-center gap-1.5">
-                                Total Sales
+                                Total Profit
                                 <span className="text-xs font-normal text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
                                     {selectedPeriodLabel}
                                 </span>
                             </p>
-                            <p className="text-2xl font-bold text-green-600">RM {displayTotalSales.toFixed(2)}</p>
+                            <p className="text-2xl font-bold text-green-600">RM {displayTotalProfit.toFixed(2)}</p>
                         </div>
                     </div>
                 </div>

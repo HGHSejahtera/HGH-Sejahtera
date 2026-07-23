@@ -37,23 +37,11 @@ export function useProducts() {
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('Products')
-                .select(`
-                    *,
-                    ProductPricing (
-                        RetailRule,
-                        WholesaleRule,
-                        AgentMarkup
-                    )
-                `)
+                .select('*')
                 .order('ProductName');
             
             if (error) throw error;
-            return data.map(p => ({
-                ...p,
-                RetailPrice: p.ProductPricing?.RetailRule || p.Price || 0,
-                WholesalePrice: p.ProductPricing?.WholesaleRule || p.Price || 0,
-                AgentPrice: p.ProductPricing?.AgentMarkup || 0,
-            }));
+            return data;
         }
     });
 
@@ -144,7 +132,7 @@ export function useProducts() {
                     Stock: p.Stock,
                     Brand: p.Brand,
                     Category: p.Category,
-                    Price: p.Price
+                    RetailPrice: p.RetailPrice
                 },
                 PerformedBy: 'System Admin'
             }));
@@ -161,14 +149,7 @@ export function useProducts() {
                 .in('ProductID', productIds);
             if (logsError) throw logsError;
 
-            // 3. Cascade Delete: ProductPricing
-            const { error: pricingError } = await supabase
-                .from('ProductPricing')
-                .delete()
-                .in('ProductID', productIds);
-            if (pricingError) throw pricingError;
-
-            // 4. Delete Products
+            // 3. Delete Products
             const { error: productError } = await supabase
                 .from('Products')
                 .delete()

@@ -12,16 +12,16 @@ export function useAgentPortal() {
         queryKey: ['agent_orders', agentId],
         queryFn: async () => {
             const { data, error } = await supabase
-                .from('ImportedOrders')
+                .from('ImportOrders')
                 .select(`
-                    ImportedOrderID,
+                    ImportOrderID,
                     PlatformOrderID,
                     Platform,
                     TrackingID,
                     AwbUrl,
                     CreatedAt,
                     OrderImports!inner(AgentID),
-                    ImportedOrderItems(Quantity, PlatformSKU)
+                    ImportOrderItems(Quantity, PlatformSKU)
                 `)
                 .eq('OrderImports.AgentID', agentId)
                 .order('CreatedAt', { ascending: false });
@@ -30,10 +30,10 @@ export function useAgentPortal() {
 
             // Map the data for easier consumption in the data table
             return data.map(order => {
-                const totalItems = order.ImportedOrderItems?.reduce((sum, item) => sum + item.Quantity, 0) || 0;
+                const totalItems = order.ImportOrderItems?.reduce((sum, item) => sum + item.Quantity, 0) || 0;
                 
                 return {
-                    ID: order.ImportedOrderID,
+                    ID: order.ImportOrderID,
                     OrderID: order.PlatformOrderID,
                     Date: new Date(order.CreatedAt).toLocaleDateString(),
                     RawDate: order.CreatedAt,

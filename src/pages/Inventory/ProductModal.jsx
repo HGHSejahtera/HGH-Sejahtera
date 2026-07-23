@@ -3,7 +3,6 @@ import { useProducts } from '@/hooks/useProducts';
 import { GenerateMasterSKU } from '@/utils/MasterSKUGenerator';
 import { useBrands } from '@/hooks/useBrands';
 import { useCategories } from '@/hooks/useCategories';
-import { useBulkUpdatePricing } from '@/hooks/usePricing';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,6 +11,7 @@ import { ImageDropzone } from '@/components/ui/image-dropzone';
 import { X, AlertTriangle, Wand2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useBulkUpdatePricing } from '@/hooks/usePricing';
 
 const formatPlatformData = (PlatformData) => {
     if (!PlatformData || Object.keys(PlatformData).length === 0) return '';
@@ -51,9 +51,6 @@ export function ProductModal({ isOpen, onClose, product = null, prefilledName = 
     const [errorMsg, setErrorMsg] = useState('');
     const [fieldErrors, setFieldErrors] = useState({});
 
-    const pricingObj = product?.ProductPricing;
-    const pricing = Array.isArray(pricingObj) ? (pricingObj[0] || {}) : (pricingObj || {});
-
     const [formData, setFormData] = useState({
         ImageURL: product?.ImageURL || '',
         MasterSKU: product?.MasterSKU || '',
@@ -74,17 +71,13 @@ export function ProductModal({ isOpen, onClose, product = null, prefilledName = 
         WidthCM: product?.WidthCM || '',
         HeightCM: product?.HeightCM || '',
         PlatformData: formatPlatformData(product?.PlatformData),
-        PricingModel: pricing.PricingModel || 'HQ_DISCOUNT',
-        RetailRule: pricing.RetailRule ?? product?.Price ?? '',
-        WholesaleRule: pricing.WholesaleRule ?? '',
-        AgentMarkup: pricing.AgentMarkup ?? '',
+        RetailPrice: product?.RetailPrice ?? '',
+        WholesalePrice: product?.WholesalePrice ?? '',
+        AgentPrice: product?.AgentPrice ?? '',
     });
 
     useEffect(() => {
         if (isOpen) {
-            const pricingObj = product?.ProductPricing;
-            const pricing = Array.isArray(pricingObj) ? (pricingObj[0] || {}) : (pricingObj || {});
-
             setFormData({
                 ImageURL: product?.ImageURL || '',
                 MasterSKU: product?.MasterSKU || '',
@@ -105,10 +98,9 @@ export function ProductModal({ isOpen, onClose, product = null, prefilledName = 
                 WidthCM: product?.WidthCM || '',
                 HeightCM: product?.HeightCM || '',
                 PlatformData: formatPlatformData(product?.PlatformData),
-                PricingModel: pricing.PricingModel || 'HQ_DISCOUNT',
-                RetailRule: pricing.RetailRule ?? product?.Price ?? '',
-                WholesaleRule: pricing.WholesaleRule ?? '',
-                AgentMarkup: pricing.AgentMarkup ?? '',
+                RetailPrice: product?.RetailPrice ?? '',
+                WholesalePrice: product?.WholesalePrice ?? '',
+                AgentPrice: product?.AgentPrice ?? '',
             });
             setErrorMsg('');
             setFieldErrors({});
@@ -222,7 +214,6 @@ export function ProductModal({ isOpen, onClose, product = null, prefilledName = 
             const LengthCM = formData.LengthCM === '' ? null : parseFloat(formData.LengthCM);
             const WidthCM = formData.WidthCM === '' ? null : parseFloat(formData.WidthCM);
             const HeightCM = formData.HeightCM === '' ? null : parseFloat(formData.HeightCM);
-            const ProductRetailPrice = parseFloat(formData.RetailRule) || 0;
 
             let finalCategory = formData.Category || null;
             let finalCategoryName = null;
@@ -254,7 +245,9 @@ export function ProductModal({ isOpen, onClose, product = null, prefilledName = 
                 CostPrice: parseFloat(formData.CostPrice) || 0,
                 FakeCostPrice: parseFloat(formData.FakeCostPrice) || 0,
                 StockistPrice: parseFloat(formData.StockistPrice) || 0,
-                Price: ProductRetailPrice,
+                RetailPrice: parseFloat(formData.RetailPrice) || 0,
+                WholesalePrice: parseFloat(formData.WholesalePrice) || 0,
+                AgentPrice: parseFloat(formData.AgentPrice) || 0,
                 WeightG: Number.isFinite(WeightG) ? WeightG : null,
                 LengthCM: Number.isFinite(LengthCM) ? LengthCM : null,
                 WidthCM: Number.isFinite(WidthCM) ? WidthCM : null,
@@ -279,18 +272,6 @@ export function ProductModal({ isOpen, onClose, product = null, prefilledName = 
                         reference_input: 'Initial Stock (System)'
                     });
                 }
-            }
-
-            if (savedProductId) {
-                const pricingData = {
-                    ProductID: savedProductId,
-                    PricingModel: formData.PricingModel,
-                    BasePrice: ProductRetailPrice,
-                    RetailRule: ProductRetailPrice,
-                    WholesaleRule: parseFloat(formData.WholesaleRule) || 0,
-                    AgentMarkup: parseFloat(formData.AgentMarkup) || 0,
-                };
-                await updatePricing.mutateAsync([pricingData]);
             }
 
             if (onSuccess && typeof onSuccess === 'function') {
@@ -541,18 +522,18 @@ export function ProductModal({ isOpen, onClose, product = null, prefilledName = 
 
 
                                         <div className="space-y-2">
-                                            <Label htmlFor="RetailRule" className="text-gray-700 font-medium flex items-center">Retail Price</Label>
-                                            <Input id="RetailRule" name="RetailRule" type="number" step="0.01" value={formData.RetailRule} onChange={handleChange} onBlur={handlePriceBlur} className="bg-gray-50/50 focus:bg-white" />
+                                            <Label htmlFor="RetailPrice" className="text-gray-700 font-medium flex items-center">Retail Price</Label>
+                                            <Input id="RetailPrice" name="RetailPrice" type="number" step="0.01" value={formData.RetailPrice} onChange={handleChange} onBlur={handlePriceBlur} className="bg-gray-50/50 focus:bg-white" />
                                         </div>
 
                                         <div className="space-y-2">
-                                            <Label htmlFor="WholesaleRule" className="text-gray-700 font-medium flex items-center">Wholesale Price</Label>
-                                            <Input id="WholesaleRule" name="WholesaleRule" type="number" step="0.01" value={formData.WholesaleRule} onChange={handleChange} onBlur={handlePriceBlur} className="bg-gray-50/50 focus:bg-white" />
+                                            <Label htmlFor="WholesalePrice" className="text-gray-700 font-medium flex items-center">Wholesale Price</Label>
+                                            <Input id="WholesalePrice" name="WholesalePrice" type="number" step="0.01" value={formData.WholesalePrice} onChange={handleChange} onBlur={handlePriceBlur} className="bg-gray-50/50 focus:bg-white" />
                                         </div>
 
                                         <div className="space-y-2">
-                                            <Label htmlFor="AgentMarkup" className="text-gray-700 font-medium flex items-center">Agent Price</Label>
-                                            <Input id="AgentMarkup" name="AgentMarkup" type="number" step="0.01" value={formData.AgentMarkup} onChange={handleChange} onBlur={handlePriceBlur} className="bg-gray-50/50 focus:bg-white" />
+                                            <Label htmlFor="AgentPrice" className="text-gray-700 font-medium flex items-center">Agent Price</Label>
+                                            <Input id="AgentPrice" name="AgentPrice" type="number" step="0.01" value={formData.AgentPrice} onChange={handleChange} onBlur={handlePriceBlur} className="bg-gray-50/50 focus:bg-white" />
                                         </div>
                                     </div>
                                 </section>

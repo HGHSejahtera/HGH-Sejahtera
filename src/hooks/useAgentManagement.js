@@ -111,7 +111,7 @@ export const useAgentRecentOrders = (agentId) => {
             }
 
             const { data, error } = await supabase
-                .from('ImportedOrders')
+                .from('ImportOrders')
                 .select(`
                     *,
                     OrderImports!inner (
@@ -120,11 +120,10 @@ export const useAgentRecentOrders = (agentId) => {
                         Platform,
                         AccountName
                     ),
-                    ImportedOrderItems (
+                    ImportOrderItems (
                         *,
                         Products (
-                            CostPrice, Brand, ProductName, Variation, Size, Barcode,
-                            ProductPricing (AgentMarkup)
+                            CostPrice, Brand, ProductName, Variation, Size, Barcode, AgentPrice
                         )
                     )
                 `)
@@ -136,35 +135,36 @@ export const useAgentRecentOrders = (agentId) => {
             
             return (data || []).map(order => {
                 const parent = order.OrderImports;
-                const isAgentOrder = parent?.Source === 'AgentOrder';
-                const mappedItems = order.ImportedOrderItems?.map(item => {
-                    let unitPrice = Number(item.UnitPrice || 0);
-                    if (unitPrice === 0 || isAgentOrder) {
-                        if (item.Products?.ProductPricing?.AgentMarkup !== undefined && item.Products?.ProductPricing?.AgentMarkup !== null) {
-                            unitPrice = Number(item.Products.ProductPricing.AgentMarkup);
-                        }
-                    }
-                    const subtotal = unitPrice * Number(item.Quantity || 1);
+                // Calculate Order Total using snapshot
+                const mappedItems = order.ImportOrderItems?.map(item => {
+                    const unitPrice = Number(item.UnitPrice || 0);
+                    const subtotal = Number(item.Subtotal || 0);
+                    const profit = Number(item.Profit || 0);
+                    
                     return {
                         ...item,
                         UnitPrice: unitPrice,
-                        Subtotal: subtotal
+                        Subtotal: subtotal,
+                        Profit: profit
                     };
                 }) || [];
 
-                const displayAmount = mappedItems.reduce((sum, item) => sum + item.Subtotal, 0);
+                const displayAmount = Number(order.OrderAmount) || mappedItems.reduce((sum, item) => sum + item.Subtotal, 0);
+                const displayProfit = Number(order.OrderProfit) || mappedItems.reduce((sum, item) => sum + item.Profit, 0);
                 const totalItems = mappedItems.reduce((sum, item) => sum + Number(item.Quantity || 1), 0);
 
                 return {
                     ...order,
-                    ImportedOrderItems: mappedItems,
+                    ImportOrderItems: mappedItems,
                     Items: mappedItems,
                     Platform: order.Platform || parent?.Platform || 'TikTok',
                     Source: parent?.Source,
                     AccountName: parent?.AccountName || 'Main Account',
                     DisplayAmount: displayAmount,
+                    DisplayProfit: displayProfit,
                     TotalAmount: displayAmount,
                     OrderAmount: displayAmount,
+                    OrderProfit: displayProfit,
                     TotalItems: totalItems,
                     ItemCount: totalItems
                 };
@@ -219,9 +219,9 @@ export const useAgentStatement = (agentId, month, year) => {
                 .order('CreatedAt', { ascending: true });
             if (currentError) throw currentError;
 
-            // 4. Fetch Total COGS from ImportedOrders for the month
+            // 4. Fetch Total COGS from ImportOrders for the month
             const { data: cogsData, error: cogsError } = await supabase
-                .from('ImportedOrders')
+                .from('ImportOrders')
                 .select('OrderAmount, OrderImports!inner(AgentID)')
                 .eq('OrderImports.AgentID', actualAgentId)
                 .gte('CreatedAt', startDate)

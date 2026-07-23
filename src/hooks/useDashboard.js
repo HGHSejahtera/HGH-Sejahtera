@@ -28,8 +28,8 @@ export function useDashboardMetrics(timeframe = 'this_month') {
             if (salesError) throw salesError;
             const totalSales = salesData?.reduce((sum, sale) => sum + Number(sale.TotalAmount || 0), 0) || 0;
 
-            // 2. Total Orders (ImportedOrders)
-            let ordersQuery = supabase.from('ImportedOrders').select('ImportedOrderID', { count: 'exact', head: true });
+            // 2. Total Orders (ImportOrders)
+            let ordersQuery = supabase.from('ImportOrders').select('ImportOrderID', { count: 'exact', head: true });
             if (dateFilter) ordersQuery = ordersQuery.gte('CreatedAt', dateFilter);
             const { count: totalOrders, error: ordersError } = await ordersQuery;
             if (ordersError) throw ordersError;
@@ -52,20 +52,21 @@ export function useDashboardMetrics(timeframe = 'this_month') {
 
             // 5. Recent Orders
             const { data: recentOrdersData, error: recentOrdersError } = await supabase
-                .from('ImportedOrders')
+                .from('ImportOrders')
                 .select(`
-                    ImportedOrderID,
+                    ImportOrderID,
                     PlatformOrderID,
                     OrderAmount,
+                    OrderProfit,
                     OrderImports ( AgentID, Users!OrderImports_AgentID_fkey ( DisplayName ) ),
-                    ImportedOrderItems ( Quantity )
+                    ImportOrderItems ( Quantity )
                 `)
                 .order('CreatedAt', { ascending: false })
                 .limit(5);
             if (recentOrdersError) throw recentOrdersError;
 
             const recentOrders = recentOrdersData?.map(order => {
-                const totalItems = order.ImportedOrderItems?.reduce((sum, item) => sum + (item.Quantity || 0), 0) || 0;
+                const totalItems = order.ImportOrderItems?.reduce((sum, item) => sum + (item.Quantity || 0), 0) || 0;
                 
                 // For Agent Orders, the name is in OrderImports.Users.DisplayName
                 const agentName = order.OrderImports?.Users?.DisplayName;
@@ -74,7 +75,8 @@ export function useDashboardMetrics(timeframe = 'this_month') {
                     id: order.PlatformOrderID,
                     customer: agentName || 'Unknown Agent',
                     items: totalItems,
-                    total: `RM ${Number(order.OrderAmount || 0).toFixed(2)}`
+                    total: `RM ${Number(order.OrderAmount || 0).toFixed(2)}`,
+                    profit: `RM ${Number(order.OrderProfit || 0).toFixed(2)}`
                 };
             }) || [];
 

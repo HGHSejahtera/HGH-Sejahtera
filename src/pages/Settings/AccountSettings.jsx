@@ -6,18 +6,16 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { SettingsTabs } from './Settings';
 import { 
     User, 
-    KeyRound, 
     Loader2, 
     CheckCircle2, 
     AlertCircle, 
-    ShieldCheck, 
-    Mail, 
+    AlertTriangle,
     Lock, 
     Clock, 
-    IdCard,
     Shield
 } from 'lucide-react';
 
@@ -37,6 +35,7 @@ export function AccountSettings() {
 
     const [isEditingPin, setIsEditingPin] = useState(false);
     const [isEditingPassword, setIsEditingPassword] = useState(false);
+    const [isDisableModalOpen, setIsDisableModalOpen] = useState(false);
 
     // PIN state
     const [oldPin, setOldPin] = useState('');
@@ -48,40 +47,62 @@ export function AccountSettings() {
     const [confirmPassword, setConfirmPassword] = useState('');
 
     useEffect(() => {
-        const fetchProfile = async () => {
+        async function fetchProfile() {
+            if (!user?.id) return;
+            setIsLoading(true);
+
             const { data, error } = await supabase
                 .from('Users')
-                .select('StaffID, Username, Email, PINHash, Nickname')
+                .select('StaffID, Username, Email, Nickname, PINHash')
                 .eq('UserID', user.id)
                 .single();
-                
+
             if (!error && data) {
-                setProfile({ 
-                    staffId: data.StaffID || '', 
-                    username: data.Username || '', 
-                    email: data.Email || '', 
-                    nickname: data.Nickname || '' 
+                setProfile({
+                    staffId: data.StaffID || '',
+                    username: data.Username || '',
+                    email: data.Email || '',
+                    nickname: data.Nickname || ''
                 });
                 setHasPin(!!data.PINHash);
+                if (useAuthStore.getState().user) {
+                    useAuthStore.getState().user.hasPin = !!data.PINHash;
+                }
             }
             setIsLoading(false);
-        };
-
-        if (user?.id) {
-            fetchProfile();
         }
+
+        fetchProfile();
     }, [user?.id]);
+
+    const handleUpdateField = async (field, value, setStatus) => {
+        setStatus('loading');
+        const { data, error } = await supabase
+            .from('Users')
+            .update({ [field]: value })
+            .eq('UserID', user.id)
+            .select();
+
+        if (error || !data || data.length === 0) {
+            setStatus('error');
+            console.error(`Failed to update ${field}:`, error || '0 rows updated (RLS block)');
+        } else {
+            setStatus('success');
+            setTimeout(() => setStatus(''), 3000);
+        }
+    };
 
     const handleUpdateUsername = async () => {
         setUsernameStatus('loading');
-        const { error } = await supabase
+        const { data, error } = await supabase
             .from('Users')
             .update({ Username: profile.username })
-            .eq('UserID', user.id);
+            .eq('UserID', user.id)
+            .select();
             
-        if (error) {
-            console.error(error);
-            setUsernameStatus(error.code === '23505' ? 'taken' : 'error');
+        if (error || !data || data.length === 0) {
+            console.error(error || '0 rows updated (RLS block)');
+            setUsernameStatus(error?.code === '23505' ? 'taken' : 'error');
         } else {
             setUsernameStatus('success');
             setTimeout(() => setUsernameStatus(''), 3000);
@@ -93,13 +114,14 @@ export function AccountSettings() {
         const formattedNickname = profile.nickname 
             ? profile.nickname.trim().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
             : '';
-        const { error } = await supabase
+        const { data, error } = await supabase
             .from('Users')
             .update({ Nickname: formattedNickname })
-            .eq('UserID', user.id);
+            .eq('UserID', user.id)
+            .select();
             
-        if (error) {
-            console.error(error);
+        if (error || !data || data.length === 0) {
+            console.error(error || '0 rows updated (RLS block)');
             setNicknameStatus('error');
         } else {
             setProfile({ ...profile, nickname: formattedNickname });
@@ -139,6 +161,49 @@ export function AccountSettings() {
         }
     };
 
+    const handleDisablePin = () => {
+        setIsDisableModalOpen(true);
+    };
+
+    const executeDisablePin = async () => {
+        setPinStatus('loading');
+        try {
+            let success = false;
+            // 1. First attempt standardized clear_my_pin RPC (bypasses RLS reliably)
+            const { data: rpcSuccess, error: rpcError } = await supabase.rpc('clear_my_pin');
+            if (!rpcError && rpcSuccess !== false) {
+                success = true;
+            } else {
+                // 2. Fallback to direct update with .select() check to ensure row was modified
+                const { data: updatedData, error: updateError } = await supabase
+                    .from('Users')
+                    .update({ PINHash: null })
+                    .eq('UserID', user.id)
+                    .select();
+
+                if (!updateError && updatedData && updatedData.length > 0) {
+                    success = true;
+                }
+            }
+
+            if (!success) {
+                setPinStatus('error');
+            } else {
+                setHasPin(false);
+                if (useAuthStore.getState().user) {
+                    useAuthStore.getState().user.hasPin = false;
+                }
+                setPinStatus('disabled_success');
+                setIsEditingPin(false);
+                setIsDisableModalOpen(false);
+                setTimeout(() => setPinStatus(''), 3000);
+            }
+        } catch (err) {
+            console.error(err);
+            setPinStatus('error');
+        }
+    };
+
     const submitWindowsPin = async () => {
         if (!newPinStr || newPinStr.length !== 4 || newPinStr !== confirmPinStr) {
             setPinStatus('mismatch');
@@ -149,34 +214,24 @@ export function AccountSettings() {
 
         try {
             if (hasPin) {
-                const { data: userData, error: fetchError } = await supabase
-                    .from('Users')
-                    .select('PINHash')
-                    .eq('UserID', user.id)
-                    .single();
-
-                if (fetchError || !userData?.PINHash) {
-                    setPinStatus('error');
-                    return;
-                }
-
-                const hashedInputOld = btoa(oldPin);
-                if (userData.PINHash !== hashedInputOld) {
+                // Check current PIN via verify_my_pin RPC or direct comparison
+                const { data: verifySuccess, error: verifyErr } = await supabase.rpc('verify_my_pin', { entered_pin: oldPin });
+                if (verifyErr || !verifySuccess) {
                     setPinStatus('wrong_old');
                     return;
                 }
             }
 
-            const hashedNewPin = btoa(newPinStr);
-            const { error: updateError } = await supabase
-                .from('Users')
-                .update({ PINHash: hashedNewPin })
-                .eq('UserID', user.id);
+            // Save using standardized set_my_pin RPC so backend and frontend stay 100% synchronized
+            const { data: setSuccess, error: setError } = await supabase.rpc('set_my_pin', { new_pin: newPinStr });
 
-            if (updateError) {
+            if (setError || !setSuccess) {
                 setPinStatus('error');
             } else {
                 setHasPin(true);
+                if (useAuthStore.getState().user) {
+                    useAuthStore.getState().user.hasPin = true;
+                }
                 setPinStatus('success');
                 setOldPin('');
                 setNewPinStr('');
@@ -417,15 +472,30 @@ export function AccountSettings() {
                                             {hasPin ? 'PIN is currently set up and active' : 'Set a 4-digit PIN for quick unlock'}
                                         </p>
                                     </div>
-                                    <Button 
-                                        variant="outline" 
-                                        size="sm"
-                                        onClick={() => setIsEditingPin(!isEditingPin)}
-                                        className="font-semibold text-xs"
-                                    >
-                                        {isEditingPin ? 'Close' : (hasPin ? 'Change PIN' : 'Set PIN')}
-                                    </Button>
+                                    <div className="flex items-center gap-2">
+                                        {hasPin && (
+                                            <Button 
+                                                variant="destructive" 
+                                                size="sm"
+                                                onClick={handleDisablePin}
+                                                disabled={pinStatus === 'loading'}
+                                                className="font-semibold text-xs bg-red-600 hover:bg-red-700 text-white"
+                                            >
+                                                Disable PIN
+                                            </Button>
+                                        )}
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm"
+                                            onClick={() => setIsEditingPin(!isEditingPin)}
+                                            className="font-semibold text-xs"
+                                        >
+                                            {isEditingPin ? 'Close' : (hasPin ? 'Change PIN' : 'Set PIN')}
+                                        </Button>
+                                    </div>
                                 </div>
+
+                                {pinStatus === 'disabled_success' && <p className="text-xs text-emerald-600 font-medium mt-2">PIN has been disabled successfully</p>}
 
                                 {isEditingPin && (
                                     <div className="p-4 rounded-xl bg-gray-50 border border-gray-200/80 space-y-4 pt-4 mt-2">
@@ -573,6 +643,48 @@ export function AccountSettings() {
                     </div>
                 </div>
             </div>
+
+            {/* Disable PIN Confirmation Modal */}
+            <Dialog open={isDisableModalOpen} onOpenChange={setIsDisableModalOpen}>
+                <DialogContent className="max-w-md rounded-2xl p-6 border border-gray-200/80 shadow-2xl bg-white overflow-hidden">
+                    <DialogHeader>
+                        <DialogTitle className="text-lg font-bold text-gray-900">
+                            Disable POS Terminal PIN
+                        </DialogTitle>
+                    </DialogHeader>
+
+                    <p className="text-sm text-gray-600 py-2">
+                        Are you sure you want to disable and remove your terminal PIN?
+                    </p>
+
+                    <DialogFooter className="pt-2 flex items-center justify-end gap-2.5">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setIsDisableModalOpen(false)}
+                            disabled={pinStatus === 'loading'}
+                            className="text-xs font-semibold px-4 h-9"
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="button"
+                            onClick={executeDisablePin}
+                            disabled={pinStatus === 'loading'}
+                            className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-5 h-9 shadow-sm"
+                        >
+                            {pinStatus === 'loading' ? (
+                                <>
+                                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                                    Deleting...
+                                </>
+                            ) : (
+                                'Confirm Delete'
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

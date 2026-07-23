@@ -6,6 +6,7 @@ import {
     getSortedRowModel,
     useReactTable,
     getFilteredRowModel,
+    getExpandedRowModel,
 } from "@tanstack/react-table"
 import {
     Table,
@@ -18,7 +19,7 @@ import {
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { useState } from "react"
+import React, { useState } from "react"
 import { Settings2 } from "lucide-react"
 import {
     DropdownMenu,
@@ -44,7 +45,8 @@ export function DataTable({
     columnVisibility: externalColumnVisibility,
     onColumnVisibilityChange: externalOnColumnVisibilityChange,
     tableContainerClassName = "max-h-[calc(100vh-220px)] overflow-auto",
-    defaultPageSize = 100
+    defaultPageSize = 100,
+    renderSubComponent
 }) {
     const [globalFilter, setGlobalFilter] = useState("")
     const [internalColumnVisibility, setInternalColumnVisibility] = useState({})
@@ -62,6 +64,8 @@ export function DataTable({
         getPaginationRowModel: getPaginationRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
         getSortedRowModel: getSortedRowModel(),
+        getExpandedRowModel: getExpandedRowModel(),
+        getRowCanExpand: renderSubComponent ? () => true : undefined,
         onColumnVisibilityChange: setColumnVisibility,
         onSortingChange: setSorting,
         onRowSelectionChange: onRowSelectionChange,
@@ -170,18 +174,26 @@ export function DataTable({
                     </TableHeader>
                     <TableBody>
                         {(table.getState().pagination.pageSize === 999999 ? table.getRowModel().rows.slice(0, visibleLimit) : table.getRowModel().rows)?.length ? (
-                            (table.getState().pagination.pageSize === 999999 ? table.getRowModel().rows.slice(0, visibleLimit) : table.getRowModel().rows).map((row) => (
-                                <TableRow
-                                    key={row.id}
-                                    data-state={row.getIsSelected() && "selected"}
-                                >
-                                    {row.getVisibleCells().map((cell) => (
-                                        <TableCell key={cell.id} className={cell.column.columnDef.meta?.className}>
-                                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                                        </TableCell>
-                                    ))}
-                                </TableRow>
-                            ))
+                                (table.getState().pagination.pageSize === 999999 ? table.getRowModel().rows.slice(0, visibleLimit) : table.getRowModel().rows).map((row) => (
+                                    <React.Fragment key={row.id}>
+                                        <TableRow
+                                            data-state={row.getIsSelected() && "selected"}
+                                        >
+                                            {row.getVisibleCells().map((cell) => (
+                                                <TableCell key={cell.id} className={cell.column.columnDef.meta?.className}>
+                                                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                                </TableCell>
+                                            ))}
+                                        </TableRow>
+                                        {row.getIsExpanded() && renderSubComponent && (
+                                            <TableRow>
+                                                <TableCell colSpan={row.getVisibleCells().length} className="p-0 border-b bg-gray-50/50">
+                                                    {renderSubComponent({ row })}
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
+                                    </React.Fragment>
+                                ))
                         ) : (
                             <TableRow>
                                 <TableCell colSpan={columns.length} className="h-24 text-center">

@@ -11,7 +11,7 @@ export function SortOrders(OrdersList, SortBy = 'Product') {
 
     // Helper to generate SKU combo summary and Longgokan group for an order
     const EnrichedOrders = OrdersList.map(Order => {
-        const Items = Order.Items || Order.ImportedOrderItems || [];
+        const Items = Order.Items || Order.ImportOrderItems || [];
         
         const DistinctSkuNames = [];
         const DistinctBrands = [];
@@ -156,7 +156,7 @@ export async function MergeAndPrintAwbs(OrdersList, onProgress = null) {
 
     for (let i = 0; i < ValidOrders.length; i++) {
         const Order = ValidOrders[i];
-        const orderIdDisplay = Order.PlatformOrderID || Order.ImportedOrderID || `Order #${i + 1}`;
+        const orderIdDisplay = Order.PlatformOrderID || Order.ImportOrderID || `Order #${i + 1}`;
         
         if (onProgress) {
             onProgress({
@@ -183,7 +183,7 @@ export async function MergeAndPrintAwbs(OrdersList, onProgress = null) {
                 const SourcePdf = await PDFDocument.load(pdfArrayBuffer);
                 const CopiedPages = await MergedPdf.copyPages(SourcePdf, SourcePdf.getPageIndices());
                 CopiedPages.forEach(Page => MergedPdf.addPage(Page));
-                SuccessfulOrderIds.push(Order.ImportedOrderID);
+                SuccessfulOrderIds.push(Order.ImportOrderID);
                 fetchSuccess = true;
                 break;
             } catch (error) {
@@ -297,7 +297,7 @@ export async function MergeAwbsBatch(OrdersList, onProgress = null) {
 
     for (let i = 0; i < ValidOrders.length; i++) {
         const Order = ValidOrders[i];
-        const orderIdDisplay = Order.PlatformOrderID || Order.ImportedOrderID || `Order #${i + 1}`;
+        const orderIdDisplay = Order.PlatformOrderID || Order.ImportOrderID || `Order #${i + 1}`;
         
         if (onProgress) {
             onProgress({
@@ -323,7 +323,7 @@ export async function MergeAwbsBatch(OrdersList, onProgress = null) {
                 const SourcePdf = await PDFDocument.load(pdfArrayBuffer);
                 const CopiedPages = await MergedPdf.copyPages(SourcePdf, SourcePdf.getPageIndices());
                 CopiedPages.forEach(Page => MergedPdf.addPage(Page));
-                SuccessfulOrderIds.push(Order.ImportedOrderID);
+                SuccessfulOrderIds.push(Order.ImportOrderID);
                 fetchSuccess = true;
                 break;
             } catch (error) {
@@ -335,7 +335,7 @@ export async function MergeAwbsBatch(OrdersList, onProgress = null) {
                     ErrorsList.push({ orderId: orderIdDisplay, error: errorMsg });
                     FailedOrdersList.push({
                         orderId: orderIdDisplay,
-                        importedOrderId: Order.ImportedOrderID,
+                        importedOrderId: Order.ImportOrderID,
                         error: errorMsg,
                         order: Order
                     });

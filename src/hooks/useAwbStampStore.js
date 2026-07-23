@@ -24,7 +24,7 @@ export const useAwbStampStore = create((set) => ({
 
         // Deduplicate and format items for queue
         const formattedQueue = items.map(item => ({
-            orderId: item.orderId || item.ImportedOrderID || item.OrderID || '',
+            orderId: item.orderId || item.ImportOrderID || item.OrderID || '',
             platformOrderId: item.platformOrderId || item.PlatformOrderID || item.AWBNumber || '-',
             awbUrl: item.awbUrl || item.AwbUrl || '',
             targetSku: item.targetSku || item.PlatformSKU || item.SellerSKU || item.Barcode || '-',

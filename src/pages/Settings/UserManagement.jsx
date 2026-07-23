@@ -1,14 +1,111 @@
 import { useState, useEffect, useCallback } from 'react';
 
-import { UserPlus, Shield, Check, X, Users } from 'lucide-react';
+import { UserPlus, Shield, Check, X, Users, KeyRound, Loader2, Trash2, Edit2, AlertTriangle, AlertCircle } from 'lucide-react';
 import { DataTable } from '@/components/common/DataTable';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { supabase } from '@/lib/supabase';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useAuthStore } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 
 import { SettingsTabs } from './Settings';
+
+function DeveloperPinDirectory({ pins, isLoading, onResetPin, onClearPin }) {
+    if (isLoading) {
+        return (
+            <div className="bg-slate-900 text-white rounded-xl p-6 border border-slate-800 flex items-center justify-center min-h-[120px]">
+                <Loader2 className="w-6 h-6 animate-spin text-indigo-400 mr-3" />
+                <span className="text-sm font-medium text-slate-300">Loading Developer PIN Directory...</span>
+            </div>
+        );
+    }
+
+    return (
+        <div className="bg-slate-900 text-white rounded-xl shadow-lg border border-slate-800 overflow-hidden">
+            <div className="p-6 border-b border-slate-800 bg-slate-950/60 flex items-center justify-between">
+                <div>
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                        <KeyRound className="w-5 h-5 text-amber-400" />
+                        Developer PIN Directory
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-1">
+                        Exclusively accessible to Developer role. View exact 4-digit terminal PIN codes or clear forgotten PINs instantly.
+                    </p>
+                </div>
+                <span className="text-xs font-semibold px-2.5 py-1 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                    Developer Vault
+                </span>
+            </div>
+
+            <div className="p-6">
+                {pins.length === 0 ? (
+                    <p className="text-sm text-slate-500 text-center py-6">No users found in PIN directory.</p>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {pins.map((user) => {
+                            const isSet = user.DecodedPIN && user.DecodedPIN !== 'Not Set';
+                            return (
+                                <div 
+                                    key={user.UserID}
+                                    className="bg-slate-800/80 rounded-lg p-4 border border-slate-700/80 flex flex-col justify-between gap-3"
+                                >
+                                    <div className="flex items-start justify-between gap-2">
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-bold text-slate-100 text-sm">{user.DisplayName}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <span className="text-xs font-mono text-slate-400">{user.StaffID || 'No Staff ID'}</span>
+                                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-700 text-slate-300 uppercase">
+                                                    {user.Role}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center justify-between pt-2 border-t border-slate-700/60 mt-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs text-slate-400">PIN:</span>
+                                            <span className={`font-mono font-bold text-sm px-2 py-0.5 rounded ${isSet ? 'bg-amber-400/10 text-amber-300 border border-amber-400/30 tracking-widest' : 'bg-slate-700/50 text-slate-500 italic'}`}>
+                                                {user.DecodedPIN}
+                                            </span>
+                                        </div>
+
+                                        <div className="flex items-center gap-1.5">
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                onClick={() => onResetPin(user)}
+                                                className="h-7 px-2.5 text-xs bg-slate-700 hover:bg-slate-600 text-slate-200"
+                                                title="Set new PIN"
+                                            >
+                                                <Edit2 className="w-3 h-3 mr-1" /> Set
+                                            </Button>
+                                            {isSet && (
+                                                <Button
+                                                    size="sm"
+                                                    variant="destructive"
+                                                    onClick={() => onClearPin(user)}
+                                                    className="h-7 px-2.5 text-xs bg-red-600/80 hover:bg-red-600 text-white"
+                                                    title="Clear PIN"
+                                                >
+                                                    <Trash2 className="w-3 h-3" />
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
 
 function PendingUserCard({ user, onApprove, onReject }) {
     const [SelectedRole, setSelectedRole] = useState('Agent');
@@ -37,7 +134,7 @@ function PendingUserCard({ user, onApprove, onReject }) {
                 >
                     <Check className="w-4 h-4 mr-1" /> Approve
                 </Button>
-                <Button variant="destructive" onClick={() => onReject(user.UserID)}>
+                <Button variant="destructive" onClick={() => onReject(user)}>
                     <X className="w-4 h-4 mr-1" /> Reject
                 </Button>
             </div>
@@ -51,6 +148,26 @@ export function UserManagement() {
     const currentUserRole = user?.role || 'Staff';
     const [ActiveUsers, setActiveUsers] = useState([]);
     const [PendingUsers, setPendingUsers] = useState([]);
+    const [DeveloperPins, setDeveloperPins] = useState([]);
+    const [IsLoadingPins, setIsLoadingPins] = useState(false);
+
+    const [rejectTarget, setRejectTarget] = useState(null);
+    const [resetPinTarget, setResetPinTarget] = useState(null);
+    const [clearPinTarget, setClearPinTarget] = useState(null);
+    const [newPinInput, setNewPinInput] = useState('');
+    const [isActionLoading, setIsActionLoading] = useState(false);
+
+    const fetchDeveloperPins = useCallback(async () => {
+        if (currentUserRole !== 'Developer') return;
+        setIsLoadingPins(true);
+        const { data, error } = await supabase.rpc('developer_get_user_pins');
+        if (error) {
+            console.error('Error fetching developer PINs:', error);
+        } else if (data) {
+            setDeveloperPins(data);
+        }
+        setIsLoadingPins(false);
+    }, [currentUserRole]);
 
     const fetchUsers = useCallback(async () => {
         const { data, error } = await supabase
@@ -71,7 +188,11 @@ export function UserManagement() {
             setActiveUsers(active);
             setPendingUsers(data.filter(u => u.Role === 'Pending'));
         }
-    }, [currentUserRole]);
+
+        if (currentUserRole === 'Developer') {
+            fetchDeveloperPins();
+        }
+    }, [currentUserRole, fetchDeveloperPins]);
 
     useEffect(() => {
         fetchUsers(); // eslint-disable-line react-hooks/set-state-in-effect
@@ -114,20 +235,27 @@ export function UserManagement() {
         }
     };
 
-    const handleReject = async (userId) => {
-        if (window.confirm('Adakah anda pasti mahu menolak (reject) pengguna ini? Mereka tidak akan dapat login.')) {
-            const { error } = await supabase
-                .from('Users')
-                .update({ Role: 'Rejected', IsActive: false })
-                .eq('UserID', userId);
-                
-            if (error) {
-                console.error('Error rejecting user:', error);
-                toast.error('Failed to reject user');
-            } else {
-                toast.success('User Rejected');
-                fetchUsers();
-            }
+    const handleReject = (targetUser) => {
+        setRejectTarget(targetUser);
+    };
+
+    const executeReject = async () => {
+        if (!rejectTarget) return;
+        setIsActionLoading(true);
+        const userId = typeof rejectTarget === 'string' ? rejectTarget : rejectTarget.UserID;
+        const { error } = await supabase
+            .from('Users')
+            .update({ Role: 'Rejected', IsActive: false })
+            .eq('UserID', userId);
+            
+        setIsActionLoading(false);
+        if (error) {
+            console.error('Error rejecting user:', error);
+            toast.error('Failed to reject user');
+        } else {
+            toast.success('User Rejected');
+            setRejectTarget(null);
+            fetchUsers();
         }
     };
 
@@ -140,6 +268,59 @@ export function UserManagement() {
             
         if (!error) {
             fetchUsers();
+        }
+    };
+
+    const handleResetPin = (targetUser) => {
+        setResetPinTarget(targetUser);
+        setNewPinInput('');
+    };
+
+    const executeResetPin = async () => {
+        if (!resetPinTarget) return;
+        if (newPinInput.trim().length !== 4 || isNaN(newPinInput.trim())) {
+            toast.error('PIN must be exactly 4 numeric digits');
+            return;
+        }
+
+        setIsActionLoading(true);
+        const { error } = await supabase.rpc('developer_reset_user_pin', {
+            target_user_id: resetPinTarget.UserID,
+            new_pin: newPinInput.trim()
+        });
+        setIsActionLoading(false);
+
+        if (error) {
+            console.error('Error resetting PIN:', error);
+            toast.error('Failed to reset user PIN');
+        } else {
+            toast.success(`PIN updated to ${newPinInput.trim()} for ${resetPinTarget.DisplayName}`);
+            setResetPinTarget(null);
+            setNewPinInput('');
+            fetchDeveloperPins();
+        }
+    };
+
+    const handleClearPin = (targetUser) => {
+        setClearPinTarget(targetUser);
+    };
+
+    const executeClearPin = async () => {
+        if (!clearPinTarget) return;
+        setIsActionLoading(true);
+        const { error } = await supabase.rpc('developer_reset_user_pin', {
+            target_user_id: clearPinTarget.UserID,
+            new_pin: null
+        });
+        setIsActionLoading(false);
+
+        if (error) {
+            console.error('Error clearing PIN:', error);
+            toast.error('Failed to clear user PIN');
+        } else {
+            toast.success(`PIN cleared for ${clearPinTarget.DisplayName}`);
+            setClearPinTarget(null);
+            fetchDeveloperPins();
         }
     };
 
@@ -203,6 +384,15 @@ export function UserManagement() {
 
             <SettingsTabs />
 
+            {currentUserRole === 'Developer' && (
+                <DeveloperPinDirectory
+                    pins={DeveloperPins}
+                    isLoading={IsLoadingPins}
+                    onResetPin={handleResetPin}
+                    onClearPin={handleClearPin}
+                />
+            )}
+
             {PendingUsers.length > 0 && (
                 <div className="bg-orange-50 border border-orange-200 rounded-xl p-6">
                     <h3 className="text-lg font-semibold text-orange-800 mb-4 flex items-center">
@@ -241,7 +431,105 @@ export function UserManagement() {
                     </div>
                 )}
             </div>
+
+            {/* Reject User Confirmation Modal */}
+            <Dialog open={!!rejectTarget} onOpenChange={(open) => !open && setRejectTarget(null)}>
+                <DialogContent className="max-w-md rounded-2xl p-6 border border-gray-200/80 shadow-2xl bg-white overflow-hidden">
+                    <DialogHeader>
+                        <DialogTitle className="text-lg font-bold text-gray-900">
+                            Reject User Registration
+                        </DialogTitle>
+                    </DialogHeader>
+                    <p className="text-sm text-gray-600 py-2">
+                        Are you sure you want to reject this user registration?
+                    </p>
+                    <DialogFooter className="pt-2 flex justify-end gap-2.5">
+                        <Button variant="outline" onClick={() => setRejectTarget(null)} disabled={isActionLoading} className="text-xs font-semibold px-4 h-9">
+                            Cancel
+                        </Button>
+                        <Button variant="destructive" onClick={executeReject} disabled={isActionLoading} className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-5 h-9">
+                            {isActionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
+                            Confirm Delete
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Set PIN Modal */}
+            <Dialog open={!!resetPinTarget} onOpenChange={(open) => !open && setResetPinTarget(null)}>
+                <DialogContent className="max-w-xl rounded-2xl p-6 border border-slate-800 shadow-2xl bg-slate-900 text-white overflow-hidden">
+                    <DialogHeader className="space-y-3 pb-2">
+                        <div className="flex items-center gap-3">
+                            <div className="w-11 h-11 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0 shadow-sm">
+                                <KeyRound className="w-6 h-6" />
+                            </div>
+                            <div>
+                                <DialogTitle className="text-xl font-bold text-white tracking-tight">
+                                    Set POS Terminal PIN
+                                </DialogTitle>
+                                <DialogDescription className="text-xs text-slate-400 font-medium mt-0.5">
+                                    Set a 4-digit numeric PIN for quick unlock
+                                </DialogDescription>
+                            </div>
+                        </div>
+                    </DialogHeader>
+                    <div className="py-4 space-y-4">
+                        <div className="p-3.5 rounded-xl bg-slate-800/80 border border-slate-700/80 text-xs text-slate-300 flex items-center justify-between">
+                            <span>Target Account</span>
+                            <span className="font-mono font-bold text-amber-300 bg-slate-950 px-2.5 py-1 rounded border border-slate-700">
+                                {resetPinTarget?.DisplayName} (@{resetPinTarget?.Username})
+                            </span>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="newPinInput" className="text-xs font-semibold text-slate-200">
+                                Enter 4-Digit Numeric PIN
+                            </Label>
+                            <Input
+                                id="newPinInput"
+                                type="text"
+                                maxLength={4}
+                                value={newPinInput}
+                                onChange={(e) => setNewPinInput(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                                className="h-11 bg-slate-950 border-slate-700 text-white font-mono text-center text-lg tracking-widest rounded-xl focus-visible:ring-amber-400"
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter className="pt-4 border-t border-slate-800 flex justify-end gap-2.5">
+                        <Button variant="ghost" onClick={() => setResetPinTarget(null)} disabled={isActionLoading} className="text-xs font-semibold px-4 h-9 text-slate-300 hover:bg-slate-800">
+                            Cancel
+                        </Button>
+                        <Button onClick={executeResetPin} disabled={isActionLoading || newPinInput.length !== 4} className="bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold px-5 h-9">
+                            {isActionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
+                            Save PIN
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Clear PIN Modal */}
+            <Dialog open={!!clearPinTarget} onOpenChange={(open) => !open && setClearPinTarget(null)}>
+                <DialogContent className="max-w-md rounded-2xl p-6 border border-slate-800 shadow-2xl bg-slate-900 text-white overflow-hidden">
+                    <DialogHeader>
+                        <DialogTitle className="text-lg font-bold text-white">
+                            Clear POS Terminal PIN
+                        </DialogTitle>
+                    </DialogHeader>
+                    <p className="text-sm text-slate-300 py-2">
+                        Are you sure you want to clear and remove the PIN for <strong className="text-white">{clearPinTarget?.DisplayName}</strong>?
+                    </p>
+                    <DialogFooter className="pt-2 flex justify-end gap-2.5">
+                        <Button variant="ghost" onClick={() => setClearPinTarget(null)} disabled={isActionLoading} className="text-xs font-semibold px-4 h-9 text-slate-300 hover:bg-slate-800">
+                            Cancel
+                        </Button>
+                        <Button variant="destructive" onClick={executeClearPin} disabled={isActionLoading} className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-5 h-9">
+                            {isActionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
+                            Confirm Delete
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
+
 

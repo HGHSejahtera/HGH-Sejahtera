@@ -10,10 +10,10 @@ export function useProductMatcher() {
         queryKey: ['unmatched_items'],
         queryFn: async () => {
             const { data, error } = await supabase
-                .from('ImportedOrderItems')
+                .from('ImportOrderItems')
                 .select(`
                     *,
-                    ImportedOrders (
+                    ImportOrders (
                         PlatformOrderID,
                         Platform,
                         AwbUrl,
@@ -33,7 +33,7 @@ export function useProductMatcher() {
             if (error) throw error;
 
             return data.map(item => {
-                const parent = item.ImportedOrders?.OrderImports;
+                const parent = item.ImportOrders?.OrderImports;
                 let agentName = 'Direct Sale';
                 if (parent?.Users) {
                     agentName = parent.Users.Nickname || parent.Users.DisplayName || parent.Users.StaffID;
@@ -43,9 +43,9 @@ export function useProductMatcher() {
 
                 return {
                     ...item,
-                    PlatformOrderID: item.ImportedOrders?.PlatformOrderID,
-                    Platform: item.ImportedOrders?.Platform,
-                    AwbUrl: item.ImportedOrders?.AwbUrl,
+                    PlatformOrderID: item.ImportOrders?.PlatformOrderID,
+                    Platform: item.ImportOrders?.Platform,
+                    AwbUrl: item.ImportOrders?.AwbUrl,
                     AgentName: agentName
                 };
             });
@@ -70,6 +70,7 @@ export function useProductMatcher() {
                     TotalQuantity: 0,
                     AffectedOrders: new Set(),
                     ItemIDs: [],
+                    Items: [],
                     Agents: new Set(),
                     FirstItemID: item.ItemID,
                     SampleItem: item
@@ -78,8 +79,11 @@ export function useProductMatcher() {
 
             const entry = map.get(key);
             entry.TotalQuantity += Number(item.Quantity || 1);
-            if (item.ImportedOrderID) entry.AffectedOrders.add(item.ImportedOrderID);
-            if (item.ItemID) entry.ItemIDs.push(item.ItemID);
+            if (item.ImportOrderID) entry.AffectedOrders.add(item.ImportOrderID);
+            if (item.ItemID) {
+                entry.ItemIDs.push(item.ItemID);
+                entry.Items.push(item);
+            }
             if (item.AgentName) entry.Agents.add(item.AgentName);
         });
 
@@ -93,7 +97,7 @@ export function useProductMatcher() {
     const resolveItemMutation = useMutation({
         mutationFn: async ({ itemId, productId }) => {
             const itemObj = unmatchedItems.find(i => i.ItemID === itemId);
-            const affectedOrderId = itemObj?.ImportedOrderID;
+            const affectedOrderId = itemObj?.ImportOrderID;
 
             const { data, error } = await supabase.rpc('resolve_unmatched_items_batch', {
                 p_item_ids: [itemId],
@@ -109,14 +113,14 @@ export function useProductMatcher() {
 
                 if (targetSku && targetSku !== '-') {
                     const { data: affectedOrders } = await supabase
-                        .from('ImportedOrders')
-                        .select('ImportedOrderID, PlatformOrderID, AwbUrl')
-                        .eq('ImportedOrderID', affectedOrderId)
+                        .from('ImportOrders')
+                        .select('ImportOrderID, PlatformOrderID, AwbUrl')
+                        .eq('ImportOrderID', affectedOrderId)
                         .not('AwbUrl', 'is', null);
 
                     if (affectedOrders && affectedOrders.length > 0) {
                         syncQueueItems = affectedOrders.map(o => ({
-                            orderId: o.ImportedOrderID,
+                            orderId: o.ImportOrderID,
                             platformOrderId: o.PlatformOrderID,
                             awbUrl: o.AwbUrl,
                             targetSku: targetSku
@@ -146,8 +150,8 @@ export function useProductMatcher() {
         mutationFn: async ({ itemIds, productId }) => {
             const affectedOrderIds = Array.from(new Set(
                 unmatchedItems
-                    .filter(i => itemIds.includes(i.ItemID) && i.ImportedOrderID)
-                    .map(i => i.ImportedOrderID)
+                    .filter(i => itemIds.includes(i.ItemID) && i.ImportOrderID)
+                    .map(i => i.ImportOrderID)
             ));
 
             const { data, error } = await supabase.rpc('resolve_unmatched_items_batch', {
@@ -164,14 +168,14 @@ export function useProductMatcher() {
 
                 if (targetSku && targetSku !== '-') {
                     const { data: affectedOrders } = await supabase
-                        .from('ImportedOrders')
-                        .select('ImportedOrderID, PlatformOrderID, AwbUrl')
-                        .in('ImportedOrderID', affectedOrderIds)
+                        .from('ImportOrders')
+                        .select('ImportOrderID, PlatformOrderID, AwbUrl')
+                        .in('ImportOrderID', affectedOrderIds)
                         .not('AwbUrl', 'is', null);
 
                     if (affectedOrders && affectedOrders.length > 0) {
                         syncQueueItems = affectedOrders.map(o => ({
-                            orderId: o.ImportedOrderID,
+                            orderId: o.ImportOrderID,
                             platformOrderId: o.PlatformOrderID,
                             awbUrl: o.AwbUrl,
                             targetSku: targetSku
@@ -197,6 +201,22 @@ export function useProductMatcher() {
         }
     });
 
+    const unresolveItemMutation = useMutation({
+        mutationFn: async ({ itemId }) => {
+            const { data, error } = await supabase.rpc('unresolve_order_item', {
+                p_item_id: itemId
+            });
+            if (error) throw error;
+            return data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['unmatched_items'] });
+            queryClient.invalidateQueries({ queryKey: ['active_orders'] });
+            queryClient.invalidateQueries({ queryKey: ['order_history'] });
+            queryClient.invalidateQueries({ queryKey: ['all_orders'] });
+        }
+    });
+
     return {
         unmatchedItems,
         uniqueUnmatched,
@@ -205,6 +225,8 @@ export function useProductMatcher() {
         resolveItem: resolveItemMutation.mutateAsync,
         isResolving: resolveItemMutation.isPending,
         resolveBatch: resolveBatchMutation.mutateAsync,
-        isResolvingBatch: resolveBatchMutation.isPending
+        isResolvingBatch: resolveBatchMutation.isPending,
+        unresolveItem: unresolveItemMutation.mutateAsync,
+        isUnresolving: unresolveItemMutation.isPending
     };
 }

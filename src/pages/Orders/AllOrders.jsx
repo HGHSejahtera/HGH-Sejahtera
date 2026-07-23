@@ -112,7 +112,7 @@ export function AllOrders() {
     const [isClosing, setIsClosing] = useState(false);
     const [viewAwbUrl, setViewAwbUrl] = useState(null);
 
-    const { resolveBatch, uniqueUnmatched } = useProductMatcher();
+    const { resolveBatch, uniqueUnmatched, unresolveItem, isUnresolving } = useProductMatcher();
     const [IsProductModalOpen, SetIsProductModalOpen] = useState(false);
     const [SkuReviewItem, SetSkuReviewItem] = useState(null);
     const [MatchOrderModalData, SetMatchOrderModalData] = useState(null);
@@ -122,7 +122,7 @@ export function AllOrders() {
     };
 
     const handleOpenProductCreateModal = (order, targetItem = null) => {
-        const items = order.Items || order.ImportedOrderItems || [];
+        const items = order.Items || order.ImportOrderItems || [];
         const unmatchedItem = targetItem || items.find(i => !i.ProductID || i.PlatformSKU === '-' || i.MatchStatus === 'Unmatched');
 
         if (!unmatchedItem) {
@@ -137,9 +137,9 @@ export function AllOrders() {
         if (!SkuReviewItem || !newProductId) return;
 
         try {
-            if (SkuReviewItem.ImportedOrderID) {
+            if (SkuReviewItem.ImportOrderID) {
                 const resolvedSessionIds = new Set(JSON.parse(localStorage.getItem('HGH_ResolvedStatusOrders') || '[]'));
-                resolvedSessionIds.add(SkuReviewItem.ImportedOrderID);
+                resolvedSessionIds.add(SkuReviewItem.ImportOrderID);
                 localStorage.setItem('HGH_ResolvedStatusOrders', JSON.stringify(Array.from(resolvedSessionIds)));
             }
 
@@ -183,10 +183,10 @@ export function AllOrders() {
 
         orders.forEach(o => {
             const isMissingAwb = !o.AwbUrl || o.AwbUrl.trim() === '';
-            const hasUnmatched = (o.Items || o.ImportedOrderItems)?.some(
+            const hasUnmatched = (o.Items || o.ImportOrderItems)?.some(
                 i => !i.ProductID || i.PlatformSKU === '-' || i.MatchStatus === 'Unmatched'
-            ) || (Number(o.DisplayAmount || 0) === 0 && (o.Items?.length > 0 || o.ImportedOrderItems?.length > 0));
-            const isResolvedProblem = (o.Items || o.ImportedOrderItems)?.some(i => i.MatchStatus === 'ManualMatch') || resolvedSessionIds.has(o.ImportedOrderID);
+            ) ;
+            const isResolvedProblem = (o.Items || o.ImportOrderItems)?.some(i => i.MatchStatus === 'ManualMatch') || resolvedSessionIds.has(o.ImportOrderID);
 
             const isProblemOrResolved = isMissingAwb || hasUnmatched || isResolvedProblem;
             if (!isProblemOrResolved) return;
@@ -240,7 +240,7 @@ export function AllOrders() {
             Printed.sort((a, b) => {
                 const getWeight = (o) => {
                     if (!o.AwbUrl || o.AwbUrl.trim() === '') return 1;
-                    const hasUnmatched = (o.Items || o.ImportedOrderItems)?.some(i => !i.ProductID || i.PlatformSKU === '-' || i.MatchStatus === 'Unmatched') || Number(o.DisplayAmount || 0) === 0;
+                    const hasUnmatched = (o.Items || o.ImportOrderItems)?.some(i => !i.ProductID || i.PlatformSKU === '-' || i.MatchStatus === 'Unmatched') ;
                     if (hasUnmatched) return 2;
                     return 3;
                 };
@@ -258,10 +258,10 @@ export function AllOrders() {
         const resolvedSessionIds = new Set(JSON.parse(localStorage.getItem('HGH_ResolvedStatusOrders') || '[]'));
         let filtered = orders.filter(o => {
             const isMissingAwb = !o.AwbUrl || o.AwbUrl.trim() === '';
-            const hasUnmatched = (o.Items || o.ImportedOrderItems)?.some(
+            const hasUnmatched = (o.Items || o.ImportOrderItems)?.some(
                 i => !i.ProductID || i.PlatformSKU === '-' || i.MatchStatus === 'Unmatched'
-            ) || (Number(o.DisplayAmount || 0) === 0 && (o.Items?.length > 0 || o.ImportedOrderItems?.length > 0));
-            const isResolvedProblem = (o.Items || o.ImportedOrderItems)?.some(i => i.MatchStatus === 'ManualMatch') || resolvedSessionIds.has(o.ImportedOrderID);
+            ) ;
+            const isResolvedProblem = (o.Items || o.ImportOrderItems)?.some(i => i.MatchStatus === 'ManualMatch') || resolvedSessionIds.has(o.ImportOrderID);
 
             const isProblemOrResolved = isMissingAwb || hasUnmatched || isResolvedProblem;
             if (!isProblemOrResolved) return false;
@@ -286,7 +286,7 @@ export function AllOrders() {
             filtered.sort((a, b) => {
                 const getWeight = (o) => {
                     if (!o.AwbUrl || o.AwbUrl.trim() === '') return 1;
-                    const hasUnmatched = (o.Items || o.ImportedOrderItems)?.some(i => !i.ProductID || i.PlatformSKU === '-' || i.MatchStatus === 'Unmatched') || Number(o.DisplayAmount || 0) === 0;
+                    const hasUnmatched = (o.Items || o.ImportOrderItems)?.some(i => !i.ProductID || i.PlatformSKU === '-' || i.MatchStatus === 'Unmatched') ;
                     if (hasUnmatched) return 2;
                     return 3;
                 };
@@ -411,11 +411,11 @@ export function AllOrders() {
             )
         },
         {
-            header: () => <div className="text-right">Amount</div>,
-            accessorKey: 'DisplayAmount',
+            header: () => <div className="text-right">Profit</div>,
+            accessorKey: 'DisplayProfit',
             cell: ({ row }) => (
                 <div className="text-right font-medium text-emerald-600">
-                    {formatCurrency(row.original.DisplayAmount)}
+                    {formatCurrency(row.original.DisplayProfit)}
                 </div>
             )
         },
@@ -424,9 +424,9 @@ export function AllOrders() {
             id: 'review',
             cell: ({ row }) => {
                 const isMissingAwb = !row.original.AwbUrl || row.original.AwbUrl.trim() === '';
-                const hasUnmatched = (row.original.Items || row.original.ImportedOrderItems)?.some(
+                const hasUnmatched = (row.original.Items || row.original.ImportOrderItems)?.some(
                     i => !i.ProductID || i.PlatformSKU === '-' || i.MatchStatus === 'Unmatched'
-                ) || (Number(row.original.DisplayAmount || 0) === 0 && (row.original.Items?.length > 0 || row.original.ImportedOrderItems?.length > 0));
+                ) ;
 
                 return (
                     <div className="flex justify-center items-center gap-1.5 flex-wrap">
@@ -557,11 +557,11 @@ export function AllOrders() {
             )
         },
         {
-            header: () => <div className="text-right">Amount</div>,
-            accessorKey: 'DisplayAmount',
+            header: () => <div className="text-right">Profit</div>,
+            accessorKey: 'DisplayProfit',
             cell: ({ row }) => (
                 <div className="text-right font-medium text-emerald-600">
-                    {formatCurrency(row.original.DisplayAmount)}
+                    {formatCurrency(row.original.DisplayProfit)}
                 </div>
             )
         },
@@ -579,9 +579,9 @@ export function AllOrders() {
             ),
             id: 'status',
             cell: ({ row }) => {
-                const hasUnmatched = (row.original.Items || row.original.ImportedOrderItems)?.some(
+                const hasUnmatched = (row.original.Items || row.original.ImportOrderItems)?.some(
                     i => !i.ProductID || i.PlatformSKU === '-' || i.MatchStatus === 'Unmatched'
-                ) || (Number(row.original.DisplayAmount || 0) === 0 && (row.original.Items?.length > 0 || row.original.ImportedOrderItems?.length > 0));
+                ) ;
 
                 return (
                     <div className="flex justify-center items-center">
@@ -705,11 +705,11 @@ export function AllOrders() {
             )
         },
         {
-            header: () => <div className="text-right">Amount</div>,
-            accessorKey: 'DisplayAmount',
+            header: () => <div className="text-right">Profit</div>,
+            accessorKey: 'DisplayProfit',
             cell: ({ row }) => (
                 <div className="text-right font-medium text-emerald-600">
-                    {formatCurrency(row.original.DisplayAmount)}
+                    {formatCurrency(row.original.DisplayProfit)}
                 </div>
             )
         },
@@ -728,9 +728,9 @@ export function AllOrders() {
             id: 'status',
             cell: ({ row }) => {
                 const isMissingAwb = !row.original.AwbUrl || row.original.AwbUrl.trim() === '';
-                const hasUnmatched = (row.original.Items || row.original.ImportedOrderItems)?.some(
+                const hasUnmatched = (row.original.Items || row.original.ImportOrderItems)?.some(
                     i => !i.ProductID || i.PlatformSKU === '-' || i.MatchStatus === 'Unmatched'
-                ) || (Number(row.original.DisplayAmount || 0) === 0 && (row.original.Items?.length > 0 || row.original.ImportedOrderItems?.length > 0));
+                ) ;
 
                 return (
                     <div className="flex justify-center items-center gap-1.5 flex-wrap py-0.5">
@@ -1254,8 +1254,8 @@ export function AllOrders() {
                         {/* Content */}
                         <div className="p-6 overflow-y-auto flex-1 space-y-6">
                             {(() => {
-                                const orderItems = selectedOrder.Items || selectedOrder.ImportedOrderItems || [];
-                                const hasUnmatchedItems = orderItems.some(i => !i.ProductID || i.PlatformSKU === '-' || i.MatchStatus === 'Unmatched') || Number(selectedOrder.DisplayAmount || 0) === 0;
+                                const orderItems = selectedOrder.Items || selectedOrder.ImportOrderItems || [];
+                                const hasUnmatchedItems = orderItems.some(i => !i.ProductID || i.PlatformSKU === '-' || i.MatchStatus === 'Unmatched') ;
                                 const isMissingAwb = !selectedOrder.AwbUrl || selectedOrder.AwbUrl.trim() === '';
 
                                 return (
@@ -1278,7 +1278,7 @@ export function AllOrders() {
                                                 <div className="flex-1 text-xs">
                                                     <p className="font-bold text-sm">Action Required</p>
                                                     <p className="mt-1 text-amber-800 leading-relaxed">
-                                                        One or more items in this order have no Seller SKU. Commission and Total Amount will remain RM 0.00 until matched.
+                                                        One or more items in this order have no Seller SKU. Commission and Total Profit will remain RM 0.00 until matched.
                                                     </p>
                                                     <Button
                                                         variant="outline"
@@ -1295,8 +1295,8 @@ export function AllOrders() {
                                         {/* Key Metrics */}
                                         <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-none border">
                                             <div>
-                                                <p className="text-gray-500 mb-1">Total Amount</p>
-                                                <p className="text-lg font-bold text-gray-900">{formatCurrency(selectedOrder.TotalAmount || selectedOrder.DisplayAmount)}</p>
+                                                <p className="text-gray-500 mb-1">Total Profit</p>
+                                                <p className="text-lg font-bold text-gray-900">{formatCurrency(selectedOrder.OrderProfit || selectedOrder.DisplayProfit)}</p>
                                             </div>
                                             <div>
                                                 <p className="text-gray-500 mb-1">Items Count</p>
@@ -1397,11 +1397,32 @@ export function AllOrders() {
                                                                             </button>
                                                                         </div>
                                                                     )}
+                                                                    {!isUnmatched && item.MatchStatus === 'ManualMatch' && (
+                                                                        <div className="flex items-center">
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={async () => {
+                                                                                    if (window.confirm('Are you sure you want to un-match this item?')) {
+                                                                                        try {
+                                                                                            await unresolveItem({ itemId: item.ItemID });
+                                                                                            // Query invalidation handles the refresh
+                                                                                        } catch (error) {
+                                                                                            alert(error.message || 'Failed to un-match item');
+                                                                                        }
+                                                                                    }
+                                                                                }}
+                                                                                disabled={isUnresolving}
+                                                                                className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 hover:bg-rose-200 text-rose-800 border border-rose-300 cursor-pointer transition-colors disabled:opacity-50"
+                                                                            >
+                                                                                Un-match
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                             </div>
                                                             <div className="ml-4 text-right">
                                                                 <div className="text-sm font-bold text-gray-900">x{item.Quantity}</div>
-                                                                <div className="text-xs font-medium text-emerald-600 mt-0.5">{formatCurrency(item.Subtotal)}</div>
+                                                                <div className="text-xs font-medium text-emerald-600 mt-0.5">{formatCurrency(item.Profit)}</div>
                                                             </div>
                                                         </div>
                                                     );

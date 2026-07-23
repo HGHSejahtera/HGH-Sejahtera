@@ -208,11 +208,9 @@ export function PriceSetup() {
 
             return {
                 ProductID: productId,
-                PricingModel: original.PricingModel || 'HQ_DISCOUNT',
-                BasePrice: changes.BasePrice ?? original.BasePrice,
-                RetailRule: changes.RetailRule ?? original.RetailRule,
-                WholesaleRule: changes.WholesaleRule ?? original.WholesaleRule,
-                AgentMarkup: changes.AgentMarkup ?? original.AgentMarkup, // AgentMarkup acts as Agent Price in Absolute mode
+                RetailPrice: changes.RetailPrice ?? original.RetailPrice,
+                WholesalePrice: changes.WholesalePrice ?? original.WholesalePrice,
+                AgentPrice: changes.AgentPrice ?? original.AgentPrice,
                 CostPrice: changes.CostPrice ?? original.CostPrice,
                 FakeCostPrice: changes.FakeCostPrice ?? original.FakeCostPrice,
                 StockistPrice: changes.StockistPrice ?? original.StockistPrice,
@@ -389,9 +387,9 @@ export function PriceSetup() {
                             const dCostPrice = currentEdits.CostPrice ?? product.CostPrice;
                             const dFakeCostPrice = currentEdits.FakeCostPrice ?? product.FakeCostPrice;
                             const dStockistPrice = currentEdits.StockistPrice ?? product.StockistPrice;
-                            const dWholesale = currentEdits.WholesaleRule ?? product.WholesaleRule;
-                            const dAgent = currentEdits.AgentMarkup ?? product.AgentMarkup; // Acts as Agent Price
-                            const dRetail = currentEdits.RetailRule ?? product.RetailRule;
+                            const dWholesale = currentEdits.WholesalePrice ?? product.WholesalePrice;
+                            const dAgent = currentEdits.AgentPrice ?? product.AgentPrice;
+                            const dRetail = currentEdits.RetailPrice ?? product.RetailPrice;
                             const formattedName = product._name || [product.Brand, product.ProductName, product.Variation, product.Size].filter(Boolean).join(' ');
                             return (
                                 <tr key={product.ProductID} className={isEdited ? 'bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-sm font-semibold text-white' : 'hover:bg-gray-50 transition-colors'}>
@@ -433,7 +431,7 @@ export function PriceSetup() {
                                             type="selling"
                                             costPrice={dCostPrice}
                                             value={dWholesale}
-                                            onChange={(val) => handlePriceChange(product.ProductID, 'WholesaleRule', val)}
+                                            onChange={(val) => handlePriceChange(product.ProductID, 'WholesalePrice', val)}
                                         />
                                     </td>
                                     <td className="px-4 py-3 text-right">
@@ -441,7 +439,7 @@ export function PriceSetup() {
                                             type="selling"
                                             costPrice={dCostPrice}
                                             value={dAgent}
-                                            onChange={(val) => handlePriceChange(product.ProductID, 'AgentMarkup', val)}
+                                            onChange={(val) => handlePriceChange(product.ProductID, 'AgentPrice', val)}
                                         />
                                     </td>
                                     <td className="px-4 py-3 text-right">
@@ -449,10 +447,7 @@ export function PriceSetup() {
                                             type="selling"
                                             costPrice={dCostPrice}
                                             value={dRetail}
-                                            onChange={(val) => {
-                                                handlePriceChange(product.ProductID, 'RetailRule', val);
-                                                handlePriceChange(product.ProductID, 'BasePrice', val);
-                                            }}
+                                            onChange={(val) => handlePriceChange(product.ProductID, 'RetailPrice', val)}
                                         />
                                     </td>
                                     <td className="px-2 py-3 text-center">
@@ -509,9 +504,9 @@ export function PriceSetup() {
                                         return Object.entries(changes).map(([field, newValue]) => {
                                             const oldValue = product[field] || 0;
                                             let displayField = field;
-                                            if (field === 'RetailRule') displayField = 'Retail Price';
-                                            else if (field === 'WholesaleRule') displayField = 'Wholesale';
-                                            else if (field === 'AgentMarkup') displayField = 'Agent';
+                                            if (field === 'RetailPrice') displayField = 'Retail Price';
+                                            else if (field === 'WholesalePrice') displayField = 'Wholesale';
+                                            else if (field === 'AgentPrice') displayField = 'Agent';
                                             else if (field === 'CostPrice') displayField = 'Real Cost';
                                             else if (field === 'FakeCostPrice') displayField = 'Fake Cost';
                                             else if (field === 'StockistPrice') displayField = 'Stockist';
@@ -522,7 +517,7 @@ export function PriceSetup() {
                                                         <div className="font-semibold text-gray-900 text-base">{formattedName}</div>
                                                         <div className="text-sm text-gray-500 mt-0.5">{product.Barcode}</div>
                                                     </td>
-                                                    <td className="px-6 py-4 text-gray-700 font-medium text-base">{displayField}</td>
+                                    <td className="px-6 py-4 text-gray-700 font-medium text-base">{displayField}</td>
                                                     <td className="px-6 py-4 text-right text-gray-400 font-medium text-base line-through">RM {Number(oldValue).toFixed(2)}</td>
                                                     <td className="px-6 py-4 text-right font-bold text-indigo-600 text-base bg-indigo-50/20">RM {Number(newValue).toFixed(2)}</td>
                                                 </tr>
