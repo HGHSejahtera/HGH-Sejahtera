@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { DataTable } from '@/components/common/DataTable';
 import { useDropzone } from 'react-dropzone';
-import { TikTokPdfParser } from '@/services/parsers/TikTokPdfParser';
+import { TikTokPDFParser } from '@/services/parsers/TikTokPDFParser';
 import { useAuthStore } from '@/hooks/useAuth';
 import { useAgentPortal } from '@/hooks/useAgentPortal';
 import { useProducts } from '@/hooks/useProducts';
@@ -127,7 +127,7 @@ export function AgentOrderCreate() {
                 const timeStr = `${p.hour}${p.minute}${p.second}`;
                 const newFileName = `TikTokSeller-${dateStr}-${timeStr}.pdf`;
 
-                const ExtractedData = await TikTokPdfParser.parse(file);
+                const ExtractedData = await TikTokPDFParser.parse(file);
 
                 if (isAgent) {
                     ExtractedData.forEach(Order => {

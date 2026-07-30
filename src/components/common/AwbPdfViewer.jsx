@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Document, Page, pdfjs } from 'react-pdf';
-import { Loader2, AlertCircle, ExternalLink, X } from 'lucide-react';
+import { Loader2, AlertCircle, ExternalLink, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAwbStampStore } from '@/hooks/useAwbStampStore';
 import { supabase } from '@/lib/supabase';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
@@ -17,7 +17,7 @@ export function AwbPdfViewer({ url, open, onOpenChange }) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
     const [syncing, setSyncing] = useState(false);
-    const [viewerTimestamp, setViewerTimestamp] = useState(Date.now());
+    const [viewerTimestamp, setViewerTimestamp] = useState(0);
     const [viewport, setViewport] = useState({
         w: window.innerWidth,
         h: window.innerHeight,
@@ -33,7 +33,9 @@ export function AwbPdfViewer({ url, open, onOpenChange }) {
     // Refresh viewer timestamp when global sync completes or url changes
     useEffect(() => {
         if (syncTimestamp) {
-            setViewerTimestamp(syncTimestamp);
+            queueMicrotask(() => {
+                setViewerTimestamp(syncTimestamp);
+            });
         }
     }, [syncTimestamp]);
 
@@ -72,6 +74,16 @@ export function AwbPdfViewer({ url, open, onOpenChange }) {
 
     const handleOpen = () => window.open(url ? `/api/proxy-pdf?url=${encodeURIComponent(url)}&t=${viewerTimestamp}` : '', '_blank');
     const handleClose = () => onOpenChange(false);
+
+    const previousPage = (e) => {
+        e.stopPropagation();
+        setPageNumber(prev => (prev > 1 ? prev - 1 : prev));
+    };
+
+    const nextPage = (e) => {
+        e.stopPropagation();
+        setPageNumber(prev => (prev < numPages ? prev + 1 : prev));
+    };
 
     const handleSyncSku = async () => {
         if (!url || syncing) return;
@@ -205,8 +217,26 @@ export function AwbPdfViewer({ url, open, onOpenChange }) {
 
                             {/* Pagination — bottom-right, only when more than 1 page */}
                             {numPages > 1 && (
-                                <div className="absolute bottom-2 right-2 z-10 bg-black/40 text-white text-xs font-medium px-3 py-1.5 rounded-full backdrop-blur-sm">
-                                    {pageNumber}/{numPages}
+                                <div className="absolute bottom-2 right-2 z-10 flex items-center gap-1">
+                                    <button 
+                                        onClick={previousPage}
+                                        disabled={pageNumber <= 1}
+                                        className="bg-black/40 hover:bg-black/70 text-white p-1.5 rounded-none transition-colors backdrop-blur-sm disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center cursor-pointer"
+                                        title="Previous Page"
+                                    >
+                                        <ChevronLeft className="h-3.5 w-3.5" />
+                                    </button>
+                                    <div className="bg-black/40 text-white text-xs font-medium px-3 py-1.5 rounded-none backdrop-blur-sm flex items-center justify-center">
+                                        {pageNumber} / {numPages}
+                                    </div>
+                                    <button 
+                                        onClick={nextPage}
+                                        disabled={pageNumber >= numPages}
+                                        className="bg-black/40 hover:bg-black/70 text-white p-1.5 rounded-none transition-colors backdrop-blur-sm disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center cursor-pointer"
+                                        title="Next Page"
+                                    >
+                                        <ChevronRight className="h-3.5 w-3.5" />
+                                    </button>
                                 </div>
                             )}
                         </div>

@@ -19,8 +19,8 @@ const BUCKET_NAME = process.env.R2_PRIVATE_BUCKET_NAME || 'hgh-awb';
 export async function processAwbPdf({ pdfBuffer, fileName, agentId, staffId, supabase }) {
     try {
         // 1. Parse and split PDF via dynamic import
-        const { TikTokPdfParserNode } = await import('./pdfParserNode.js');
-        const orders = await TikTokPdfParserNode.parse(pdfBuffer);
+        const { TikTokPDFParserNode } = await import('./TikTokPDFParser-Telegram.js');
+        const orders = await TikTokPDFParserNode.parse(pdfBuffer);
         
         if (!orders || orders.length === 0) {
             throw new Error('No valid TikTok AWB orders found in this PDF.');
