@@ -5,10 +5,19 @@ import { cn } from "@/lib/utils"
 function Table({
   className,
   containerClassName,
+  containerRef,
+  containerTabIndex,
+  containerAriaLabel,
   ...props
 }) {
   return (
-    <div data-slot="table-container" className={cn("relative w-full overflow-auto", containerClassName)}>
+    <div
+      ref={containerRef}
+      data-slot="table-container"
+      tabIndex={containerTabIndex}
+      aria-label={containerAriaLabel}
+      className={cn("relative w-full overflow-auto", containerClassName)}
+    >
       <table
         data-slot="table"
         className={cn("w-full caption-bottom text-sm", className)}

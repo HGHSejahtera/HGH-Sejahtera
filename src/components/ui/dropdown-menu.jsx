@@ -1,7 +1,8 @@
-import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui"
+import * as React from "react"
+import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu"
+import { CheckIcon, ChevronRightIcon, CircleIcon, Eye } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import { CheckIcon, ChevronRightIcon } from "lucide-react"
 
 function DropdownMenu({
   ...props
@@ -85,10 +86,13 @@ function DropdownMenuCheckboxItem({
       checked={checked}
       {...props}>
       <span
-        className="pointer-events-none absolute right-2 flex items-center justify-center"
+        className={cn(
+          "pointer-events-none absolute right-3 flex h-4 w-4 items-center justify-center rounded-full border transition-colors",
+          checked ? "border-indigo-600 bg-indigo-600" : "border-gray-300 bg-transparent"
+        )}
         data-slot="dropdown-menu-checkbox-item-indicator">
         <DropdownMenuPrimitive.ItemIndicator>
-          <CheckIcon />
+          <div className="h-1.5 w-1.5 rounded-full bg-white" />
         </DropdownMenuPrimitive.ItemIndicator>
       </span>
       {children}

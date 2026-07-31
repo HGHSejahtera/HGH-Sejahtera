@@ -169,8 +169,7 @@ export async function MergeAndPrintAwbs(OrdersList, onProgress = null) {
             });
         }
 
-        let fetchSuccess = false;
-        const pdfUrl = `/api/proxy-pdf?url=${encodeURIComponent(Order.AwbUrl)}`;
+        const pdfUrl = `/api/Proxy-PDF?url=${encodeURIComponent(Order.AwbUrl)}`;
 
         // Retry mechanism (up to 3 attempts total) for network/proxy glitches like 502 Bad Gateway
         for (let attempt = 1; attempt <= 3; attempt++) {
@@ -184,7 +183,6 @@ export async function MergeAndPrintAwbs(OrdersList, onProgress = null) {
                 const CopiedPages = await MergedPdf.copyPages(SourcePdf, SourcePdf.getPageIndices());
                 CopiedPages.forEach(Page => MergedPdf.addPage(Page));
                 SuccessfulOrderIds.push(Order.ImportOrderID);
-                fetchSuccess = true;
                 break;
             } catch (error) {
                 if (attempt < 3) {
@@ -310,8 +308,7 @@ export async function MergeAwbsBatch(OrdersList, onProgress = null) {
             });
         }
 
-        let fetchSuccess = false;
-        const pdfUrl = `/api/proxy-pdf?url=${encodeURIComponent(Order.AwbUrl)}`;
+        const pdfUrl = `/api/Proxy-PDF?url=${encodeURIComponent(Order.AwbUrl)}`;
 
         for (let attempt = 1; attempt <= 3; attempt++) {
             try {
@@ -324,7 +321,6 @@ export async function MergeAwbsBatch(OrdersList, onProgress = null) {
                 const CopiedPages = await MergedPdf.copyPages(SourcePdf, SourcePdf.getPageIndices());
                 CopiedPages.forEach(Page => MergedPdf.addPage(Page));
                 SuccessfulOrderIds.push(Order.ImportOrderID);
-                fetchSuccess = true;
                 break;
             } catch (error) {
                 if (attempt < 3) {

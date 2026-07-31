@@ -5,7 +5,7 @@ import { ExternalLink } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAgentPortal } from '@/hooks/useAgentPortal';
 import { AgentTabs } from './AgentTabs';
-import { AwbPdfViewer } from '@/components/common/AwbPdfViewer';
+import { AWBPDFViewer } from '@/components/common/AWB-PDF-Viewer';
 
 export function AgentMyOrders() {
     const { myOrders, isLoadingOrders } = useAgentPortal();
@@ -125,7 +125,7 @@ export function AgentMyOrders() {
                 </div>
             </div>
 
-            <AwbPdfViewer 
+            <AWBPDFViewer 
                 url={viewAwbUrl} 
                 open={!!viewAwbUrl} 
                 onOpenChange={(open) => {

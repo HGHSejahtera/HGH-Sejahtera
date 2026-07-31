@@ -10,7 +10,8 @@ export function SidebarProvider({ children }) {
     const [isCollapsed, setIsCollapsed] = useState(() => {
         if (window.innerWidth < 1024) return true;
         const path = location.pathname.toLowerCase();
-        if (path.startsWith('/inventory') || path.startsWith('/price') || path.includes('/product-matcher')) return true;
+        const lowerPath = path.toLowerCase();
+        if (lowerPath.startsWith('/inventory') || lowerPath.startsWith('/price') || lowerPath.includes('/product-matcher')) return true;
         return false;
     });
     
@@ -25,7 +26,8 @@ export function SidebarProvider({ children }) {
             } else {
                 // If screen is large, auto-expand UNLESS on inventory, pricing, product-matcher, or statement page
                 const path = location.pathname.toLowerCase();
-                if (path.startsWith('/inventory') || path.startsWith('/price') || path.includes('/product-matcher') || path.includes('/statement')) {
+                const lowerPath = path.toLowerCase();
+                if (lowerPath.startsWith('/inventory') || lowerPath.startsWith('/price') || lowerPath.includes('/product-matcher') || lowerPath.includes('/statement')) {
                     setIsCollapsed(true);
                 } else {
                     setIsCollapsed(false);

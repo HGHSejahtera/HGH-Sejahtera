@@ -1,13 +1,13 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useOrderHistory } from '@/hooks/useOrderHistory';
-import { AwbPdfViewer } from '@/components/common/AwbPdfViewer';
+import { AWBPDFViewer } from '@/components/common/AWB-PDF-Viewer';
 import { SortOrders } from '@/services/pdf/AwbMergeService';
 import { useAwbPrintStore } from '@/hooks/useAwbPrintStore';
 import { ProductModal } from '@/pages/Inventory/ProductModal';
 import { OrderMatchModal } from '@/pages/Orders/OrderMatchModal';
 import { useProductMatcher } from '@/hooks/useProductMatcher';
 
-import { Clock, ChevronRight, Package, X, Printer, AlertTriangle, Calendar, ArrowUp, ArrowDown, ArrowUpDown, CheckCircle2, ShieldAlert, RotateCcw, Layers } from 'lucide-react';
+import { Clock, ChevronRight, Package, X, Printer, AlertTriangle, Calendar, CheckCircle2, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/common/DataTable';
 import { Badge } from '@/components/ui/badge';
@@ -77,11 +77,6 @@ export function AllOrders() {
             }
             return { column: columnName, direction: 'asc' };
         });
-    };
-
-    const handleHistorySortChange = (value) => {
-        SetHistorySortBy(value);
-        SetHeaderSort({ column: null, direction: 'asc' });
     };
 
     // Reset selection when changing tabs or filters
@@ -1402,19 +1397,19 @@ export function AllOrders() {
                                                                             <button
                                                                                 type="button"
                                                                                 onClick={async () => {
-                                                                                    if (window.confirm('Are you sure you want to un-match this item?')) {
+                                                                                    if (window.confirm('Are you sure you want to reset this match?')) {
                                                                                         try {
                                                                                             await unresolveItem({ itemId: item.ItemID });
                                                                                             // Query invalidation handles the refresh
                                                                                         } catch (error) {
-                                                                                            alert(error.message || 'Failed to un-match item');
+                                                                                            alert(error.message || 'Failed to reset match');
                                                                                         }
                                                                                     }
                                                                                 }}
                                                                                 disabled={isUnresolving}
-                                                                                className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 hover:bg-rose-200 text-rose-800 border border-rose-300 cursor-pointer transition-colors disabled:opacity-50"
+                                                                                className="inline-flex items-center px-2 py-1 rounded text-[10px] font-medium border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:border-amber-300 hover:text-amber-800 transition-colors shadow-sm disabled:opacity-50"
                                                                             >
-                                                                                Un-match
+                                                                                Reset Match
                                                                             </button>
                                                                         </div>
                                                                     )}
@@ -1439,7 +1434,7 @@ export function AllOrders() {
 
 
 
-            <AwbPdfViewer
+            <AWBPDFViewer
                 url={viewAwbUrl}
                 open={!!viewAwbUrl}
                 onOpenChange={(open) => {

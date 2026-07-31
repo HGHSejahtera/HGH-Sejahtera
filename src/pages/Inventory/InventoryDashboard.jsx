@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Archive, Barcode, Boxes, ChevronDown, ChevronUp, ChevronsUpDown, Edit, MoreHorizontal, Package, PackagePlus, Plus, RefreshCw, Trash2, AlertTriangle, XCircle, Square, Maximize, Minimize, Download, X } from 'lucide-react';
+import { Archive, Barcode, Boxes, ChevronDown, ChevronUp, ChevronsUpDown, Edit, MoreHorizontal, Package, PackagePlus, Plus, RefreshCw, Trash2, AlertTriangle, XCircle, Square, ListChecks, Maximize, Minimize, Download, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DataTable } from '@/components/common/DataTable';
+import { PriceSetup } from '@/pages/Products/PriceSetup';
 import { Input } from '@/components/ui/input';
 import { useInventoryLogs, useInventoryProducts } from '@/hooks/useInventory';
 import { useProducts } from '@/hooks/useProducts';
@@ -65,7 +66,7 @@ const SortableHeader = ({ column, children }) => (
     <Button
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-        className="px-0 h-8 hover:bg-transparent data-[state=open]:bg-transparent text-gray-700 font-medium justify-start"
+        className="h-8 justify-start px-0 text-sm font-medium text-slate-500 hover:bg-transparent data-[state=open]:bg-transparent"
     >
         {children}
         {column.getIsSorted() === 'desc' ? (
@@ -82,6 +83,7 @@ export function InventoryDashboard() {
     const { deleteProduct, updateProduct, bulkArchiveProducts, bulkDeleteProducts, forcePurgeProducts } = useProducts();
 
     const [ViewMode, setViewMode] = useState('Basic');
+    const [DisplayMode, setDisplayMode] = useState('Compact');
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [rowSelection, setRowSelection] = useState({});
     const [bulkActionConfirm, setBulkActionConfirm] = useState(null);
@@ -112,36 +114,23 @@ export function InventoryDashboard() {
 
     const [ExpandedImage, SetExpandedImage] = useState(null);
 
-    const [tableColumnVisibility, setTableColumnVisibility] = useState(() => {
-        const base = ['RowNumber', 'Image', 'MasterSKU', 'Brand', 'CategoryName', 'ProductName', 'Variation', 'Size', 'Barcode', 'Quantity', 'CostPrice'];
-        const all = ['RowNumber', 'Image', 'MasterSKU', 'Brand', 'CategoryName', 'CategoryID', 'ProductName', 'Variation', 'Size', 'Barcode', 'SellerSKU', 'GTIN', 'Quantity', 'Availability', 'CostPrice', 'StockistPrice', 'RetailPrice', 'WholesalePrice', 'AgentPrice', 'WeightG', 'LengthCM', 'WidthCM', 'HeightCM', 'PlatformData'];
-        const visibility = {};
-        all.forEach(id => {
-            visibility[id] = base.includes(id);
-        });
-        visibility['Actions'] = true;
-        visibility['select'] = true;
-        return visibility;
-    });
+    // Each scope and display choice owns its own optional-column state.
+    // This prevents a View change in one table from leaking into another.
+    const [tableColumnVisibility, setTableColumnVisibility] = useState({});
 
-    const modeColumns = useMemo(() => {
-        const base = ['RowNumber', 'Image', 'MasterSKU', 'Brand', 'CategoryName', 'ProductName', 'Variation', 'Size', 'Barcode', 'Quantity', 'CostPrice'];
-        const pricing = ['RowNumber', 'Image', 'MasterSKU', 'Brand', 'CategoryName', 'ProductName', 'Variation', 'Size', 'Barcode', 'Quantity', 'CostPrice', 'StockistPrice', 'RetailPrice', 'WholesalePrice', 'AgentPrice'];
-        const all = ['RowNumber', 'Image', 'MasterSKU', 'Brand', 'CategoryName', 'CategoryID', 'ProductName', 'Variation', 'Size', 'Barcode', 'SellerSKU', 'GTIN', 'Quantity', 'Availability', 'CostPrice', 'StockistPrice', 'RetailPrice', 'WholesalePrice', 'AgentPrice', 'WeightG', 'LengthCM', 'WidthCM', 'HeightCM', 'PlatformData'];
-        
-        return { Basic: base, Detail: pricing, All: all };
-    }, []);
+    const activeTableKey = `${ViewMode}${DisplayMode}`;
 
-    const handleViewModeChange = (mode) => {
-        setViewMode(mode);
-        const targetCols = modeColumns[mode];
-        const visibility = {};
-        modeColumns.All.forEach(id => {
-            visibility[id] = targetCols.includes(id);
-        });
-        visibility['Actions'] = true;
-        visibility['select'] = true;
-        setTableColumnVisibility(visibility);
+    const handleActiveColumnVisibilityChange = (visibility) => {
+        setTableColumnVisibility((current) => ({
+            ...current,
+            [activeTableKey]: typeof visibility === 'function'
+                ? visibility(current[activeTableKey] || {})
+                : visibility,
+        }));
+    };
+
+    const handleDisplayModeToggle = () => {
+        setDisplayMode((current) => current === 'Compact' ? 'Advance' : 'Compact');
     };
 
     const { data: Products, isLoading, error, refetch, isRefetching } = useInventoryProducts();
@@ -196,7 +185,7 @@ export function InventoryDashboard() {
         if (exportColumns.masterSKU) Headers.push('Master SKU');
         if (exportColumns.barcode) Headers.push('Barcode');
         if (exportColumns.productName) Headers.push('Product Name');
-        if (exportColumns.category) Headers.push('Category Name');
+        if (exportColumns.category) Headers.push('Category');
         if (exportColumns.categoryID) Headers.push('Category ID');
         if (exportColumns.stock) Headers.push('Current Stock');
         if (exportColumns.costPrice) Headers.push('Cost Price');
@@ -230,7 +219,7 @@ export function InventoryDashboard() {
                 if (header === 'Master SKU') row.push(Product.MasterSKU || '');
                 else if (header === 'Barcode') row.push(Product.Barcode || '');
                 else if (header === 'Product Name') row.push(formattedName);
-                else if (header === 'Category Name') row.push(Product.CategoryName || '');
+                else if (header === 'Category') row.push(Product.CategoryName || '');
                 else if (header === 'Category ID') row.push(Product.CategoryID || '');
                 else if (header === 'Current Stock') row.push(Product.Stock || 0);
                 else if (header === 'Cost Price') row.push(isHGHMode ? (Product.CostPrice || 0) : (Product.FakeCostPrice || 0));
@@ -379,11 +368,12 @@ export function InventoryDashboard() {
         };
     }, [InventoryProducts]);
 
-    const Columns = useMemo(() => {
+    const { columns: Columns, tableClassName: TableClassName, defaultHiddenForLayout } = useMemo(() => {
         const SelectColumn = {
             id: 'select',
+            meta: { className: 'w-[40px] px-0 text-center' },
             header: ({ table }) => (
-                <div className="pl-4 pr-2">
+                <div className="flex justify-center">
                     <Checkbox
                         checked={
                             table.getIsAllPageRowsSelected() ||
@@ -396,7 +386,7 @@ export function InventoryDashboard() {
                 </div>
             ),
             cell: ({ row }) => (
-                <div className="pl-4 pr-2">
+                <div className="flex justify-center">
                     <Checkbox
                         checked={row.getIsSelected()}
                         onCheckedChange={(value) => row.toggleSelected(!!value)}
@@ -414,7 +404,7 @@ export function InventoryDashboard() {
             header: '#',
             enableHiding: false,
             enableSorting: false,
-            meta: { className: 'w-[56px] text-center text-gray-500' },
+            meta: { className: 'w-[48px] text-center text-gray-500' },
             cell: ({ row, table }) => {
                 const { pageIndex, pageSize } = table.getState().pagination;
                 const VisibleIndex = table.getRowModel().rows.findIndex(VisibleRow => VisibleRow.id === row.id);
@@ -425,7 +415,7 @@ export function InventoryDashboard() {
         const ImageColumn = {
             id: 'Image',
             header: 'Image',
-            meta: { className: 'w-[80px]' },
+            meta: { className: 'w-[64px]' },
             cell: ({ row }) => {
                 const ImageURL = row.original.ImageURL;
 
@@ -449,9 +439,21 @@ export function InventoryDashboard() {
             },
         };
 
+        const ProductColumn = {
+            id: 'Product',
+            header: 'Product',
+            meta: { className: ViewMode === 'Basic' ? 'min-w-[280px] w-full' : ViewMode === 'Detail' ? 'min-w-[300px]' : 'min-w-[340px]' },
+            accessorFn: (row) => [row.Brand, row.ProductName, row.Variation, row.Size].filter(Boolean).join(' '),
+            cell: ({ row }) => (
+                <span className="block truncate font-medium text-gray-900">
+                    {[row.original.Brand, row.original.ProductName, row.original.Variation, row.original.Size].filter(Boolean).join(' ') || '-'}
+                </span>
+            ),
+        };
+
         const MasterSKUColumn = {
             accessorKey: 'MasterSKU',
-            meta: { className: 'w-[180px]' },
+            meta: { className: 'min-w-[160px] w-[160px]' },
             header: ({ column }) => <SortableHeader column={column}>Master SKU</SortableHeader>,
             cell: ({ row }) => (
                 <span className="font-mono text-sm font-semibold text-gray-900">
@@ -462,7 +464,7 @@ export function InventoryDashboard() {
 
         const BrandColumn = {
             accessorKey: 'Brand',
-            meta: { className: 'w-[140px]' },
+            meta: { className: 'w-[132px]' },
             header: ({ column }) => <SortableHeader column={column}>Brand</SortableHeader>,
             cell: ({ row }) => (
                 <span className="text-sm text-gray-500 font-medium">
@@ -473,8 +475,8 @@ export function InventoryDashboard() {
 
         const CategoryColumn = {
             accessorKey: 'CategoryName',
-            meta: { className: 'w-[150px]' },
-            header: ({ column }) => <SortableHeader column={column}>Category Name</SortableHeader>,
+            meta: { className: 'w-[140px]' },
+            header: ({ column }) => <SortableHeader column={column}>Category</SortableHeader>,
             cell: ({ row }) => (
                 <span className="text-sm text-gray-500 font-medium">
                     {row.original.CategoryName || '-'}
@@ -484,7 +486,7 @@ export function InventoryDashboard() {
 
         const CategoryIDColumn = {
             accessorKey: 'CategoryID',
-            meta: { className: 'w-[120px]' },
+            meta: { className: 'w-[110px]' },
             header: ({ column }) => <SortableHeader column={column}>Category ID</SortableHeader>,
             cell: ({ row }) => (
                 <span className="text-sm text-gray-500 font-mono">
@@ -496,16 +498,16 @@ export function InventoryDashboard() {
         const ProductNameColumn = {
             accessorKey: 'ProductName',
             header: 'Product Name',
-            meta: { className: 'min-w-[220px]' },
+            meta: { className: ViewMode === 'Basic' ? 'min-w-[240px] w-full' : 'min-w-[250px]' },
             cell: ({ row }) => (
-                <span className="font-medium text-gray-900">{row.original.ProductName || '-'}</span>
+                <span className="block truncate font-medium text-gray-900">{row.original.ProductName || '-'}</span>
             ),
         };
 
         const VariationColumn = {
             accessorKey: 'Variation',
             header: 'Variation',
-            meta: { className: 'w-[110px]' },
+            meta: { className: 'w-[136px]' },
             cell: ({ row }) => <span className="text-gray-500">{row.original.Variation || ''}</span>,
         };
 
@@ -519,7 +521,7 @@ export function InventoryDashboard() {
         const BarcodeColumn = {
             accessorKey: 'Barcode',
             header: 'Barcode',
-            meta: { className: 'w-[140px]' },
+            meta: { className: 'w-[130px]' },
             cell: ({ row }) => row.original.Barcode || '-',
         };
 
@@ -527,7 +529,7 @@ export function InventoryDashboard() {
             accessorKey: 'Stock',
             id: 'Quantity',
             header: 'Quantity',
-            meta: { className: 'w-[100px] text-right' },
+            meta: { className: 'w-[88px] text-right' },
             cell: ({ row }) => {
                 const Stock = Number(row.original.Stock || 0);
                 return (
@@ -554,77 +556,84 @@ export function InventoryDashboard() {
         const CostPriceColumn = {
             id: 'CostPrice',
             header: () => <div className={`text-right w-full ${isHGHMode ? 'text-green-500' : ''}`}>Cost</div>,
-            meta: { className: 'min-w-[120px] max-w-[120px] w-[120px] text-right' },
+            meta: { className: 'min-w-[108px] max-w-[108px] w-[108px] text-right' },
             cell: ({ row }) => <PriceCell value={isHGHMode ? row.original.CostPrice : row.original.FakeCostPrice} />,
         };
 
         const StockistPriceColumn = {
             accessorKey: 'StockistPrice',
             header: () => <div className="text-right w-full">Stockist</div>,
-            meta: { className: 'min-w-[120px] max-w-[120px] w-[120px] text-right' },
+            meta: { className: 'min-w-[108px] max-w-[108px] w-[108px] text-right' },
             cell: ({ row }) => <PriceCell value={row.original.StockistPrice} />,
         };
 
         const RetailPriceColumn = {
             id: 'RetailPrice',
             header: () => <div className="text-right w-full">Retail</div>,
-            meta: { className: 'min-w-[120px] max-w-[120px] w-[120px] text-right' },
+            meta: { className: 'min-w-[108px] max-w-[108px] w-[108px] text-right' },
             cell: ({ row }) => <PriceCell value={row.original.RetailPrice} />,
         };
 
         const WholesalePriceColumn = {
             id: 'WholesalePrice',
             header: () => <div className="text-right w-full">Wholesale</div>,
-            meta: { className: 'min-w-[120px] max-w-[120px] w-[120px] text-right' },
+            meta: { className: 'min-w-[108px] max-w-[108px] w-[108px] text-right' },
             cell: ({ row }) => <PriceCell value={row.original.WholesalePrice} />,
         };
 
         const AgentPriceColumn = {
             id: 'AgentPrice',
             header: () => <div className="text-right w-full">Agent</div>,
-            meta: { className: 'min-w-[120px] max-w-[120px] w-[120px] text-right' },
+            meta: { className: 'min-w-[108px] max-w-[108px] w-[108px] text-right' },
             cell: ({ row }) => <PriceCell value={row.original.AgentPrice} />,
         };
 
         const SellerSKUColumn = {
             accessorKey: 'SellerSKU',
             header: 'Seller SKU',
+            meta: { className: 'w-[132px]' },
             cell: ({ row }) => row.original.SellerSKU || '-',
         };
 
         const GTINColumn = {
             accessorKey: 'GTIN',
             header: 'GTIN',
+            meta: { className: 'w-[120px]' },
             cell: ({ row }) => row.original.GTIN || '-',
         };
 
         const WeightColumn = {
             accessorKey: 'WeightG',
             header: 'Weight',
+            meta: { className: 'w-[80px]' },
             cell: ({ row }) => row.original.WeightG ? `${row.original.WeightG}g` : '-',
         };
 
         const LengthCMColumn = {
             accessorKey: 'LengthCM',
             header: 'Length',
+            meta: { className: 'w-[80px]' },
             cell: ({ row }) => row.original.LengthCM ? `${row.original.LengthCM}cm` : '-',
         };
 
         const WidthCMColumn = {
             accessorKey: 'WidthCM',
             header: 'Width',
+            meta: { className: 'w-[80px]' },
             cell: ({ row }) => row.original.WidthCM ? `${row.original.WidthCM}cm` : '-',
         };
 
         const HeightCMColumn = {
             accessorKey: 'HeightCM',
             header: 'Height',
+            meta: { className: 'w-[80px]' },
             cell: ({ row }) => row.original.HeightCM ? `${row.original.HeightCM}cm` : '-',
         };
 
         const PlatformDataColumn = {
             accessorKey: 'PlatformData',
             header: 'Platform Data',
+            meta: { className: 'w-[160px]' },
             cell: ({ row }) => {
                 const PlatformData = row.original.PlatformData || {};
                 const Keys = Object.keys(PlatformData);
@@ -640,9 +649,9 @@ export function InventoryDashboard() {
 
         const ActionColumn = {
             id: 'Actions',
-            header: () => <div className="w-[60px] text-center">Action</div>,
+            header: () => <div className="w-[56px] text-center">Action</div>,
             enableHiding: false,
-            meta: { className: 'w-[60px]' },
+            meta: { className: 'sticky right-0 z-20 w-[60px] bg-white group-hover:!bg-indigo-50/45 group-data-[state=selected]:!bg-indigo-50 transition-colors px-0' },
             cell: ({ row }) => (
                 <div className="flex items-center justify-center">
                     <DropdownMenu>
@@ -671,7 +680,7 @@ export function InventoryDashboard() {
                                 <span>Edit Details</span>
                             </DropdownMenuItem>
                             <DropdownMenuItem asChild>
-                                <Link to={`/inventory/stock-in?productId=${row.original.ProductID}`} className="cursor-pointer">
+                                <Link to={`/Inventory/Stock-In?productId=${row.original.ProductID}`} className="cursor-pointer">
                                     <PackagePlus className="mr-2 h-4 w-4 text-indigo-500" />
                                     <span>Stock-In</span>
                                 </Link>
@@ -698,36 +707,179 @@ export function InventoryDashboard() {
         };
 
 
+        // Basic owns its visual grid. These column entities never feed Detail or All.
+        const BasicNumberColumn = {
+            ...NumberColumn,
+            meta: { className: 'w-[3%] text-center text-gray-500' },
+        };
+        const BasicImageColumn = {
+            ...ImageColumn,
+            meta: { className: 'w-[5%]' },
+        };
+        const BasicMasterSKUColumn = {
+            ...MasterSKUColumn,
+            meta: { className: 'min-w-[160px] w-[160px]' },
+        };
 
-        const ShowAllColumns = [
-            NumberColumn,
-            ImageColumn,
-            MasterSKUColumn,
-            BrandColumn,
-            CategoryColumn,
-            CategoryIDColumn,
-            ProductNameColumn,
-            VariationColumn,
-            SizeColumn,
-            BarcodeColumn,
-            SellerSKUColumn,
-            GTINColumn,
-            QuantityColumn,
-            AvailabilityColumn,
-            CostPriceColumn,
-            StockistPriceColumn,
-            RetailPriceColumn,
-            WholesalePriceColumn,
-            AgentPriceColumn,
-            WeightColumn,
-            LengthCMColumn,
-            WidthCMColumn,
-            HeightCMColumn,
-            PlatformDataColumn,
+        const BasicCompactProductColumn = {
+            ...ProductColumn,
+            meta: { className: 'w-[44%]' },
+        };
+        const BasicCompactBarcodeColumn = {
+            ...BarcodeColumn,
+            meta: { className: 'w-[12%] text-center' },
+        };
+        const BasicCompactQuantityColumn = {
+            ...QuantityColumn,
+            meta: { className: 'w-[12%] text-center' },
+        };
+        const BasicCompactCostPriceColumn = {
+            ...CostPriceColumn,
+            meta: { className: 'w-[12%] text-right' },
+        };
+
+        const BasicAdvanceBrandColumn = {
+            ...BrandColumn,
+            meta: { className: 'w-[11%]' },
+        };
+        const BasicAdvanceProductNameColumn = {
+            ...ProductNameColumn,
+            meta: { className: 'w-[21%]' },
+        };
+        const BasicAdvanceVariationColumn = {
+            ...VariationColumn,
+            meta: { className: 'w-[13%]' },
+        };
+        const BasicAdvanceSizeColumn = {
+            ...SizeColumn,
+            meta: { className: 'w-[7%]' },
+        };
+        const BasicAdvanceBarcodeColumn = {
+            ...BarcodeColumn,
+            meta: { className: 'w-[10%] text-center' },
+        };
+        const BasicAdvanceQuantityColumn = {
+            ...QuantityColumn,
+            meta: { className: 'w-[10%] text-center' },
+        };
+        const BasicAdvanceCostPriceColumn = {
+            ...CostPriceColumn,
+            meta: { className: 'w-[10%] text-right' },
+        };
+
+        const BasicCompactActionColumn = {
+            ...ActionColumn,
+            header: () => <div className="w-full text-center">Action</div>,
+            meta: { className: 'sticky right-0 z-20 min-w-[60px] w-[12%] bg-white group-hover:!bg-indigo-50/45 group-data-[state=selected]:!bg-indigo-50 transition-colors px-0' },
+        };
+        const BasicAdvanceActionColumn = {
+            ...ActionColumn,
+            header: () => <div className="w-full text-center">Action</div>,
+            meta: { className: 'sticky right-0 z-20 min-w-[60px] w-[10%] bg-white group-hover:!bg-indigo-50/45 group-data-[state=selected]:!bg-indigo-50 transition-colors px-0' },
+        };
+
+
+
+
+        const BasicCompactColumns = [
+            BasicNumberColumn, BasicImageColumn, BasicMasterSKUColumn, BasicCompactProductColumn,
+            BasicCompactBarcodeColumn, BasicCompactQuantityColumn, BasicCompactCostPriceColumn,
         ];
 
-        return [...(isSelectionMode ? [SelectColumn] : []), ...ShowAllColumns, ActionColumn];
-    }, [isSelectionMode, isHGHMode]);
+        const BasicAdvanceColumns = [
+            BasicNumberColumn, BasicImageColumn, BasicMasterSKUColumn, BasicAdvanceBrandColumn, BasicAdvanceProductNameColumn,
+            BasicAdvanceVariationColumn, BasicAdvanceSizeColumn, BasicAdvanceBarcodeColumn, BasicAdvanceQuantityColumn, BasicAdvanceCostPriceColumn,
+        ];
+
+        const DetailCompactColumns = [
+            NumberColumn, ImageColumn, MasterSKUColumn, ProductColumn, CategoryColumn,
+            BarcodeColumn, QuantityColumn, CostPriceColumn, StockistPriceColumn,
+            RetailPriceColumn, WholesalePriceColumn, AgentPriceColumn,
+        ];
+
+        const DetailAdvanceColumns = [
+            NumberColumn, ImageColumn, MasterSKUColumn, BrandColumn, ProductNameColumn,
+            VariationColumn, SizeColumn, CategoryColumn, BarcodeColumn, QuantityColumn,
+            CostPriceColumn, StockistPriceColumn, RetailPriceColumn, WholesalePriceColumn,
+            AgentPriceColumn,
+        ];
+
+        const AllCompactColumns = [
+            NumberColumn, ImageColumn, MasterSKUColumn, ProductColumn, CategoryColumn,
+            CategoryIDColumn, BarcodeColumn, SellerSKUColumn, GTINColumn, QuantityColumn,
+            AvailabilityColumn, CostPriceColumn, StockistPriceColumn, RetailPriceColumn,
+            WholesalePriceColumn, AgentPriceColumn, WeightColumn, LengthCMColumn,
+            WidthCMColumn, HeightCMColumn, PlatformDataColumn,
+        ];
+
+        const AllAdvanceColumns = [
+            NumberColumn, ImageColumn, MasterSKUColumn, BrandColumn, ProductNameColumn,
+            VariationColumn, SizeColumn, CategoryColumn, CategoryIDColumn, BarcodeColumn,
+            SellerSKUColumn, GTINColumn, QuantityColumn, AvailabilityColumn, CostPriceColumn,
+            StockistPriceColumn, RetailPriceColumn, WholesalePriceColumn, AgentPriceColumn,
+            WeightColumn, LengthCMColumn, WidthCMColumn, HeightCMColumn, PlatformDataColumn,
+        ];
+
+        const tableLayouts = {
+            Basic: {
+                Compact: { columns: BasicCompactColumns, tableClassName: 'w-full min-w-[920px] table-fixed' },
+                Advance: { columns: BasicAdvanceColumns, tableClassName: 'w-full min-w-[1120px] table-fixed' },
+            },
+            Detail: {
+                Compact: { columns: DetailCompactColumns, tableClassName: 'w-full min-w-[1480px]' },
+                Advance: { columns: DetailAdvanceColumns, tableClassName: 'w-full min-w-[1700px]' },
+            },
+            All: {
+                Compact: { columns: AllCompactColumns, tableClassName: 'w-full min-w-[2320px]' },
+                Advance: { columns: AllAdvanceColumns, tableClassName: 'w-full min-w-[2600px]' },
+            },
+        };
+
+        const activeTableLayout = tableLayouts[ViewMode][DisplayMode];
+
+        const activeActionColumn = ViewMode === 'Basic'
+            ? (DisplayMode === 'Compact' ? BasicCompactActionColumn : BasicAdvanceActionColumn)
+            : ActionColumn;
+
+        const supersetColumnsBase = [
+            NumberColumn, ImageColumn, MasterSKUColumn, ProductColumn, BrandColumn, ProductNameColumn,
+            VariationColumn, SizeColumn, CategoryColumn, CategoryIDColumn, BarcodeColumn,
+            SellerSKUColumn, GTINColumn, QuantityColumn, AvailabilityColumn, CostPriceColumn,
+            StockistPriceColumn, RetailPriceColumn, WholesalePriceColumn, AgentPriceColumn,
+            WeightColumn, LengthCMColumn, WidthCMColumn, HeightCMColumn, PlatformDataColumn,
+        ];
+
+        const activeLayoutColumnsMap = activeTableLayout.columns.reduce((acc, col) => {
+            acc[col.id || col.accessorKey] = col;
+            return acc;
+        }, {});
+
+        const defaultHiddenForLayout = supersetColumnsBase.reduce((acc, col) => {
+            const key = col.id || col.accessorKey;
+            if (!activeLayoutColumnsMap[key]) {
+                acc[key] = false;
+            }
+            return acc;
+        }, {});
+        
+        defaultHiddenForLayout.MasterSKU = false; // Always hidden by default unless explicitly enabled
+
+        const finalSupersetColumns = supersetColumnsBase.map(baseCol => {
+            const key = baseCol.id || baseCol.accessorKey;
+            return activeLayoutColumnsMap[key] || baseCol;
+        });
+
+        return {
+            columns: [...(isSelectionMode ? [SelectColumn] : []), ...finalSupersetColumns, activeActionColumn],
+            tableClassName: activeTableLayout.tableClassName,
+            defaultHiddenForLayout,
+        };
+    }, [isSelectionMode, isHGHMode, ViewMode, DisplayMode]);
+
+    const activeColumnVisibility = {
+        ...defaultHiddenForLayout,
+        ...(tableColumnVisibility[activeTableKey] || {})
+    };
 
     if (error) {
         return (
@@ -752,7 +904,7 @@ export function InventoryDashboard() {
                 <div className="flex flex-wrap items-center gap-2">
                     {hasProductMatcherIssue && (
                         <Button variant="outline" asChild className="h-10 px-4 border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 font-semibold shadow-xs transition-all">
-                            <Link to="/Orders/Product-Matcher" state={{ from: '/inventory' }}>
+                            <Link to="/Orders/Product-Matcher" state={{ from: '/Inventory' }}>
                                 <AlertTriangle className="mr-2 h-4 w-4 text-amber-600 shrink-0" />
                                 <span>Product Matcher</span>
                                 {(uniqueUnmatched || unmatchedItems)?.length > 0 && (
@@ -764,13 +916,13 @@ export function InventoryDashboard() {
                         </Button>
                     )}
                     <Button variant="outline" asChild className="h-10 w-36">
-                        <Link to="/barcode">
+                        <Link to="/Barcode">
                             <Barcode className="mr-2 h-4 w-4" />
                             Barcodes
                         </Link>
                     </Button>
                     <Button className="h-10 w-36" asChild>
-                        <Link to="/inventory/stock-in">
+                        <Link to="/Inventory/Stock-In">
                             <PackagePlus className="mr-2 h-4 w-4" />
                             Stock-In
                         </Link>
@@ -823,7 +975,7 @@ export function InventoryDashboard() {
             {!isExpanded && (
                 <div className="border-b border-gray-200">
                     <nav className="-mb-px flex space-x-8">
-                        {['Inventory', 'Stock Logs'].map((tab) => (
+                        {['Inventory', 'Price Setup', 'Stock Logs'].map((tab) => (
                             <button
                                 key={tab}
                                 onClick={() => setActiveTab(tab)}
@@ -849,24 +1001,42 @@ export function InventoryDashboard() {
                         <DataTable
                             columns={Columns}
                             data={InventoryProducts}
-                            columnVisibility={tableColumnVisibility}
-                            onColumnVisibilityChange={setTableColumnVisibility}
+                            columnVisibility={activeColumnVisibility}
+                            onColumnVisibilityChange={handleActiveColumnVisibilityChange}
                             searchPlaceholder="Search"
                             rowSelection={rowSelection}
                             onRowSelectionChange={setRowSelection}
-                            actionElement={
-                                <div className="flex items-center gap-2 w-full">
+                            tableClassName={TableClassName}
+                            tableContainerClassName="inventory-table-scroll max-h-[calc(100vh-220px)] overflow-x-auto overflow-y-auto bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2"
+                            tableHeaderClassName="border-b border-slate-200 bg-white z-30"
+                            tableHeadClassName="h-11 bg-white px-3 text-sm font-medium text-slate-500"
+                            tableRowClassName="group border-slate-200 hover:!bg-indigo-50/45 data-[state=selected]:!bg-indigo-50"
+                            tableCellClassName="px-3 py-3 text-sm text-slate-700"
+                            horizontalScrollHint={ViewMode === 'All' ? 'Scroll horizontally to view all columns' : ViewMode === 'Detail' ? 'Scroll horizontally to view pricing columns' : 'Scroll horizontally to view more columns'}
+                            leftActionElement={
+                                <>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleDisplayModeToggle}
+                                        className={cn("h-8 px-3 text-xs font-medium rounded-md shadow-xs border-gray-200 transition-all", DisplayMode === 'Advance' ? "bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100" : "bg-white text-gray-700 hover:bg-gray-50")}
+                                    >
+                                        {DisplayMode === 'Compact' ? 'Compact' : 'Advance'}
+                                    </Button>
                                     <Button
                                         variant="outline"
                                         size="sm"
                                         onClick={() => setIsExpanded(!isExpanded)}
-                                        className={cn("h-9 px-3 bg-white", isExpanded && "bg-indigo-50 border-indigo-200 text-indigo-700")}
+                                        className={cn("h-8 px-3 text-xs font-medium rounded-md shadow-xs border-gray-200 transition-all", isExpanded ? "bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100" : "bg-white text-gray-700 hover:bg-gray-50")}
                                         title={isExpanded ? "Collapse View" : "Expand View"}
                                     >
-                                        {isExpanded ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
-                                        <span className="ml-2 hidden sm:inline">{isExpanded ? 'Collapse' : 'Expand'}</span>
+                                        {isExpanded ? <Minimize className="h-3.5 w-3.5 mr-1.5" /> : <Maximize className="h-3.5 w-3.5 mr-1.5" />}
+                                        <span className="hidden sm:inline">{isExpanded ? 'Collapse' : 'Expand'}</span>
                                     </Button>
-
+                                </>
+                            }
+                            actionElement={
+                                <div className="flex items-center gap-2 w-full">
                                     {isSelectionMode ? (
                                         <>
                                             {Object.keys(rowSelection).length > 0 ? (
@@ -886,13 +1056,13 @@ export function InventoryDashboard() {
                                                     Select items...
                                                 </span>
                                             )}
-                                            <Button size="sm" variant="outline" className="text-gray-500 h-9" onClick={() => { setIsSelectionMode(false); setRowSelection({}); }}>
+                                            <Button variant="outline" className="text-gray-500 h-8 px-3 text-xs font-medium rounded-md shadow-xs border-gray-200" onClick={() => { setIsSelectionMode(false); setRowSelection({}); }}>
                                                 Cancel
                                             </Button>
                                         </>
                                     ) : (
-                                         <Button size="sm" variant="outline" className="h-9" onClick={() => setIsSelectionMode(true)}>
-                                            <Square className="mr-2 h-4 w-4" />
+                                         <Button variant="outline" size="sm" className="h-8 px-3 text-xs font-medium rounded-md shadow-xs border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition-all cursor-pointer" onClick={() => setIsSelectionMode(true)}>
+                                            <ListChecks className="mr-1.5 h-3.5 w-3.5 text-gray-500" />
                                             Select
                                         </Button>
                                     )}
@@ -902,11 +1072,11 @@ export function InventoryDashboard() {
                                             <Button
                                                 variant="outline"
                                                 size="sm"
-                                                className="h-9 px-3 bg-white"
+                                                className="h-8 px-3 text-xs font-medium rounded-md shadow-xs border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition-all cursor-pointer"
                                                 title="Smart Export to Excel"
                                             >
-                                                <Download className="h-4 w-4" />
-                                                <span className="ml-2 hidden sm:inline">Export</span>
+                                                <Download className="mr-1.5 h-3.5 w-3.5 text-gray-500" />
+                                                <span className="hidden sm:inline">Export</span>
                                             </Button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end" className="w-56">
@@ -917,7 +1087,7 @@ export function InventoryDashboard() {
                                                     masterSKU: 'Master SKU',
                                                     barcode: 'Barcode',
                                                     productName: 'Product Name',
-                                                    category: 'Category Name',
+                                                    category: 'Category',
                                                     categoryID: 'Category ID',
                                                     stock: 'Current Stock',
                                                     costPrice: 'Cost Price',
@@ -949,8 +1119,21 @@ export function InventoryDashboard() {
                                             </div>
                                         </DropdownMenuContent>
                                     </DropdownMenu>
-
-                                    <div className="flex rounded-lg border bg-gray-100 p-1 w-[260px] h-9 items-center">
+                                </div>
+                            }
+                            rightActionElement={
+                                <>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => refetch()}
+                                        disabled={isRefetching || isLoading}
+                                        className="h-8 w-8 px-0 rounded-md shadow-xs border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition-all cursor-pointer"
+                                        title="Refresh Inventory"
+                                    >
+                                        <RefreshCw className={cn('h-3.5 w-3.5 text-gray-500', isRefetching && 'animate-spin text-indigo-500')} />
+                                    </Button>
+                                    <div className="flex rounded-md border border-gray-200 bg-gray-100 p-0.5 w-[220px] h-8 items-center">
                                         {[
                                             { Label: 'Basic', Value: 'Basic' },
                                             { Label: 'Detail', Value: 'Detail' },
@@ -960,27 +1143,22 @@ export function InventoryDashboard() {
                                                 key={Option.Value}
                                                 variant={ViewMode === Option.Value ? 'default' : 'ghost'}
                                                 className="flex-1 h-full text-xs shadow-none"
-                                                onClick={() => handleViewModeChange(Option.Value)}
+                                                onClick={() => setViewMode(Option.Value)}
                                             >
                                                 {Option.Label}
                                             </Button>
                                         ))}
                                     </div>
-                                    
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => refetch()}
-                                        disabled={isRefetching || isLoading}
-                                        className="h-9 w-9 px-0 bg-white"
-                                        title="Refresh Inventory"
-                                    >
-                                        <RefreshCw className={cn('h-4 w-4 text-gray-500', isRefetching && 'animate-spin text-indigo-500')} />
-                                    </Button>
-                                </div>
+                                </>
                             }
                         />
                     )}
+                </div>
+            )}
+
+            {activeTab === 'Price Setup' && (
+                <div className="rounded-xl border bg-white p-4 shadow-sm relative overflow-visible">
+                    <PriceSetup />
                 </div>
             )}
 

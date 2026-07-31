@@ -31,7 +31,6 @@ import { UserManagement } from './pages/Settings/UserManagement';
 import { AccountSettings } from './pages/Settings/AccountSettings';
 import { InventoryDashboard } from './pages/Inventory/InventoryDashboard';
 import { StockIn } from './pages/Inventory/StockIn';
-import { PriceSetup } from './pages/Products/PriceSetup';
 
 import { Dashboard } from './pages/Dashboard/Dashboard';
 export default function App() {
@@ -89,11 +88,11 @@ export default function App() {
                                     <Route path="/POS" element={<POS />} />
                                     <Route path="/Orders" element={<AllOrders />} />
                                     <Route path="/Orders/Product-Matcher" element={<ProductMatcher />} />
-                                    <Route path="/inventory/import" element={<ProductBulkImport />} />
-                                    <Route path="/barcode" element={<BarcodeGenerator />} />
-                                    <Route path="/Price/Setup" element={<PriceSetup />} />
-                                    <Route path="/Inventory" element={<InventoryDashboard />} />
-                                    <Route path="/inventory/stock-in" element={<StockIn />} />
+                                    <Route path="/Inventory/Import" element={<ProductBulkImport />} />
+                                    <Route path="/Barcode" element={<BarcodeGenerator />} />
+                                    <Route path="/Inventory" element={<InventoryDashboard />} caseSensitive />
+                                    <Route path="/inventory" element={<Navigate to="/Inventory" replace />} caseSensitive />
+                                    <Route path="/Inventory/Stock-In" element={<StockIn />} />
                                     <Route path="/Agent-Management" element={<AgentList />} />
                                     <Route path="/Agent-Management/:id" element={<AgentDetails />} />
                                     <Route path="/Agent-Management/:id/Statement" element={<AgentStatement />} />

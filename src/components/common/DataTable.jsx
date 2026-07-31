@@ -19,7 +19,7 @@ import {
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import React, { useState } from "react"
+import React, { useEffect, useRef, useState } from "react"
 import { Settings2 } from "lucide-react"
 import {
     DropdownMenu,
@@ -40,11 +40,20 @@ export function DataTable({
     data, 
     searchPlaceholder = "Search", 
     actionElement,
+    leftActionElement,
+    rightActionElement,
     rowSelection = {},
     onRowSelectionChange,
     columnVisibility: externalColumnVisibility,
     onColumnVisibilityChange: externalOnColumnVisibilityChange,
+    hideableColumnIds,
     tableContainerClassName = "max-h-[calc(100vh-220px)] overflow-auto",
+    tableClassName,
+    tableHeaderClassName,
+    tableHeadClassName,
+    tableRowClassName,
+    tableCellClassName,
+    horizontalScrollHint,
     defaultPageSize = 100,
     renderSubComponent
 }) {
@@ -52,9 +61,31 @@ export function DataTable({
     const [internalColumnVisibility, setInternalColumnVisibility] = useState({})
     const [sorting, setSorting] = useState([])
     const [visibleLimit, setVisibleLimit] = useState(100)
+    const tableContainerRef = useRef(null)
+    const [hasHorizontalOverflow, setHasHorizontalOverflow] = useState(false)
 
     const columnVisibility = externalColumnVisibility !== undefined ? externalColumnVisibility : internalColumnVisibility;
     const setColumnVisibility = externalOnColumnVisibilityChange || setInternalColumnVisibility;
+
+    useEffect(() => {
+        const container = tableContainerRef.current
+        if (!container) {
+            setHasHorizontalOverflow(false)
+            return undefined
+        }
+
+        const updateOverflow = () => {
+            const nextHasHorizontalOverflow = container.scrollWidth > container.clientWidth + 1
+            setHasHorizontalOverflow((current) => current === nextHasHorizontalOverflow ? current : nextHasHorizontalOverflow)
+        }
+
+        updateOverflow()
+        if (typeof ResizeObserver === "undefined") return undefined
+
+        const resizeObserver = new ResizeObserver(updateOverflow)
+        resizeObserver.observe(container)
+        return () => resizeObserver.disconnect()
+    }, [columns, data, columnVisibility])
 
     // eslint-disable-next-line react-hooks/incompatible-library
     const table = useReactTable({
@@ -97,6 +128,11 @@ export function DataTable({
                         onChange={(event) => setGlobalFilter(String(event.target.value))}
                         className="max-w-sm h-8 text-xs rounded-md border-gray-200 shadow-xs focus:border-indigo-500"
                     />
+                    {leftActionElement && (
+                        <div className="flex items-center gap-2">
+                            {leftActionElement}
+                        </div>
+                    )}
                     <div className="flex items-center space-x-1.5 text-xs text-gray-500">
                         <span className="font-medium whitespace-nowrap">Show</span>
                         <Select
@@ -127,7 +163,7 @@ export function DataTable({
                     )}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm" className="ml-auto hidden h-8 px-3 text-xs font-medium rounded-md border-gray-200 lg:flex shadow-xs text-gray-700 hover:bg-gray-50 cursor-pointer">
+                            <Button variant="outline" size="sm" className="h-8 px-3 text-xs font-medium rounded-md shadow-xs border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition-all cursor-pointer">
                                 <Settings2 className="mr-1.5 h-3.5 w-3.5 text-gray-500" />
                                 View
                             </Button>
@@ -145,21 +181,32 @@ export function DataTable({
                                             onCheckedChange={(value) => column.toggleVisibility(!!value)}
                                             onSelect={(e) => e.preventDefault()}
                                         >
-                                            {typeof column.columnDef.header === 'string' ? column.columnDef.header : column.id}
+                                            {column.id.replace(/([A-Z]+)/g, ' $1').trim()}
                                         </DropdownMenuCheckboxItem>
                                     )
                                 })}
                         </DropdownMenuContent>
                     </DropdownMenu>
+                    {rightActionElement && (
+                        <div className="flex items-center gap-2">
+                            {rightActionElement}
+                        </div>
+                    )}
                 </div>
             </div>
-            <Table containerClassName={cn("rounded-md border relative", tableContainerClassName)}>
-                <TableHeader>
+            <Table
+                containerRef={tableContainerRef}
+                containerTabIndex={horizontalScrollHint && hasHorizontalOverflow ? 0 : undefined}
+                containerAriaLabel={horizontalScrollHint && hasHorizontalOverflow ? "Scrollable data table" : undefined}
+                containerClassName={cn("rounded-md border relative", tableContainerClassName)}
+                className={tableClassName}
+            >
+                <TableHeader className={tableHeaderClassName}>
                         {table.getHeaderGroups().map((headerGroup) => (
                             <TableRow key={headerGroup.id}>
                                 {headerGroup.headers.map((header) => {
                                     return (
-                                        <TableHead key={header.id} className={header.column.columnDef.meta?.className}>
+                                        <TableHead key={header.id} className={cn(tableHeadClassName, header.column.columnDef.meta?.className)}>
                                             {header.isPlaceholder
                                                 ? null
                                                 : flexRender(
@@ -178,9 +225,10 @@ export function DataTable({
                                     <React.Fragment key={row.id}>
                                         <TableRow
                                             data-state={row.getIsSelected() && "selected"}
+                                            className={tableRowClassName}
                                         >
                                             {row.getVisibleCells().map((cell) => (
-                                                <TableCell key={cell.id} className={cell.column.columnDef.meta?.className}>
+                                                <TableCell key={cell.id} className={cn(tableCellClassName, cell.column.columnDef.meta?.className)}>
                                                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                                                 </TableCell>
                                             ))}
@@ -203,6 +251,12 @@ export function DataTable({
                         )}
                     </TableBody>
             </Table>
+            {horizontalScrollHint && hasHorizontalOverflow && (
+                <div className="mt-2 flex items-center justify-center gap-2 rounded-md border border-indigo-100 bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-700">
+                    <span className="text-sm leading-none text-indigo-600" aria-hidden="true">&harr;</span>
+                    {horizontalScrollHint}
+                </div>
+            )}
             {table.getState().pagination.pageSize === 999999 && table.getRowModel().rows.length > visibleLimit && (
                 <div className="flex justify-center py-3 border-t border-gray-100 bg-gray-50/60 rounded-b-md">
                     <Button

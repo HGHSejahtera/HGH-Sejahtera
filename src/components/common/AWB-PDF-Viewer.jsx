@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Document, Page, pdfjs } from 'react-pdf';
-import { Loader2, AlertCircle, ExternalLink, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Loader2, AlertCircle, ExternalLink, X, ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import { useAwbStampStore } from '@/hooks/useAwbStampStore';
 import { supabase } from '@/lib/supabase';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
@@ -10,7 +10,7 @@ import 'react-pdf/dist/Page/TextLayer.css';
 // Use CDN to ensure the worker version perfectly matches the loaded pdfjs API version
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
-export function AwbPdfViewer({ url, open, onOpenChange }) {
+export function AWBPDFViewer({ url, open, onOpenChange }) {
     const syncTimestamp = useAwbStampStore(state => state.syncTimestamp);
     const [numPages, setNumPages] = useState(null);
     const [pageNumber, setPageNumber] = useState(1);
@@ -72,8 +72,22 @@ export function AwbPdfViewer({ url, open, onOpenChange }) {
         setError(true);
     }
 
-    const handleOpen = () => window.open(url ? `/api/proxy-pdf?url=${encodeURIComponent(url)}&t=${viewerTimestamp}` : '', '_blank');
+    const handleOpen = () => {
+        window.open(url ? `/api/Proxy-PDF?url=${encodeURIComponent(url)}&t=${viewerTimestamp}` : '', '_blank');
+    };
     const handleClose = () => onOpenChange(false);
+
+    const handleDownload = () => {
+        if (!url) return;
+        const downloadUrl = `/api/Proxy-PDF?url=${encodeURIComponent(url)}&download=true&t=${viewerTimestamp}`;
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        // The backend Content-Disposition will dictate the filename for the browser
+        a.download = url.split('/').pop() || 'AWB.pdf'; 
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    };
 
     const previousPage = (e) => {
         e.stopPropagation();
@@ -181,7 +195,7 @@ export function AwbPdfViewer({ url, open, onOpenChange }) {
                             </button>
 
                             <Document
-                                file={`/api/proxy-pdf?url=${encodeURIComponent(url)}&t=${viewerTimestamp}`}
+                                file={`/api/Proxy-PDF?url=${encodeURIComponent(url)}&t=${viewerTimestamp}`}
                                 onLoadSuccess={onDocumentLoadSuccess}
                                 onLoadError={onDocumentLoadError}
                                 loading={null}
@@ -203,6 +217,14 @@ export function AwbPdfViewer({ url, open, onOpenChange }) {
                                 >
                                     <ExternalLink className="h-3 w-3" />
                                     Open
+                                </button>
+                                <button
+                                    onClick={handleDownload}
+                                    className="bg-black/40 hover:bg-black/70 text-white text-xs font-medium px-3 py-1.5 rounded-none transition-colors backdrop-blur-sm flex items-center gap-1.5 cursor-pointer border-l border-white/20"
+                                    title="Download PDF"
+                                >
+                                    <Download className="h-3 w-3" />
+                                    Download
                                 </button>
                                 <button
                                     onClick={handleSyncSku}

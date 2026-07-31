@@ -130,11 +130,11 @@ export function StockIn() {
         <div className="space-y-6">
             <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                 <div>
-                    <Button variant="ghost" size="sm" asChild className="-ml-2 mb-2">
-                        <Link to="/inventory">
-                            <ArrowLeft className="mr-1 h-4 w-4" />
-                            Back to Inventory
-                        </Link>
+                    <Button variant="ghost" asChild className="mb-4">
+                    <Link to="/Inventory" className="flex items-center text-gray-500 hover:text-gray-900">
+                        <ArrowLeft className="mr-2 h-4 w-4" />
+                        Back to Inventory
+                    </Link>
                     </Button>
                     <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Stock-In</h2>
                 </div>

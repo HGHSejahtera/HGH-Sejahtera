@@ -32,7 +32,7 @@ export function BarcodeGenerator() {
             <div className="print:hidden flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                 <div>
                     <Button variant="ghost" size="sm" asChild className="-ml-2 mb-2">
-                        <Link to="/inventory">
+                        <Link to="/Inventory">
                             <ArrowLeft className="mr-1 h-4 w-4" />
                             Back to Inventory
                         </Link>

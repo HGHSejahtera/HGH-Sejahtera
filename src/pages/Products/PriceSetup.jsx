@@ -355,7 +355,7 @@ export function PriceSetup() {
                 </div>
             </div>
 
-            <div className="bg-white rounded-none shadow-sm border border-gray-200 overflow-auto max-h-[calc(100vh-250px)]">
+            <div className="rounded-md border border-gray-200 bg-white shadow-xs overflow-auto max-h-[calc(100vh-250px)]">
                 <table className="w-full text-sm text-left relative">
                     <thead className="bg-gray-50 border-b border-gray-200 text-gray-600 sticky top-0 z-10">
                         <tr>

@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useAgentDetails, useAgentMutations, useAgentRecentOrders } from '@/hooks/useAgentManagement';
-import { AwbPdfViewer } from '@/components/common/AwbPdfViewer';
+import { AWBPDFViewer } from '@/components/common/AWB-PDF-Viewer';
 import { cn } from '@/lib/utils';
 
 const MonthOptions = [
@@ -100,7 +100,7 @@ export function AgentDetails() {
 
     const handleDirectDownload = async (url, orderId, createdAt, platform) => {
         try {
-            const res = await fetch(`/api/proxy-pdf?url=${encodeURIComponent(url)}`);
+            const res = await fetch(`/api/Proxy-PDF?url=${encodeURIComponent(url)}`);
             if (!res.ok) throw new Error('Failed to fetch file for download');
             const blob = await res.blob();
             const blobUrl = window.URL.createObjectURL(blob);
@@ -794,7 +794,7 @@ export function AgentDetails() {
                 </div>
             )}
 
-            <AwbPdfViewer 
+            <AWBPDFViewer 
                 url={viewAwbUrl} 
                 open={!!viewAwbUrl} 
                 onOpenChange={(open) => {

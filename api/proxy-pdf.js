@@ -1,4 +1,3 @@
-/* global process, Buffer */
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 
 export default async function handler(req, res) {
@@ -91,11 +90,27 @@ export default async function handler(req, res) {
             return res.status(404).json({ error: 'Failed to load PDF from R2 storage or URL' });
         }
 
+        // Determine filename
+        const isDownload = req.query.download === 'true';
+        let filename = 'AWB.pdf';
+        
+        // Extract filename from URL (e.g. Order Archive/TikTokSeller-STF001-...)
+        try {
+            const pathParts = targetUrl.split('?')[0].split('/');
+            const lastPart = pathParts[pathParts.length - 1];
+            if (lastPart && lastPart.toLowerCase().endsWith('.pdf')) {
+                filename = decodeURIComponent(lastPart);
+            }
+        } catch {
+            // Ignore error and use default 'AWB.pdf'
+        }
+
         // Set CORS headers so the frontend can read it cleanly
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Content-Disposition', `${isDownload ? 'attachment' : 'inline'}; filename="${filename}"`);
         
         res.status(200).send(Buffer.from(buffer));
     } catch (error) {
