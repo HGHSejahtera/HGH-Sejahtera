@@ -100,7 +100,7 @@ export function AgentDetails() {
 
     const handleDirectDownload = async (url, orderId, createdAt, platform) => {
         try {
-            const res = await fetch(`/api/Proxy-PDF?url=${encodeURIComponent(url)}`);
+            const res = await fetch(`/api/proxy-pdf?url=${encodeURIComponent(url)}`);
             if (!res.ok) throw new Error('Failed to fetch file for download');
             const blob = await res.blob();
             const blobUrl = window.URL.createObjectURL(blob);

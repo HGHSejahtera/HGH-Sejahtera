@@ -169,7 +169,7 @@ export async function MergeAndPrintAwbs(OrdersList, onProgress = null) {
             });
         }
 
-        const pdfUrl = `/api/Proxy-PDF?url=${encodeURIComponent(Order.AwbUrl)}`;
+        const pdfUrl = `/api/proxy-pdf?url=${encodeURIComponent(Order.AwbUrl)}`;
 
         // Retry mechanism (up to 3 attempts total) for network/proxy glitches like 502 Bad Gateway
         for (let attempt = 1; attempt <= 3; attempt++) {
@@ -308,7 +308,7 @@ export async function MergeAwbsBatch(OrdersList, onProgress = null) {
             });
         }
 
-        const pdfUrl = `/api/Proxy-PDF?url=${encodeURIComponent(Order.AwbUrl)}`;
+        const pdfUrl = `/api/proxy-pdf?url=${encodeURIComponent(Order.AwbUrl)}`;
 
         for (let attempt = 1; attempt <= 3; attempt++) {
             try {

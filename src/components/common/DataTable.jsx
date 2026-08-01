@@ -40,13 +40,13 @@ export function DataTable({
     data, 
     searchPlaceholder = "Search", 
     actionElement,
+    bottomActionElement,
     leftActionElement,
     rightActionElement,
     rowSelection = {},
     onRowSelectionChange,
     columnVisibility: externalColumnVisibility,
     onColumnVisibilityChange: externalOnColumnVisibilityChange,
-    hideableColumnIds,
     tableContainerClassName = "max-h-[calc(100vh-220px)] overflow-auto",
     tableClassName,
     tableHeaderClassName,
@@ -120,20 +120,20 @@ export function DataTable({
 
     return (
         <div className="w-full space-y-4">
-            <div className="flex items-center justify-between gap-4 flex-wrap">
-                <div className="flex items-center gap-4 flex-1 flex-wrap">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-4 flex-1 flex-wrap w-full md:w-auto">
                     <Input
                         placeholder={searchPlaceholder}
                         value={globalFilter ?? ""}
                         onChange={(event) => setGlobalFilter(String(event.target.value))}
-                        className="max-w-sm h-8 text-xs rounded-md border-gray-200 shadow-xs focus:border-indigo-500"
+                        className="w-full md:max-w-sm h-8 text-xs rounded-md border-gray-200 shadow-xs focus:border-indigo-500"
                     />
                     {leftActionElement && (
                         <div className="flex items-center gap-2">
                             {leftActionElement}
                         </div>
                     )}
-                    <div className="flex items-center space-x-1.5 text-xs text-gray-500">
+                    <div className="hidden md:flex items-center space-x-1.5 text-xs text-gray-500">
                         <span className="font-medium whitespace-nowrap">Show</span>
                         <Select
                             value={`${table.getState().pagination.pageSize}`}
@@ -155,15 +155,15 @@ export function DataTable({
                         </Select>
                     </div>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex items-center justify-between md:justify-end gap-3 w-full md:w-auto flex-wrap">
                     {actionElement && (
-                        <div>
-                            {actionElement}
+                        <div className="flex-1 min-w-[200px]">
+                            {typeof actionElement === 'function' ? actionElement({ table }) : actionElement}
                         </div>
                     )}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm" className="h-8 px-3 text-xs font-medium rounded-md shadow-xs border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition-all cursor-pointer">
+                            <Button variant="outline" size="sm" className="h-8 px-3 text-xs font-medium rounded-md shadow-xs border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition-all cursor-pointer whitespace-nowrap">
                                 <Settings2 className="mr-1.5 h-3.5 w-3.5 text-gray-500" />
                                 View
                             </Button>
@@ -198,7 +198,7 @@ export function DataTable({
                 containerRef={tableContainerRef}
                 containerTabIndex={horizontalScrollHint && hasHorizontalOverflow ? 0 : undefined}
                 containerAriaLabel={horizontalScrollHint && hasHorizontalOverflow ? "Scrollable data table" : undefined}
-                containerClassName={cn("rounded-md border relative", tableContainerClassName)}
+                containerClassName={cn("rounded-none border relative", tableContainerClassName)}
                 className={tableClassName}
             >
                 <TableHeader className={tableHeaderClassName}>
@@ -258,7 +258,7 @@ export function DataTable({
                 </div>
             )}
             {table.getState().pagination.pageSize === 999999 && table.getRowModel().rows.length > visibleLimit && (
-                <div className="flex justify-center py-3 border-t border-gray-100 bg-gray-50/60 rounded-b-md">
+                <div className="flex justify-center py-3 border-t border-gray-100 bg-gray-50/60 rounded-none">
                     <Button
                         type="button"
                         variant="outline"
@@ -271,8 +271,13 @@ export function DataTable({
                 </div>
             )}
             {table.getState().pagination.pageSize === 999999 && table.getRowModel().rows.length > 100 && table.getRowModel().rows.length <= visibleLimit && (
-                <div className="flex justify-center py-2 border-t border-gray-100 bg-emerald-50/60 rounded-b-md text-emerald-700 text-xs font-medium">
+                <div className="flex justify-center py-2 border-t border-gray-100 bg-emerald-50/60 rounded-none text-emerald-700 text-xs font-medium">
                     ✓ All {table.getRowModel().rows.length} entries loaded and displayed
+                </div>
+            )}
+            {bottomActionElement && (
+                <div className="mt-4 px-1 w-full">
+                    {typeof bottomActionElement === 'function' ? bottomActionElement({ table }) : bottomActionElement}
                 </div>
             )}
             <div className="flex items-center justify-between px-2">

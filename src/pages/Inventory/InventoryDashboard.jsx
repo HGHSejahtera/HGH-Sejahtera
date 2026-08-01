@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Archive, Barcode, Boxes, ChevronDown, ChevronUp, ChevronsUpDown, Edit, MoreHorizontal, Package, PackagePlus, Plus, RefreshCw, Trash2, AlertTriangle, XCircle, Square, ListChecks, Maximize, Minimize, Download, X } from 'lucide-react';
+import { Archive, Barcode, Boxes, ChevronDown, ChevronUp, ChevronsUpDown, Edit, MoreHorizontal, Package, PackagePlus, Plus, RefreshCw, Trash2, AlertTriangle, XCircle, ListChecks, Maximize, Minimize, Download, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DataTable } from '@/components/common/DataTable';
@@ -1012,7 +1012,6 @@ export function InventoryDashboard() {
                             tableHeadClassName="h-11 bg-white px-3 text-sm font-medium text-slate-500"
                             tableRowClassName="group border-slate-200 hover:!bg-indigo-50/45 data-[state=selected]:!bg-indigo-50"
                             tableCellClassName="px-3 py-3 text-sm text-slate-700"
-                            horizontalScrollHint={ViewMode === 'All' ? 'Scroll horizontally to view all columns' : ViewMode === 'Detail' ? 'Scroll horizontally to view pricing columns' : 'Scroll horizontally to view more columns'}
                             leftActionElement={
                                 <>
                                     <Button

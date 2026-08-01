@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useTranslation } from '@/hooks/useTranslation';
 import { usePricingMatrix, useBulkUpdatePricing } from '@/hooks/usePricing';
 import { useSecretMode } from '@/hooks/useSecretMode';
@@ -11,10 +11,10 @@ const PriceInput = ({ value, onChange, disabled, type = 'selling', costPrice = 0
     const [localValue, setLocalValue] = useState(value ?? '');
     const [prevValue, setPrevValue] = useState(value);
 
-    useEffect(() => {
+    if (value !== prevValue) {
         setLocalValue(value ?? '');
         setPrevValue(value);
-    }, [value]);
+    }
 
     const numVal = parseFloat(localValue);
     const numCost = parseFloat(costPrice) || 0;

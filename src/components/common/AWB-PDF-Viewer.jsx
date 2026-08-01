@@ -73,13 +73,13 @@ export function AWBPDFViewer({ url, open, onOpenChange }) {
     }
 
     const handleOpen = () => {
-        window.open(url ? `/api/Proxy-PDF?url=${encodeURIComponent(url)}&t=${viewerTimestamp}` : '', '_blank');
+        window.open(url ? `/api/proxy-pdf?url=${encodeURIComponent(url)}&t=${viewerTimestamp}` : '', '_blank');
     };
     const handleClose = () => onOpenChange(false);
 
     const handleDownload = () => {
         if (!url) return;
-        const downloadUrl = `/api/Proxy-PDF?url=${encodeURIComponent(url)}&download=true&t=${viewerTimestamp}`;
+        const downloadUrl = `/api/proxy-pdf?url=${encodeURIComponent(url)}&download=true&t=${viewerTimestamp}`;
         const a = document.createElement('a');
         a.href = downloadUrl;
         // The backend Content-Disposition will dictate the filename for the browser
@@ -195,7 +195,7 @@ export function AWBPDFViewer({ url, open, onOpenChange }) {
                             </button>
 
                             <Document
-                                file={`/api/Proxy-PDF?url=${encodeURIComponent(url)}&t=${viewerTimestamp}`}
+                                file={`/api/proxy-pdf?url=${encodeURIComponent(url)}&t=${viewerTimestamp}`}
                                 onLoadSuccess={onDocumentLoadSuccess}
                                 onLoadError={onDocumentLoadError}
                                 loading={null}

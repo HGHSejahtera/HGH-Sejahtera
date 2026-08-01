@@ -110,7 +110,9 @@ export default async function handler(req, res) {
         res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-        res.setHeader('Content-Disposition', `${isDownload ? 'attachment' : 'inline'}; filename="${filename}"`);
+        if (isDownload) {
+            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        }
         
         res.status(200).send(Buffer.from(buffer));
     } catch (error) {

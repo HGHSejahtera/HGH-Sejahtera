@@ -159,7 +159,7 @@ export const useAgentRecentOrders = (agentId) => {
                     Items: mappedItems,
                     Platform: order.Platform || parent?.Platform || 'TikTok',
                     Source: parent?.Source,
-                    AccountName: parent?.AccountName || 'Main Account',
+                    AccountName: parent?.AccountName || null,
                     DisplayAmount: displayAmount,
                     DisplayProfit: displayProfit,
                     TotalAmount: displayAmount,

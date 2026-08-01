@@ -49,12 +49,6 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api/Proxy-PDF': {
-        target: 'https://www.hghsejahtera.my',
-        changeOrigin: true,
-        secure: false,
-        rewrite: (path) => path.replace(/^\/api\/Proxy-PDF/, '/api/proxy-pdf'),
-      },
       '/api': {
         target: 'https://www.hghsejahtera.my',
         changeOrigin: true,

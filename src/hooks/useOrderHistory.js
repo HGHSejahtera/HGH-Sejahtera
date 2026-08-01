@@ -42,10 +42,13 @@ export function useOrderHistory(filters = {}) {
             // Map data for easier UI consumption
             return data.map(order => {
                 const parent = order.OrderImports;
+                const isAgentOrder = parent?.Source === 'AgentOrder' || !!parent?.Users;
+                const accountType = isAgentOrder ? 'Agent' : 'Stores';
+                
                 let agentName = 'Direct Sale';
-                if (parent?.Users) {
+                if (isAgentOrder && parent?.Users) {
                     agentName = parent.Users.Nickname || parent.Users.DisplayName;
-                } else if (parent?.AccountName) {
+                } else if (!isAgentOrder && parent?.AccountName) {
                     agentName = parent.AccountName;
                 }
 
@@ -73,7 +76,8 @@ export function useOrderHistory(filters = {}) {
                     Items: mappedItems,
                     Platform: order.Platform,
                     Source: parent?.Source,
-                    AccountName: parent?.AccountName || 'Main Account',
+                    AccountType: accountType,
+                    AccountName: isAgentOrder ? null : (parent?.AccountName || 'Stores'),
                     AgentName: agentName,
                     DisplayAmount: displayAmount,
                     DisplayProfit: displayProfit,

@@ -7,13 +7,13 @@ import { ProductModal } from '@/pages/Inventory/ProductModal';
 import { OrderMatchModal } from '@/pages/Orders/OrderMatchModal';
 import { useProductMatcher } from '@/hooks/useProductMatcher';
 
-import { Clock, ChevronRight, Package, X, Printer, AlertTriangle, Calendar, CheckCircle2, ShieldAlert } from 'lucide-react';
+import { Clock, ChevronRight, Package, X, Printer, AlertTriangle, CheckCircle2, ShieldAlert, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/common/DataTable';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/hooks/useAuth';
 import { Navigate } from 'react-router-dom';
@@ -39,6 +39,150 @@ const MonthOptions = [
     { label: 'December', value: '11' },
 ];
 
+const FilterControls = ({
+    isMobile,
+    tab, // 'Queue', 'Complete', 'Status'
+    FilterPlatform, SetFilterPlatform, UniquePlatforms,
+    FilterAccountType, SetFilterAccountType,
+    FilterAgent, SetFilterAgent, UniqueAgents,
+    FilterMonth, SetFilterMonth,
+    QueueSortBy, SetQueueSortBy,
+    HistorySortBy, SetHistorySortBy,
+    StatusFilterPill, SetStatusFilterPill, statusCounts,
+    table
+}) => {
+    const isHistory = tab === 'Complete';
+    const isStatus = tab === 'Status';
+    
+    const wrapperClass = isMobile ? "flex flex-col gap-4 w-full" : "hidden md:flex flex-wrap items-center gap-3";
+    const itemClass = isMobile ? "flex flex-col gap-1.5" : "flex items-center gap-1.5 text-xs";
+    const labelClass = "text-gray-500 font-medium";
+    const selectTriggerClass = cn(
+        "bg-white text-xs font-medium rounded-md border-gray-200 hover:border-gray-300 shadow-xs transition-colors",
+        isMobile ? "w-full h-10" : "h-8 w-[110px]"
+    );
+    
+    return (
+        <div className={wrapperClass}>
+            {isStatus && statusCounts && (
+                <div className={itemClass}>
+                    <span className={labelClass}>Problem Type:</span>
+                    <Select value={StatusFilterPill} onValueChange={SetStatusFilterPill}>
+                        <SelectTrigger className={selectTriggerClass}>
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent side="bottom" className="rounded-md shadow-lg border-gray-200">
+                            <SelectItem value="All">All Problem ({statusCounts.total})</SelectItem>
+                            <SelectItem value="SKUReview">SKU Review ({statusCounts.skuReview})</SelectItem>
+                            <SelectItem value="MissingAWB">AWB Action ({statusCounts.missingAwb})</SelectItem>
+                            <SelectItem value="Ready">Ready ({statusCounts.ready})</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+            )}
+            
+            <div className={itemClass}>
+                <span className={labelClass}>Platform:</span>
+                <Select value={FilterPlatform} onValueChange={SetFilterPlatform}>
+                    <SelectTrigger className={selectTriggerClass}>
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent side="bottom" className="rounded-md shadow-lg border-gray-200">
+                        {UniquePlatforms.map(platform => (
+                            <SelectItem key={platform} value={platform}>{platform}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+            
+            <div className={itemClass}>
+                <span className={labelClass}>Account:</span>
+                <Select value={FilterAccountType} onValueChange={(val) => { SetFilterAccountType(val); SetFilterAgent('All'); }}>
+                    <SelectTrigger className={selectTriggerClass}>
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent side="bottom" className="rounded-md shadow-lg border-gray-200">
+                        <SelectItem value="All">All</SelectItem>
+                        <SelectItem value="Stores">Stores</SelectItem>
+                        <SelectItem value="Agent">Agent</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+            
+            {FilterAccountType === 'Agent' && (
+                <div className={itemClass}>
+                    <span className={labelClass}>Agent:</span>
+                    <Select value={FilterAgent} onValueChange={SetFilterAgent}>
+                        <SelectTrigger className={selectTriggerClass}>
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent side="bottom" className="rounded-md shadow-lg border-gray-200">
+                            {UniqueAgents.map(agent => (
+                                <SelectItem key={agent} value={agent}>{agent}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+            )}
+            
+            {isHistory && (
+                <div className={itemClass}>
+                    <span className={labelClass}>Month:</span>
+                    <Select value={FilterMonth} onValueChange={SetFilterMonth}>
+                        <SelectTrigger className={selectTriggerClass}>
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent side="bottom" className="rounded-md shadow-lg border-gray-200 max-h-[260px]">
+                            {MonthOptions.map(m => (
+                                <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+            )}
+            
+            {!isStatus && (
+                <div className={itemClass}>
+                    <span className={labelClass}>Sort By:</span>
+                    <Select value={isHistory ? HistorySortBy : QueueSortBy} onValueChange={isHistory ? SetHistorySortBy : SetQueueSortBy}>
+                        <SelectTrigger className={cn(selectTriggerClass, isMobile ? "" : "w-[130px]")}>
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent side="bottom" className="rounded-md shadow-lg border-gray-200">
+                            <SelectItem value="Product">Product</SelectItem>
+                            <SelectItem value="Brand">Brand</SelectItem>
+                            <SelectItem value="DateOldest">Oldest</SelectItem>
+                            <SelectItem value="DateNewest">Newest</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+            )}
+
+            {isMobile && table && (
+                <div className={itemClass}>
+                    <span className={labelClass}>Show Rows:</span>
+                    <Select
+                        value={`${table.getState().pagination.pageSize}`}
+                        onValueChange={(value) => table.setPageSize(Number(value))}
+                    >
+                        <SelectTrigger className={selectTriggerClass}>
+                            <SelectValue placeholder={table.getState().pagination.pageSize === 999999 ? 'All' : table.getState().pagination.pageSize} />
+                        </SelectTrigger>
+                        <SelectContent side="bottom" className="rounded-md shadow-lg border-gray-200 text-xs">
+                            {[10, 30, 50, 100].map((pageSize) => (
+                                <SelectItem key={pageSize} value={`${pageSize}`}>
+                                    {pageSize}
+                                </SelectItem>
+                            ))}
+                            <SelectItem value="999999">All</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+            )}
+        </div>
+    );
+};
+
 export function AllOrders() {
     const { user } = useAuthStore();
     const role = user?.role || 'Staff';
@@ -58,15 +202,18 @@ export function AllOrders() {
     const [IsPrinting, SetIsPrinting] = useState(false);
     const [FilterAgent, SetFilterAgent] = useState('All');
     const [FilterPlatform, SetFilterPlatform] = useState('All');
-    const [FilterAccount, SetFilterAccount] = useState('All');
+    const [FilterAccountType, SetFilterAccountType] = useState('All');
     const [FilterMonth, SetFilterMonth] = useState(String(new Date().getMonth()));
-    const [DateRange, SetDateRange] = useState({ from: '', to: '' });
     const [RowSelection, SetRowSelection] = useState({});
 
     const handleTabChange = (tab) => {
         SetActiveTab(tab);
         localStorage.setItem('HGH_Orders_ActiveTab', tab);
         SetRowSelection({});
+        SetFilterAgent('All');
+        SetFilterPlatform('All');
+        SetFilterAccountType('All');
+        SetFilterMonth(String(new Date().getMonth()));
     };
 
     const handleHeaderClick = (columnName) => {
@@ -84,22 +231,17 @@ export function AllOrders() {
         queueMicrotask(() => {
             SetRowSelection({});
         });
-    }, [ActiveTab, FilterAgent, FilterPlatform, FilterAccount, QueueSortBy, HistorySortBy, HeaderSort.column, HeaderSort.direction, StatusFilterPill, FilterMonth, DateRange.from, DateRange.to]);
+    }, [ActiveTab, FilterAgent, FilterPlatform, FilterAccountType, QueueSortBy, HistorySortBy, HeaderSort.column, HeaderSort.direction, StatusFilterPill, FilterMonth]);
 
     // Unique options for filters
     const UniqueAgents = useMemo(() => {
-        const agents = new Set(orders.filter(o => o.AgentName).map(o => o.AgentName));
+        const agents = new Set(orders.filter(o => o.AccountType === 'Agent' && o.AgentName).map(o => o.AgentName));
         return ['All', ...Array.from(agents).sort()];
     }, [orders]);
 
     const UniquePlatforms = useMemo(() => {
         const platforms = new Set(orders.filter(o => o.Platform).map(o => o.Platform));
         return ['All', ...Array.from(platforms).sort()];
-    }, [orders]);
-
-    const UniqueAccounts = useMemo(() => {
-        const accounts = new Set(orders.filter(o => o.AccountName).map(o => o.AccountName));
-        return ['All', ...Array.from(accounts).sort()];
     }, [orders]);
 
     // Drawer state
@@ -201,28 +343,24 @@ export function AllOrders() {
 
     const QueueOrders = useMemo(() => {
         let Unprinted = orders.filter(Order => !Order.IsPrinted);
-        if (FilterAgent !== 'All') Unprinted = Unprinted.filter(o => o.AgentName === FilterAgent);
-        if (FilterPlatform !== 'All') Unprinted = Unprinted.filter(o => o.Platform === FilterPlatform);
-        if (FilterAccount !== 'All') Unprinted = Unprinted.filter(o => o.AccountName === FilterAccount);
+        if (FilterAccountType === 'Stores') Unprinted = Unprinted.filter(o => o.AccountType === 'Stores');
+        if (FilterAccountType === 'Agent') {
+            Unprinted = Unprinted.filter(o => o.AccountType === 'Agent');
+            if (FilterAgent !== 'All') Unprinted = Unprinted.filter(o => o.AgentName === FilterAgent);
+        }
         return SortOrders(Unprinted, QueueSortBy);
-    }, [orders, QueueSortBy, FilterAgent, FilterPlatform, FilterAccount]);
+    }, [orders, QueueSortBy, FilterAgent, FilterPlatform, FilterAccountType]);
 
     const CompleteOrders = useMemo(() => {
         let Printed = orders.filter(Order => Order.IsPrinted);
-        if (FilterAgent !== 'All') Printed = Printed.filter(o => o.AgentName === FilterAgent);
         if (FilterPlatform !== 'All') Printed = Printed.filter(o => o.Platform === FilterPlatform);
-        if (FilterAccount !== 'All') Printed = Printed.filter(o => o.AccountName === FilterAccount);
-        const hasDateRange = Boolean(DateRange.from || DateRange.to);
-        if (!hasDateRange && FilterMonth !== 'All') {
+        if (FilterAccountType === 'Stores') Printed = Printed.filter(o => o.AccountType === 'Stores');
+        if (FilterAccountType === 'Agent') {
+            Printed = Printed.filter(o => o.AccountType === 'Agent');
+            if (FilterAgent !== 'All') Printed = Printed.filter(o => o.AgentName === FilterAgent);
+        }
+        if (FilterMonth !== 'All') {
             Printed = Printed.filter(o => new Date(o.CreatedAt || 0).getMonth() === Number(FilterMonth));
-        }
-        if (DateRange.from) {
-            const FromTime = new Date(`${DateRange.from}T00:00:00`).getTime();
-            Printed = Printed.filter(o => new Date(o.CreatedAt || 0).getTime() >= FromTime);
-        }
-        if (DateRange.to) {
-            const ToTime = new Date(`${DateRange.to}T23:59:59`).getTime();
-            Printed = Printed.filter(o => new Date(o.CreatedAt || 0).getTime() <= ToTime);
         }
 
         if (HeaderSort.column === 'Date') {
@@ -247,7 +385,7 @@ export function AllOrders() {
         }
 
         return Printed;
-    }, [orders, HistorySortBy, HeaderSort.column, HeaderSort.direction, FilterAgent, FilterPlatform, FilterAccount, FilterMonth, DateRange.from, DateRange.to]);
+    }, [orders, HistorySortBy, HeaderSort.column, HeaderSort.direction, FilterAgent, FilterPlatform, FilterAccountType, FilterMonth]);
 
     const StatusOrders = useMemo(() => {
         const resolvedSessionIds = new Set(JSON.parse(localStorage.getItem('HGH_ResolvedStatusOrders') || '[]'));
@@ -267,9 +405,12 @@ export function AllOrders() {
             return true;
         });
 
-        if (FilterAgent !== 'All') filtered = filtered.filter(o => o.AgentName === FilterAgent);
         if (FilterPlatform !== 'All') filtered = filtered.filter(o => o.Platform === FilterPlatform);
-        if (FilterAccount !== 'All') filtered = filtered.filter(o => o.AccountName === FilterAccount);
+        if (FilterAccountType === 'Stores') filtered = filtered.filter(o => o.AccountType === 'Stores');
+        if (FilterAccountType === 'Agent') {
+            filtered = filtered.filter(o => o.AccountType === 'Agent');
+            if (FilterAgent !== 'All') filtered = filtered.filter(o => o.AgentName === FilterAgent);
+        }
 
         if (HeaderSort.column === 'Date') {
             filtered.sort((a, b) => {
@@ -293,9 +434,13 @@ export function AllOrders() {
         }
 
         return filtered;
-    }, [orders, HeaderSort.column, HeaderSort.direction, StatusFilterPill, FilterAgent, FilterPlatform, FilterAccount]);
+    }, [orders, HeaderSort.column, HeaderSort.direction, StatusFilterPill, FilterAgent, FilterPlatform, FilterAccountType]);
 
     const DisplayOrders = ActiveTab === 'Queue' ? QueueOrders : ActiveTab === 'Complete' ? CompleteOrders : StatusOrders;
+
+    const TotalProfit = useMemo(() => {
+        return DisplayOrders.reduce((sum, o) => sum + (parseFloat(o.DisplayProfit || 0)), 0);
+    }, [DisplayOrders]);
 
     const HandlePrintAll = async () => {
         const selectedIndices = Object.keys(RowSelection).filter(k => RowSelection[k]);
@@ -354,6 +499,8 @@ export function AllOrders() {
         {
             header: 'Date',
             accessorKey: 'CreatedAt',
+            id: 'Date',
+            meta: { className: 'hidden md:table-cell' },
             cell: ({ row }) => {
                 const date = new Date(row.original.CreatedAt);
                 return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -362,6 +509,7 @@ export function AllOrders() {
         {
             header: 'Time',
             id: 'time',
+            meta: { className: 'hidden md:table-cell' },
             cell: ({ row }) => {
                 const date = new Date(row.original.CreatedAt);
                 return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
@@ -370,6 +518,7 @@ export function AllOrders() {
         {
             header: 'Order ID',
             accessorKey: 'PlatformOrderID',
+            id: 'OrderID',
             cell: ({ row }) => {
                 const isMissingAwb = !row.original.AwbUrl || row.original.AwbUrl.trim() === '';
                 return (
@@ -388,6 +537,7 @@ export function AllOrders() {
         {
             header: () => <div className="text-center">Platform</div>,
             accessorKey: 'Platform',
+            meta: { className: 'hidden md:table-cell' },
             cell: ({ row }) => (
                 <div className="flex justify-center">
                     <Badge variant="outline" className="bg-white rounded-md font-medium text-xs border-gray-200 px-2.5 py-0.5 shadow-xs">
@@ -399,6 +549,8 @@ export function AllOrders() {
         {
             header: 'Agent',
             accessorKey: 'AgentName',
+            id: 'Agent',
+            meta: { className: 'hidden md:table-cell' },
             cell: ({ row }) => (
                 <div className="flex flex-col">
                     <span className="font-medium text-gray-900">{row.original.AgentName}</span>
@@ -408,6 +560,8 @@ export function AllOrders() {
         {
             header: () => <div className="text-right">Profit</div>,
             accessorKey: 'DisplayProfit',
+            id: 'Profit',
+            meta: { className: 'hidden md:table-cell' },
             cell: ({ row }) => (
                 <div className="text-right font-medium text-emerald-600">
                     {formatCurrency(row.original.DisplayProfit)}
@@ -417,6 +571,7 @@ export function AllOrders() {
         {
             header: () => <div className="text-center">Review</div>,
             id: 'review',
+            meta: { className: 'hidden md:table-cell' },
             cell: ({ row }) => {
                 const isMissingAwb = !row.original.AwbUrl || row.original.AwbUrl.trim() === '';
                 const hasUnmatched = (row.original.Items || row.original.ImportOrderItems)?.some(
@@ -470,35 +625,6 @@ export function AllOrders() {
 
     const completeColumns = [
         {
-            id: 'select',
-            header: ({ table }) => (
-                <div className="flex justify-center items-center px-2">
-                    <Checkbox
-                        checked={table.getIsAllPageRowsSelected()}
-                        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-                        aria-label="Select all"
-                        className="border-gray-300"
-                    />
-                </div>
-            ),
-            cell: ({ row }) => {
-                const isMissingAwb = !row.original.AwbUrl || row.original.AwbUrl.trim() === '';
-                return (
-                    <div className="flex justify-center items-center px-2">
-                        <Checkbox
-                            checked={row.getIsSelected()}
-                            onCheckedChange={(value) => row.toggleSelected(!!value)}
-                            aria-label="Select row"
-                            className="border-gray-300"
-                            disabled={isMissingAwb}
-                        />
-                    </div>
-                );
-            },
-            enableSorting: false,
-            enableHiding: false,
-        },
-        {
             header: () => (
                 <button
                     type="button"
@@ -509,6 +635,8 @@ export function AllOrders() {
                 </button>
             ),
             accessorKey: 'CreatedAt',
+            id: 'Date',
+            meta: { className: 'hidden md:table-cell' },
             cell: ({ row }) => {
                 const date = new Date(row.original.CreatedAt);
                 return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -517,6 +645,7 @@ export function AllOrders() {
         {
             header: 'Time',
             id: 'time',
+            meta: { className: 'hidden md:table-cell' },
             cell: ({ row }) => {
                 const date = new Date(row.original.CreatedAt);
                 return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
@@ -525,6 +654,7 @@ export function AllOrders() {
         {
             header: 'Order ID',
             accessorKey: 'PlatformOrderID',
+            id: 'OrderID',
             cell: ({ row }) => (
                 <div className="flex items-center space-x-2">
                     <span className="font-semibold text-gray-900">{row.original.PlatformOrderID}</span>
@@ -534,6 +664,7 @@ export function AllOrders() {
         {
             header: () => <div className="text-center">Platform</div>,
             accessorKey: 'Platform',
+            meta: { className: 'hidden md:table-cell' },
             cell: ({ row }) => (
                 <div className="flex justify-center">
                     <Badge variant="outline" className="bg-white rounded-md font-medium text-xs border-gray-200 px-2.5 py-0.5 shadow-xs">
@@ -545,6 +676,8 @@ export function AllOrders() {
         {
             header: 'Agent',
             accessorKey: 'AgentName',
+            id: 'Agent',
+            meta: { className: 'hidden md:table-cell' },
             cell: ({ row }) => (
                 <div className="flex flex-col">
                     <span className="font-medium text-gray-900">{row.original.AgentName}</span>
@@ -554,6 +687,8 @@ export function AllOrders() {
         {
             header: () => <div className="text-right">Profit</div>,
             accessorKey: 'DisplayProfit',
+            id: 'Profit',
+            meta: { className: 'hidden md:table-cell' },
             cell: ({ row }) => (
                 <div className="text-right font-medium text-emerald-600">
                     {formatCurrency(row.original.DisplayProfit)}
@@ -573,6 +708,7 @@ export function AllOrders() {
                 </div>
             ),
             id: 'status',
+            meta: { className: 'hidden md:table-cell' },
             cell: ({ row }) => {
                 const hasUnmatched = (row.original.Items || row.original.ImportOrderItems)?.some(
                     i => !i.ProductID || i.PlatformSKU === '-' || i.MatchStatus === 'Unmatched'
@@ -622,31 +758,6 @@ export function AllOrders() {
 
     const statusColumns = [
         {
-            id: 'select',
-            header: ({ table }) => (
-                <div className="flex justify-center items-center px-2">
-                    <Checkbox
-                        checked={table.getIsAllPageRowsSelected()}
-                        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-                        aria-label="Select all"
-                        className="border-gray-300"
-                    />
-                </div>
-            ),
-            cell: ({ row }) => (
-                <div className="flex justify-center items-center px-2">
-                    <Checkbox
-                        checked={row.getIsSelected()}
-                        onCheckedChange={(value) => row.toggleSelected(!!value)}
-                        aria-label="Select row"
-                        className="border-gray-300"
-                    />
-                </div>
-            ),
-            enableSorting: false,
-            enableHiding: false,
-        },
-        {
             header: () => (
                 <button
                     type="button"
@@ -657,6 +768,8 @@ export function AllOrders() {
                 </button>
             ),
             accessorKey: 'CreatedAt',
+            id: 'Date',
+            meta: { className: 'hidden md:table-cell' },
             cell: ({ row }) => {
                 const date = new Date(row.original.CreatedAt);
                 return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -665,6 +778,7 @@ export function AllOrders() {
         {
             header: 'Time',
             id: 'time',
+            meta: { className: 'hidden md:table-cell' },
             cell: ({ row }) => {
                 const date = new Date(row.original.CreatedAt);
                 return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
@@ -673,6 +787,7 @@ export function AllOrders() {
         {
             header: 'Order ID',
             accessorKey: 'PlatformOrderID',
+            id: 'OrderID',
             cell: ({ row }) => (
                 <div className="flex items-center space-x-2">
                     <span className="font-semibold text-gray-900">{row.original.PlatformOrderID}</span>
@@ -682,6 +797,7 @@ export function AllOrders() {
         {
             header: () => <div className="text-center">Platform</div>,
             accessorKey: 'Platform',
+            meta: { className: 'hidden md:table-cell' },
             cell: ({ row }) => (
                 <div className="flex justify-center">
                     <Badge variant="outline" className="bg-white rounded-md font-medium text-xs border-gray-200 px-2.5 py-0.5 shadow-xs">
@@ -693,6 +809,8 @@ export function AllOrders() {
         {
             header: 'Agent',
             accessorKey: 'AgentName',
+            id: 'Agent',
+            meta: { className: 'hidden md:table-cell' },
             cell: ({ row }) => (
                 <div className="flex flex-col">
                     <span className="font-medium text-gray-900">{row.original.AgentName}</span>
@@ -702,6 +820,8 @@ export function AllOrders() {
         {
             header: () => <div className="text-right">Profit</div>,
             accessorKey: 'DisplayProfit',
+            id: 'Profit',
+            meta: { className: 'hidden md:table-cell' },
             cell: ({ row }) => (
                 <div className="text-right font-medium text-emerald-600">
                     {formatCurrency(row.original.DisplayProfit)}
@@ -775,441 +895,218 @@ export function AllOrders() {
     ];
 
     const selectedCount = Object.keys(RowSelection).filter(k => RowSelection[k]).length;
-    const QueueActionElement = ActiveTab === 'Queue' ? (
-        <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-1 text-xs">
-                <span className="text-gray-500 font-medium mr-1">Platform:</span>
-                <Select value={FilterPlatform} onValueChange={SetFilterPlatform}>
-                    <SelectTrigger className="h-8 w-[110px] bg-white text-xs font-medium rounded-md border-gray-200 hover:border-gray-300 shadow-xs transition-colors">
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent side="bottom" className="rounded-md shadow-lg border-gray-200">
-                        {UniquePlatforms.map(platform => (
-                            <SelectItem key={platform} value={platform}>{platform}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </div>
-            <div className="flex items-center gap-1 text-xs ml-2">
-                <span className="text-gray-500 font-medium mr-1">Account:</span>
-                <Select value={FilterAccount} onValueChange={SetFilterAccount}>
-                    <SelectTrigger className="h-8 w-[110px] bg-white text-xs font-medium rounded-md border-gray-200 hover:border-gray-300 shadow-xs transition-colors">
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent side="bottom" className="rounded-md shadow-lg border-gray-200">
-                        {UniqueAccounts.map(account => (
-                            <SelectItem key={account} value={account}>{account}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </div>
-            <div className="flex items-center gap-1 text-xs ml-2">
-                <span className="text-gray-500 font-medium mr-1">Agent:</span>
-                <Select value={FilterAgent} onValueChange={SetFilterAgent}>
-                    <SelectTrigger className="h-8 w-[110px] bg-white text-xs font-medium rounded-md border-gray-200 hover:border-gray-300 shadow-xs transition-colors">
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent side="bottom" className="rounded-md shadow-lg border-gray-200">
-                        {UniqueAgents.map(agent => (
-                            <SelectItem key={agent} value={agent}>{agent}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </div>
-            <div className="flex items-center gap-1 text-xs ml-2">
-                <span className="text-gray-500 font-medium mr-1">Sort By:</span>
-                <Select value={QueueSortBy} onValueChange={SetQueueSortBy}>
-                    <SelectTrigger className="h-8 w-[130px] bg-white text-xs font-medium rounded-md border-gray-200 hover:border-gray-300 shadow-xs transition-colors">
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent side="bottom" className="rounded-md shadow-lg border-gray-200">
-                        <SelectItem value="Product">Product</SelectItem>
-                        <SelectItem value="Brand">Brand</SelectItem>
-                        <SelectItem value="DateOldest">Date (Oldest)</SelectItem>
-                        <SelectItem value="DateNewest">Date (Newest)</SelectItem>
-                    </SelectContent>
-                </Select>
-            </div>
-            <Button
-                variant="default"
-                size="sm"
-                onClick={HandlePrintAll}
-                disabled={IsPrinting || QueueOrders.length === 0}
-                className="bg-purple-600 hover:bg-purple-700 text-white font-medium text-xs rounded-md h-8 px-3.5 shadow-sm transition-all cursor-pointer ml-2 border border-purple-600 hover:border-purple-700"
-            >
-                <Printer className="w-3.5 h-3.5 mr-1.5 text-white" />
-                {selectedCount > 0 ? `Print Selected (${selectedCount})` : `Print All (${QueueOrders.length})`}
-            </Button>
-        </div>
-    ) : null;
-
-    const CompleteActionElement = ActiveTab === 'Complete' ? (
-        <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-1 text-xs">
-                <span className="text-gray-500 font-medium mr-1">Platform:</span>
-                <Select value={FilterPlatform} onValueChange={SetFilterPlatform}>
-                    <SelectTrigger className="h-8 w-[100px] bg-white text-xs font-medium rounded-md border-gray-200 hover:border-gray-300 shadow-xs transition-colors">
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent side="bottom" className="rounded-md shadow-lg border-gray-200">
-                        {UniquePlatforms.map(platform => (
-                            <SelectItem key={platform} value={platform}>{platform}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </div>
-            <div className="flex items-center gap-1 text-xs ml-1">
-                <span className="text-gray-500 font-medium mr-1">Account:</span>
-                <Select value={FilterAccount} onValueChange={SetFilterAccount}>
-                    <SelectTrigger className="h-8 w-[100px] bg-white text-xs font-medium rounded-md border-gray-200 hover:border-gray-300 shadow-xs transition-colors">
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent side="bottom" className="rounded-md shadow-lg border-gray-200">
-                        {UniqueAccounts.map(account => (
-                            <SelectItem key={account} value={account}>{account}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </div>
-            <div className="flex items-center gap-1 text-xs ml-1">
-                <span className="text-gray-500 font-medium mr-1">Agent:</span>
-                <Select value={FilterAgent} onValueChange={SetFilterAgent}>
-                    <SelectTrigger className="h-8 w-[100px] bg-white text-xs font-medium rounded-md border-gray-200 hover:border-gray-300 shadow-xs transition-colors">
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent side="bottom" className="rounded-md shadow-lg border-gray-200">
-                        {UniqueAgents.map(agent => (
-                            <SelectItem key={agent} value={agent}>{agent}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </div>
-            <div className="flex items-center gap-1 text-xs ml-1">
-                <span className="text-gray-500 font-medium mr-1">Month:</span>
-                <Select value={FilterMonth} onValueChange={SetFilterMonth}>
-                    <SelectTrigger className="h-8 w-[110px] bg-white text-xs font-medium rounded-md border-gray-200 hover:border-gray-300 shadow-xs transition-colors">
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent side="bottom" className="rounded-md shadow-lg border-gray-200 max-h-[260px]">
-                        {MonthOptions.map(m => (
-                            <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </div>
-
-            {/* Airbnb-Style Date Range Picker */}
-            <div className="flex items-center ml-1">
-                <Popover>
-                    <PopoverTrigger asChild>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className={cn(
-                                "h-8 px-2.5 rounded-md border-gray-200 bg-white hover:bg-gray-50 text-xs font-medium shadow-xs transition-colors flex items-center gap-2 cursor-pointer",
-                                (DateRange.from || DateRange.to) ? "border-indigo-600 text-indigo-600 bg-indigo-50/60 font-semibold" : "text-gray-700"
-                            )}
-                        >
-                            <Calendar className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                            {DateRange.from && DateRange.to
-                                ? `${new Date(DateRange.from).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} — ${new Date(DateRange.to).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`
-                                : DateRange.from
-                                    ? `${new Date(DateRange.from).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} — Select To Date`
-                                    : "Select Dates"}
-                            {(DateRange.from || DateRange.to) && (
-                                <span
-                                    className="p-0.5 rounded-md hover:bg-indigo-200/60 text-indigo-500 transition-colors ml-0.5 cursor-pointer"
-                                    onClick={(e) => { e.stopPropagation(); SetDateRange({ from: '', to: '' }); }}
-                                    title="Clear dates"
-                                >
-                                    <X className="w-3 h-3" />
-                                </span>
-                            )}
+    const QueueActionElement = ActiveTab === 'Queue' ? ({ table }) => (
+        <div className="flex flex-col md:flex-row md:items-center gap-3 w-full md:w-auto">
+            {/* Desktop Filters */}
+            <FilterControls 
+                table={table}
+                isMobile={false} tab="Queue"
+                FilterPlatform={FilterPlatform} SetFilterPlatform={SetFilterPlatform} UniquePlatforms={UniquePlatforms}
+                FilterAccountType={FilterAccountType} SetFilterAccountType={SetFilterAccountType}
+                FilterAgent={FilterAgent} SetFilterAgent={SetFilterAgent} UniqueAgents={UniqueAgents}
+                QueueSortBy={QueueSortBy} SetQueueSortBy={SetQueueSortBy}
+            />
+            
+            {/* Mobile Filters Popup */}
+            <div className="md:hidden flex items-center gap-2 w-full">
+                <Sheet>
+                    <SheetTrigger asChild>
+                        <Button variant="outline" className="flex-1 h-9 bg-white text-gray-700 border-gray-200 shadow-sm font-semibold flex items-center justify-center gap-1.5 cursor-pointer">
+                            <Filter className="w-4 h-4" /> Filters
                         </Button>
-                    </PopoverTrigger>
-                    <PopoverContent side="bottom" align="start" className="w-[360px] p-4 rounded-md shadow-lg border border-gray-200 bg-white">
-                        <div className="space-y-4">
-                            <div>
-                                <h4 className="font-bold text-gray-900 text-sm">Select Date Range</h4>
-                                <p className="text-xs text-gray-500">Filter completed order history by exact dates.</p>
-                            </div>
-
-                            {/* Dual From / To Inputs */}
-                            <div className="grid grid-cols-2 gap-2 p-1 bg-gray-50 border border-gray-200 rounded-md">
-                                <div className="p-2 border-r border-gray-200">
-                                    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">FROM</label>
-                                    <input
-                                        type="date"
-                                        value={DateRange.from}
-                                        onChange={(e) => SetDateRange(prev => ({ ...prev, from: e.target.value }))}
-                                        className="w-full bg-transparent text-xs font-semibold text-gray-900 outline-hidden cursor-pointer"
-                                    />
-                                </div>
-                                <div className="p-2">
-                                    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">TO</label>
-                                    <input
-                                        type="date"
-                                        value={DateRange.to}
-                                        onChange={(e) => SetDateRange(prev => ({ ...prev, to: e.target.value }))}
-                                        className="w-full bg-transparent text-xs font-semibold text-gray-900 outline-hidden cursor-pointer"
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Preset Shortcuts */}
-                            <div className="space-y-1.5">
-                                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Quick shortcuts</span>
-                                <div className="flex flex-wrap gap-1.5">
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            const today = new Date().toISOString().split('T')[0];
-                                            SetDateRange({ from: today, to: today });
-                                        }}
-                                        className="px-2.5 py-1 text-xs font-medium rounded-md bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors cursor-pointer"
-                                    >
-                                        Today
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            const today = new Date();
-                                            const last7 = new Date();
-                                            last7.setDate(today.getDate() - 6);
-                                            SetDateRange({
-                                                from: last7.toISOString().split('T')[0],
-                                                to: today.toISOString().split('T')[0]
-                                            });
-                                        }}
-                                        className="px-2.5 py-1 text-xs font-medium rounded-md bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors cursor-pointer"
-                                    >
-                                        Last 7 Days
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            const now = new Date();
-                                            const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-                                            const today = now.toISOString().split('T')[0];
-                                            SetDateRange({ from: firstDay, to: today });
-                                        }}
-                                        className="px-2.5 py-1 text-xs font-medium rounded-md bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors cursor-pointer"
-                                    >
-                                        This Month
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => SetDateRange({ from: '', to: '' })}
-                                        className="px-2.5 py-1 text-xs font-medium rounded-md bg-rose-50 hover:bg-rose-100 text-rose-600 transition-colors cursor-pointer ml-auto"
-                                    >
-                                        Clear
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </PopoverContent>
-                </Popover>
+                    </SheetTrigger>
+                    <SheetContent side="bottom" className="rounded-t-2xl p-6 pb-8 h-[80vh] overflow-y-auto">
+                        <SheetHeader className="px-0 pt-0 pb-4 text-left">
+                            <SheetTitle className="text-xl font-bold">Filters</SheetTitle>
+                        </SheetHeader>
+                        <FilterControls 
+                            table={table}
+                            isMobile={true} tab="Queue"
+                            FilterPlatform={FilterPlatform} SetFilterPlatform={SetFilterPlatform} UniquePlatforms={UniquePlatforms}
+                            FilterAccountType={FilterAccountType} SetFilterAccountType={SetFilterAccountType}
+                            FilterAgent={FilterAgent} SetFilterAgent={SetFilterAgent} UniqueAgents={UniqueAgents}
+                            QueueSortBy={QueueSortBy} SetQueueSortBy={SetQueueSortBy}
+                        />
+                    </SheetContent>
+                </Sheet>
             </div>
-
-            <div className="flex items-center gap-1 text-xs ml-1">
-                <span className="text-gray-500 font-medium mr-1">Sort By:</span>
-                <Select value={HistorySortBy} onValueChange={SetHistorySortBy}>
-                    <SelectTrigger className="h-8 w-[140px] bg-white text-xs font-medium rounded-md border-gray-200 hover:border-gray-300 shadow-xs transition-colors">
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent side="bottom" className="rounded-md shadow-lg border-gray-200">
-                        <SelectItem value="Product">Product</SelectItem>
-                        <SelectItem value="Brand">Brand</SelectItem>
-                        <SelectItem value="DateOldest">Date (Oldest)</SelectItem>
-                        <SelectItem value="DateNewest">Date (Newest)</SelectItem>
-                        <SelectItem value="MonthJanDec">Month (Jan - Dec)</SelectItem>
-                        <SelectItem value="MonthDecJan">Month (Dec - Jan)</SelectItem>
-                    </SelectContent>
-                </Select>
+            
+            {/* Desktop Print Button */}
+            <div className="hidden md:flex">
+                <Button
+                    variant="default"
+                    size="sm"
+                    onClick={HandlePrintAll}
+                    disabled={IsPrinting || QueueOrders.length === 0}
+                    className="bg-purple-600 hover:bg-purple-700 text-white font-medium text-xs rounded-md h-8 px-3.5 shadow-sm transition-all cursor-pointer border border-purple-600 hover:border-purple-700"
+                >
+                    <Printer className="w-3.5 h-3.5 mr-1.5 text-white" />
+                    {selectedCount > 0 ? `Print Selected (${selectedCount})` : `Print All (${QueueOrders.length})`}
+                </Button>
             </div>
         </div>
     ) : null;
 
-    const StatusActionElement = null;
+    const CompleteActionElement = ActiveTab === 'Complete' ? ({ table }) => (
+        <div className="flex flex-col md:flex-row md:items-center gap-3 w-full md:w-auto">
+            {/* Desktop Filters */}
+            <FilterControls 
+                table={table}
+                isMobile={false} tab="Complete"
+                FilterPlatform={FilterPlatform} SetFilterPlatform={SetFilterPlatform} UniquePlatforms={UniquePlatforms}
+                FilterAccountType={FilterAccountType} SetFilterAccountType={SetFilterAccountType}
+                FilterAgent={FilterAgent} SetFilterAgent={SetFilterAgent} UniqueAgents={UniqueAgents}
+                FilterMonth={FilterMonth} SetFilterMonth={SetFilterMonth}
+                HistorySortBy={HistorySortBy} SetHistorySortBy={SetHistorySortBy}
+            />
+            
+            {/* Mobile Filters Popup */}
+            <div className="md:hidden flex items-center gap-2 w-full">
+                <Sheet>
+                    <SheetTrigger asChild>
+                        <Button variant="outline" className="w-full h-9 bg-white text-gray-700 border-gray-200 shadow-sm font-semibold flex items-center justify-center gap-1.5 cursor-pointer">
+                            <Filter className="w-4 h-4" /> Filters
+                        </Button>
+                    </SheetTrigger>
+                    <SheetContent side="bottom" className="rounded-t-2xl p-6 pb-8 h-[80vh] overflow-y-auto">
+                        <SheetHeader className="px-0 pt-0 pb-4 text-left">
+                            <SheetTitle className="text-xl font-bold">Filters</SheetTitle>
+                        </SheetHeader>
+                        <FilterControls 
+                            table={table}
+                            isMobile={true} tab="Complete"
+                            FilterPlatform={FilterPlatform} SetFilterPlatform={SetFilterPlatform} UniquePlatforms={UniquePlatforms}
+                            FilterAccountType={FilterAccountType} SetFilterAccountType={SetFilterAccountType}
+                            FilterAgent={FilterAgent} SetFilterAgent={SetFilterAgent} UniqueAgents={UniqueAgents}
+                            FilterMonth={FilterMonth} SetFilterMonth={SetFilterMonth}
+                            HistorySortBy={HistorySortBy} SetHistorySortBy={SetHistorySortBy}
+                        />
+                    </SheetContent>
+                </Sheet>
+            </div>
+        </div>
+    ) : null;
+
+    const StatusActionElement = ActiveTab === 'Status' ? ({ table }) => (
+        <div className="flex flex-col md:flex-row md:items-center gap-3 w-full md:w-auto">
+            {/* Desktop Filters */}
+            <FilterControls 
+                table={table}
+                isMobile={false} tab="Status"
+                FilterPlatform={FilterPlatform} SetFilterPlatform={SetFilterPlatform} UniquePlatforms={UniquePlatforms}
+                FilterAccountType={FilterAccountType} SetFilterAccountType={SetFilterAccountType}
+                FilterAgent={FilterAgent} SetFilterAgent={SetFilterAgent} UniqueAgents={UniqueAgents}
+                StatusFilterPill={StatusFilterPill} SetStatusFilterPill={SetStatusFilterPill} statusCounts={statusCounts}
+            />
+            
+            {/* Mobile Filters Popup */}
+            <div className="md:hidden flex items-center gap-2 w-full">
+                <Sheet>
+                    <SheetTrigger asChild>
+                        <Button variant="outline" className="w-full h-9 bg-white text-gray-700 border-gray-200 shadow-sm font-semibold flex items-center justify-center gap-1.5 cursor-pointer">
+                            <Filter className="w-4 h-4" /> Filters
+                        </Button>
+                    </SheetTrigger>
+                    <SheetContent side="bottom" className="rounded-t-2xl p-6 pb-8 h-[80vh] overflow-y-auto">
+                        <SheetHeader className="px-0 pt-0 pb-4 text-left">
+                            <SheetTitle className="text-xl font-bold">Filters</SheetTitle>
+                        </SheetHeader>
+                        <FilterControls 
+                            table={table}
+                            isMobile={true} tab="Status"
+                            FilterPlatform={FilterPlatform} SetFilterPlatform={SetFilterPlatform} UniquePlatforms={UniquePlatforms}
+                            FilterAccountType={FilterAccountType} SetFilterAccountType={SetFilterAccountType}
+                            FilterAgent={FilterAgent} SetFilterAgent={SetFilterAgent} UniqueAgents={UniqueAgents}
+                            StatusFilterPill={StatusFilterPill} SetStatusFilterPill={SetStatusFilterPill} statusCounts={statusCounts}
+                        />
+                    </SheetContent>
+                </Sheet>
+            </div>
+        </div>
+    ) : null;
 
     return (
         <div className="space-y-6">
             {/* Tabs Navigation */}
-            <div className="flex border-b border-gray-200">
-                <button
-                    type="button"
-                    onClick={() => handleTabChange('Queue')}
-                    className={cn(
-                        "py-3 px-6 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 cursor-pointer",
-                        ActiveTab === 'Queue'
-                            ? "border-indigo-600 text-indigo-600"
-                            : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                    )}
-                >
-                    Order Queue
-                    {QueueOrders.length > 0 && (
-                        <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full font-bold shadow-xs">
-                            {QueueOrders.length}
-                        </span>
-                    )}
-                </button>
-                <button
-                    type="button"
-                    onClick={() => handleTabChange('Complete')}
-                    className={cn(
-                        "py-3 px-6 text-sm font-bold border-b-2 transition-colors cursor-pointer",
-                        ActiveTab === 'Complete'
-                            ? "border-indigo-600 text-indigo-600"
-                            : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                    )}
-                >
-                    Order History
-                </button>
-                <button
-                    type="button"
-                    onClick={() => handleTabChange('Status')}
-                    className={cn(
-                        "py-3 px-6 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 cursor-pointer",
-                        ActiveTab === 'Status'
-                            ? "border-indigo-600 text-indigo-600"
-                            : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                    )}
-                >
-                    Order Status
-                    {(statusCounts.skuReview + statusCounts.missingAwb) > 0 && (
-                        <span className="bg-amber-500 text-white text-xs px-2 py-0.5 rounded-full font-bold shadow-xs">
-                            {statusCounts.skuReview + statusCounts.missingAwb}
-                        </span>
-                    )}
-                </button>
-            </div>
+            <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-gray-200">
+                {/* Mobile Tabs Dropdown */}
+                <div className="md:hidden p-4 w-full bg-gray-50 border-b border-gray-100">
+                    <Select value={ActiveTab} onValueChange={handleTabChange}>
+                        <SelectTrigger className="w-full h-11 bg-white font-bold text-indigo-600 border-indigo-200 shadow-sm focus:ring-indigo-500 rounded-lg">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent side="bottom" className="rounded-lg shadow-lg border-gray-200">
+                            <SelectItem value="Queue" className="font-semibold py-3">
+                                Order Queue {QueueOrders.length > 0 && <span className="ml-2 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full shadow-xs">{QueueOrders.length}</span>}
+                            </SelectItem>
+                            <SelectItem value="Complete" className="font-semibold py-3">
+                                Order History
+                            </SelectItem>
+                            <SelectItem value="Status" className="font-semibold py-3">
+                                Order Status {(statusCounts.skuReview + statusCounts.missingAwb) > 0 && <span className="ml-2 bg-amber-500 text-white text-[10px] px-1.5 py-0.5 rounded-full shadow-xs">{statusCounts.skuReview + statusCounts.missingAwb}</span>}
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
 
-            {ActiveTab === 'Status' && (
-                <div className="bg-white border rounded-none p-4 shadow-2xs space-y-3">
-                    <div className="flex items-center justify-between flex-wrap gap-4 w-full">
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <button
-                                type="button"
-                                onClick={() => SetStatusFilterPill('All')}
-                                className={cn(
-                                    "px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer border shadow-2xs flex items-center gap-1.5 select-none",
-                                    StatusFilterPill === 'All'
-                                        ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
-                                        : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
-                                )}
-                            >
-                                All Problem
-                                <span className={cn(
-                                    "px-1.5 py-0.5 rounded text-[10px] font-bold",
-                                    StatusFilterPill === 'All' ? "bg-indigo-700 text-white" : "bg-gray-100 text-gray-700"
-                                )}>
-                                    {statusCounts.total}
-                                </span>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => SetStatusFilterPill('SKUReview')}
-                                className={cn(
-                                    "px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer border shadow-2xs flex items-center gap-1.5 select-none",
-                                    StatusFilterPill === 'SKUReview'
-                                        ? "bg-amber-600 text-white border-amber-600 shadow-xs"
-                                        : "bg-white text-amber-800 border-amber-300 hover:bg-amber-50"
-                                )}
-                            >
-                                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                                SKU Review
-                                {statusCounts.skuReview > 0 && (
-                                    <span className={cn(
-                                        "px-1.5 py-0.5 rounded text-[10px] font-bold",
-                                        StatusFilterPill === 'SKUReview' ? "bg-amber-700 text-white" : "bg-amber-100 text-amber-800"
-                                    )}>
-                                        {statusCounts.skuReview}
-                                    </span>
-                                )}
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => SetStatusFilterPill('MissingAWB')}
-                                className={cn(
-                                    "px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer border shadow-2xs flex items-center gap-1.5 select-none",
-                                    StatusFilterPill === 'MissingAWB'
-                                        ? "bg-rose-600 text-white border-rose-600 shadow-xs"
-                                        : "bg-white text-rose-800 border-rose-300 hover:bg-rose-50"
-                                )}
-                            >
-                                <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
-                                AWB Action
-                                {statusCounts.missingAwb > 0 && (
-                                    <span className={cn(
-                                        "px-1.5 py-0.5 rounded text-[10px] font-bold",
-                                        StatusFilterPill === 'MissingAWB' ? "bg-rose-700 text-white" : "bg-rose-100 text-rose-800"
-                                    )}>
-                                        {statusCounts.missingAwb}
-                                    </span>
-                                )}
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => SetStatusFilterPill('Ready')}
-                                className={cn(
-                                    "px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer border shadow-2xs flex items-center gap-1.5 select-none",
-                                    StatusFilterPill === 'Ready'
-                                        ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
-                                        : "bg-white text-emerald-800 border-emerald-300 hover:bg-emerald-50"
-                                )}
-                            >
-                                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                                Resolve
-                            </button>
-                        </div>
-
-                        <div className="flex items-center gap-2 flex-wrap ml-auto">
-                            <div className="flex items-center gap-1 text-xs">
-                                <span className="text-gray-500 font-medium mr-1">Platform:</span>
-                                <Select value={FilterPlatform} onValueChange={SetFilterPlatform}>
-                                    <SelectTrigger className="h-8 w-[110px] bg-white text-xs font-medium rounded-md border-gray-200 hover:border-gray-300 shadow-xs transition-colors">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent side="bottom" className="rounded-md shadow-lg border-gray-200">
-                                        {UniquePlatforms.map(platform => (
-                                            <SelectItem key={platform} value={platform}>{platform}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="flex items-center gap-1 text-xs ml-1">
-                                <span className="text-gray-500 font-medium mr-1">Account:</span>
-                                <Select value={FilterAccount} onValueChange={SetFilterAccount}>
-                                    <SelectTrigger className="h-8 w-[110px] bg-white text-xs font-medium rounded-md border-gray-200 hover:border-gray-300 shadow-xs transition-colors">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent side="bottom" className="rounded-md shadow-lg border-gray-200">
-                                        {UniqueAccounts.map(account => (
-                                            <SelectItem key={account} value={account}>{account}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="flex items-center gap-1 text-xs ml-1">
-                                <span className="text-gray-500 font-medium mr-1">Agent:</span>
-                                <Select value={FilterAgent} onValueChange={SetFilterAgent}>
-                                    <SelectTrigger className="h-8 w-[110px] bg-white text-xs font-medium rounded-md border-gray-200 hover:border-gray-300 shadow-xs transition-colors">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent side="bottom" className="rounded-md shadow-lg border-gray-200">
-                                        {UniqueAgents.map(agent => (
-                                            <SelectItem key={agent} value={agent}>{agent}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
+                {/* Desktop Tabs */}
+                <div className="hidden md:flex overflow-x-auto hide-scrollbar whitespace-nowrap w-full md:w-auto">
+                    <button
+                        type="button"
+                        onClick={() => handleTabChange('Queue')}
+                        className={cn(
+                            "py-3 px-6 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 cursor-pointer",
+                            ActiveTab === 'Queue'
+                                ? "border-indigo-600 text-indigo-600"
+                                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                        )}
+                    >
+                        Order Queue
+                        {QueueOrders.length > 0 && (
+                            <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full font-bold shadow-xs">
+                                {QueueOrders.length}
+                            </span>
+                        )}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => handleTabChange('Complete')}
+                        className={cn(
+                            "py-3 px-6 text-sm font-bold border-b-2 transition-colors cursor-pointer",
+                            ActiveTab === 'Complete'
+                                ? "border-indigo-600 text-indigo-600"
+                                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                        )}
+                    >
+                        Order History
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => handleTabChange('Status')}
+                        className={cn(
+                            "py-3 px-6 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 cursor-pointer",
+                            ActiveTab === 'Status'
+                                ? "border-indigo-600 text-indigo-600"
+                                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                        )}
+                    >
+                        Order Status
+                        {(statusCounts.skuReview + statusCounts.missingAwb) > 0 && (
+                            <span className="bg-amber-500 text-white text-xs px-2 py-0.5 rounded-full font-bold shadow-xs">
+                                {statusCounts.skuReview + statusCounts.missingAwb}
+                            </span>
+                        )}
+                    </button>
+                </div>
+                {ActiveTab !== 'Status' && (
+                    <div className="flex items-center justify-between md:justify-end px-4 py-3 md:py-2 bg-gray-50 md:bg-transparent border-t border-gray-100 md:border-0 w-full md:w-auto">
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-gray-500">Estimated Profit</span>
+                            <span className="text-base font-bold text-emerald-600">{formatCurrency(TotalProfit)}</span>
                         </div>
                     </div>
-                </div>
-            )}
+                )}
+            </div>
 
             <div className="bg-white rounded-none shadow-xs border overflow-hidden">
                 <div className="p-4">
@@ -1220,6 +1117,19 @@ export function AllOrders() {
                         isLoading={isLoading}
                         searchPlaceholder="Search"
                         actionElement={ActiveTab === 'Queue' ? QueueActionElement : ActiveTab === 'Complete' ? CompleteActionElement : StatusActionElement}
+                        bottomActionElement={ActiveTab === 'Queue' ? (
+                            <div className="md:hidden flex w-full">
+                                <Button
+                                    variant="default"
+                                    onClick={HandlePrintAll}
+                                    disabled={IsPrinting || QueueOrders.length === 0}
+                                    className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-medium text-xs rounded-md h-9 shadow-sm transition-all cursor-pointer border border-purple-600 hover:border-purple-700"
+                                >
+                                    <Printer className="w-4 h-4 mr-1.5 text-white" />
+                                    {selectedCount > 0 ? `Print Selected (${selectedCount})` : `Print All (${QueueOrders.length})`}
+                                </Button>
+                            </div>
+                        ) : null}
                         rowSelection={RowSelection}
                         onRowSelectionChange={SetRowSelection}
                         defaultPageSize={999999}
