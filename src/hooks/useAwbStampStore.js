@@ -28,10 +28,11 @@ export const useAwbStampStore = create((set) => ({
             platformOrderId: item.platformOrderId || item.PlatformOrderID || item.AWBNumber || '-',
             awbUrl: item.awbUrl || item.AwbUrl || '',
             targetSku: item.targetSku || item.PlatformSKU || item.SellerSKU || item.Barcode || '-',
+            orderItems: item.orderItems || [],
             status: 'pending',
             existingSku: '',
             message: ''
-        })).filter(item => item.awbUrl && item.targetSku && item.targetSku !== '-');
+        })).filter(item => item.awbUrl && (item.targetSku !== '-' || item.orderItems.length > 0));
 
         if (formattedQueue.length === 0) return;
 
@@ -81,6 +82,7 @@ export const useAwbStampStore = create((set) => ({
                     body: JSON.stringify({
                         awbUrl: currentItem.awbUrl,
                         targetSku: currentItem.targetSku,
+                        orderItems: currentItem.orderItems,
                         orderId: currentItem.orderId,
                         platformOrderId: currentItem.platformOrderId
                     })

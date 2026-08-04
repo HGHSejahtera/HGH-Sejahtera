@@ -105,7 +105,7 @@ export function AWBPDFViewer({ url, open, onOpenChange }) {
         try {
             const { data: order } = await supabase
                 .from('ImportOrders')
-                .select('ImportOrderID, PlatformOrderID, AwbUrl, ImportOrderItems(ProductID, PlatformSKU, Products(SellerSKU, Barcode))')
+                .select('ImportOrderID, PlatformOrderID, AwbUrl, ImportOrderItems(ProductID, PlatformSKU, ProductName, Quantity, Products(SellerSKU, Barcode))')
                 .eq('AwbUrl', url)
                 .maybeSingle();
 
@@ -115,9 +115,13 @@ export function AWBPDFViewer({ url, open, onOpenChange }) {
                 return;
             }
 
-            const item = order.ImportOrderItems?.[0];
-            const targetSku = item?.Products?.SellerSKU || item?.Products?.Barcode || item?.PlatformSKU;
-            if (!targetSku) {
+            const itemsMapping = order.ImportOrderItems?.map(item => ({
+                name: item.ProductName || '',
+                qty: Number(item.Quantity) || 1,
+                sku: item.Products?.SellerSKU || item.Products?.Barcode || item.PlatformSKU || '-'
+            })) || [];
+
+            if (itemsMapping.length === 0 || itemsMapping.every(i => i.sku === '-')) {
                 alert('Please match/link the product before syncing Seller SKU.');
                 setSyncing(false);
                 return;
@@ -127,7 +131,7 @@ export function AWBPDFViewer({ url, open, onOpenChange }) {
                 orderId: order.ImportOrderID,
                 platformOrderId: order.PlatformOrderID,
                 awbUrl: url,
-                targetSku
+                orderItems: itemsMapping
             }]);
         } catch (err) {
             alert('Error syncing: ' + (err.message || 'Unknown error'));

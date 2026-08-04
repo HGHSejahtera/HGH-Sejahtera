@@ -438,6 +438,32 @@ export function AllOrders() {
 
     const DisplayOrders = ActiveTab === 'Queue' ? QueueOrders : ActiveTab === 'Complete' ? CompleteOrders : StatusOrders;
 
+    // Keyboard navigation for Order Detail Drawer
+    useEffect(() => {
+        if (!selectedOrder || isClosing) return;
+
+        const handleKeyDown = (e) => {
+            // Ignore if user is typing in an input or textarea
+            if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+
+            if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                e.preventDefault();
+                
+                const currentIndex = DisplayOrders.findIndex(o => o.ImportOrderID === selectedOrder.ImportOrderID);
+                if (currentIndex === -1) return;
+
+                if (e.key === 'ArrowDown' && currentIndex < DisplayOrders.length - 1) {
+                    setSelectedOrder(DisplayOrders[currentIndex + 1]);
+                } else if (e.key === 'ArrowUp' && currentIndex > 0) {
+                    setSelectedOrder(DisplayOrders[currentIndex - 1]);
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [selectedOrder, DisplayOrders, isClosing]);
+
     const TotalProfit = useMemo(() => {
         return DisplayOrders.reduce((sum, o) => sum + (parseFloat(o.DisplayProfit || 0)), 0);
     }, [DisplayOrders]);

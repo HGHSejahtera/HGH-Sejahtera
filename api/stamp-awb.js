@@ -62,14 +62,14 @@ export default async function handler(req, res) {
     }
 
     try {
-        const { awbUrl, targetSku, orderId, platformOrderId } = req.body || {};
+        const { awbUrl, targetSku, orderItems = [], orderId, platformOrderId } = req.body || {};
 
-        if (!awbUrl || !targetSku) {
-            return res.status(400).json({ error: 'awbUrl and targetSku parameters are required' });
+        if (!awbUrl || (orderItems.length === 0 && !targetSku)) {
+            return res.status(400).json({ error: 'awbUrl and orderItems parameters are required' });
         }
 
-        const cleanedTargetSku = String(targetSku).trim();
-        if (!cleanedTargetSku || cleanedTargetSku === '-') {
+        const cleanedTargetSku = targetSku ? String(targetSku).trim() : '-';
+        if (orderItems.length === 0 && (!cleanedTargetSku || cleanedTargetSku === '-')) {
             return res.status(200).json({
                 success: true,
                 status: 'match',
@@ -204,48 +204,89 @@ export default async function handler(req, res) {
 
             const tableItems = items.filter(i => i.y < yTop && i.y > yBottom);
             
-            // Check existing items in the Seller SKU column
-            const sellerSkuItems = tableItems.filter(i => i.x >= boundSellerSku && i.x < boundQty);
-            if (sellerSkuItems.length > 0) {
-                const existingSku = sellerSkuItems.map(i => i.text).join(' ').trim();
-                const normalizedExisting = existingSku.replace(/\s+/g, '').toLowerCase();
-                const normalizedTarget = cleanedTargetSku.replace(/\s+/g, '').toLowerCase();
-
-                if (normalizedExisting && normalizedExisting !== '-' && normalizedExisting !== 'null') {
-                    if (normalizedExisting === normalizedTarget) {
-                        // Already matched correctly on this page
-                        continue;
-                    } else {
-                        // Discrepancy detected! Do not overwrite
-                        detectedMismatch = {
-                            existingSku: existingSku,
-                            targetSku: cleanedTargetSku
-                        };
-                        break;
-                    }
-                }
-            }
-
-            // If we reached here, Seller SKU column is empty/blank on this page. Find row Y coordinates to stamp.
             const qtyItems = tableItems.filter(i => i.x > boundQty && /^\d+$/.test(i.text)).sort((a, b) => b.y - a.y);
             let yList = [];
-
             if (qtyItems.length > 0) {
                 yList = qtyItems.map(i => i.y);
             } else {
-                // Fallback: Check SKU items or Product Name items
                 const skuItems = tableItems.filter(i => i.x >= boundSku && i.x < boundSellerSku).sort((a, b) => b.y - a.y);
-                if (skuItems.length > 0) {
-                    yList = skuItems.map(i => i.y);
-                } else {
-                    yList = [yTop - 26]; // Default to standard first row Y (approx 195)
-                }
+                if (skuItems.length > 0) yList = skuItems.map(i => i.y);
+                else yList = [yTop - 26]; // Default to standard first row Y
             }
+            
+            yList = Array.from(new Set(yList)); // Deduplicate
+            
+            const pageStamps = [];
+            
+            for (let rowIdx = 0; rowIdx < yList.length; rowIdx++) {
+                const rowY = yList[rowIdx];
+                const nextY = rowIdx < yList.length - 1 ? yList[rowIdx + 1] : yBottom;
+                // Add a small tolerance (+5) for items slightly out of strict Y bounds
+                const rowItems = tableItems.filter(item => item.y <= rowY + 5 && item.y > nextY + 5);
 
-            pagesToStamp.push({
-                pageNum: pageNum,
-                yList: Array.from(new Set(yList)) // Deduplicate Y coordinates
-            });
+                const sellerSkuItems = rowItems.filter(i => i.x >= boundSellerSku && i.x < boundQty);
+                const existingSku = sellerSkuItems.length > 0 ? sellerSkuItems.map(i => i.text).join(' ').trim() : null;
+
+                const nameItems = rowItems.filter(i => i.x < boundSku).sort((a, b) => b.y - a.y);
+                const pdfProductName = nameItems.map(n => n.text).join(' ').toLowerCase();
+                
+                const qtyItemMatch = qtyItems.find(q => Math.abs(q.y - rowY) < 5);
+                const pdfQty = qtyItemMatch ? parseInt(qtyItemMatch.text, 10) : 1;
+
+                let bestMatch = null;
+                let bestScore = -1;
+
+                // Fuzzy Match with DB items
+                if (orderItems && orderItems.length > 0) {
+                    for (let i = 0; i < orderItems.length; i++) {
+                        const dbItem = orderItems[i];
+                        let score = 0;
+                        const dbName = (dbItem.name || '').toLowerCase();
+                        
+                        if (dbItem.qty === pdfQty) score += 50;
+                        if (pdfProductName.includes(dbName) && dbName.length > 0) score += 100;
+                        
+                        const dbTokens = dbName.split(/\s+/).filter(Boolean);
+                        if (dbTokens.length > 0) {
+                            let tokenMatches = 0;
+                            for (const token of dbTokens) {
+                                if (pdfProductName.includes(token)) tokenMatches++;
+                            }
+                            score += (tokenMatches / dbTokens.length) * 40;
+                        }
+                        
+                        if (i === rowIdx) score += 10; // Positional tie-breaker
+                        
+                        if (score > bestScore) {
+                            bestScore = score;
+                            bestMatch = dbItem;
+                        }
+                    }
+                }
+
+                const skuToStamp = (bestMatch && bestScore > 0 && bestMatch.sku !== '-') ? bestMatch.sku : cleanedTargetSku;
+                
+                if (!skuToStamp || skuToStamp === '-') continue;
+
+                if (existingSku) {
+                    const normalizedExisting = existingSku.replace(/\s+/g, '').toLowerCase();
+                    const normalizedTarget = skuToStamp.replace(/\s+/g, '').toLowerCase();
+                    
+                    if (normalizedExisting && normalizedExisting !== '-' && normalizedExisting !== 'null') {
+                        if (normalizedExisting !== normalizedTarget) {
+                            detectedMismatch = { existingSku, targetSku: skuToStamp };
+                            break; // Stop parsing pages, mismatch detected
+                        } else {
+                            continue; // Already matched correctly
+                        }
+                    }
+                }
+                
+                pageStamps.push({ y: rowY, skuToStamp });
+            }
+            
+            if (detectedMismatch) break;
+            if (pageStamps.length > 0) pagesToStamp.push({ pageNum, stamps: pageStamps });
         }
 
         // If mismatch detected across any page, return warning without saving/overwriting
@@ -266,7 +307,7 @@ export default async function handler(req, res) {
             return res.status(200).json({
                 success: true,
                 status: 'match',
-                targetSku: cleanedTargetSku,
+                targetSku: orderItems.length > 0 ? 'Batch SKUs' : cleanedTargetSku,
                 orderId: orderId,
                 platformOrderId: platformOrderId,
                 message: 'AWB already contains the correct Seller SKU.'
@@ -279,10 +320,10 @@ export default async function handler(req, res) {
 
         for (const pageInfo of pagesToStamp) {
             const page = pdfDoc.getPage(pageInfo.pageNum - 1);
-            for (const y of pageInfo.yList) {
-                page.drawText(cleanedTargetSku, {
+            for (const stamp of pageInfo.stamps) {
+                page.drawText(stamp.skuToStamp, {
                     x: 344, // Exactly aligned with TikTok Seller SKU header
-                    y: y,   // Aligned with the product row
+                    y: stamp.y,   // Aligned with the product row
                     size: 14.5, // Exactly 14.5pt as per TikTok table standard
                     font: helveticaFont,
                     color: rgb(0, 0, 0),
@@ -320,7 +361,7 @@ export default async function handler(req, res) {
         return res.status(200).json({
             success: true,
             status: 'stamped',
-            targetSku: cleanedTargetSku,
+            targetSku: orderItems.length > 0 ? 'Batch SKUs' : cleanedTargetSku,
             orderId: orderId,
             platformOrderId: platformOrderId,
             message: 'Successfully stamped Seller SKU and updated AWB in R2.'

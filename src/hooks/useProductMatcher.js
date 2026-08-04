@@ -114,17 +114,26 @@ export function useProductMatcher() {
                 if (targetSku && targetSku !== '-') {
                     const { data: affectedOrders } = await supabase
                         .from('ImportOrders')
-                        .select('ImportOrderID, PlatformOrderID, AwbUrl')
+                        .select('ImportOrderID, PlatformOrderID, AwbUrl, ImportOrderItems(PlatformSKU, ProductName, Quantity, Products(SellerSKU, Barcode))')
                         .eq('ImportOrderID', affectedOrderId)
                         .not('AwbUrl', 'is', null);
 
                     if (affectedOrders && affectedOrders.length > 0) {
-                        syncQueueItems = affectedOrders.map(o => ({
-                            orderId: o.ImportOrderID,
-                            platformOrderId: o.PlatformOrderID,
-                            awbUrl: o.AwbUrl,
-                            targetSku: targetSku
-                        }));
+                        syncQueueItems = affectedOrders.map(o => {
+                            const itemsMapping = o.ImportOrderItems?.map(item => ({
+                                name: item.ProductName || '',
+                                qty: Number(item.Quantity) || 1,
+                                sku: item.Products?.SellerSKU || item.Products?.Barcode || item.PlatformSKU || '-'
+                            })) || [];
+                            
+                            return {
+                                orderId: o.ImportOrderID,
+                                platformOrderId: o.PlatformOrderID,
+                                awbUrl: o.AwbUrl,
+                                targetSku: targetSku,
+                                orderItems: itemsMapping
+                            };
+                        });
                     }
                 }
             }
@@ -169,17 +178,26 @@ export function useProductMatcher() {
                 if (targetSku && targetSku !== '-') {
                     const { data: affectedOrders } = await supabase
                         .from('ImportOrders')
-                        .select('ImportOrderID, PlatformOrderID, AwbUrl')
+                        .select('ImportOrderID, PlatformOrderID, AwbUrl, ImportOrderItems(PlatformSKU, ProductName, Quantity, Products(SellerSKU, Barcode))')
                         .in('ImportOrderID', affectedOrderIds)
                         .not('AwbUrl', 'is', null);
 
                     if (affectedOrders && affectedOrders.length > 0) {
-                        syncQueueItems = affectedOrders.map(o => ({
-                            orderId: o.ImportOrderID,
-                            platformOrderId: o.PlatformOrderID,
-                            awbUrl: o.AwbUrl,
-                            targetSku: targetSku
-                        }));
+                        syncQueueItems = affectedOrders.map(o => {
+                            const itemsMapping = o.ImportOrderItems?.map(item => ({
+                                name: item.ProductName || '',
+                                qty: Number(item.Quantity) || 1,
+                                sku: item.Products?.SellerSKU || item.Products?.Barcode || item.PlatformSKU || '-'
+                            })) || [];
+                            
+                            return {
+                                orderId: o.ImportOrderID,
+                                platformOrderId: o.PlatformOrderID,
+                                awbUrl: o.AwbUrl,
+                                targetSku: targetSku,
+                                orderItems: itemsMapping
+                            };
+                        });
                     }
                 }
             }
