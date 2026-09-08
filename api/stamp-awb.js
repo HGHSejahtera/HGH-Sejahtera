@@ -1,4 +1,6 @@
-import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import { PutObjectCommand } from '@aws-sdk/client-s3';
+import { RequireFileAccess, ResolveAWBAccess, SendFileError } from './_utils/FileAccess.js';
+import { GetFileStorage, ReadPrivatePDF } from './_utils/FileStorage.js';
 
 // Polyfill browser globals required by pdfjs-dist v6 in Node.js (Vercel Serverless)
 if (typeof globalThis.DOMMatrix === 'undefined') {
@@ -40,34 +42,21 @@ if (typeof globalThis.Path2D === 'undefined') {
     };
 }
 
-let s3ClientInstance = null;
-function getS3Client() {
-    if (!s3ClientInstance) {
-        s3ClientInstance = new S3Client({
-            region: 'auto',
-            endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-            credentials: {
-                accessKeyId: process.env.R2_ACCESS_KEY_ID,
-                secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
-            },
-            forcePathStyle: true,
-        });
-    }
-    return s3ClientInstance;
-}
-
 export default async function handler(req, res) {
+    res.setHeader('Cache-Control', 'private, no-store');
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method Not Allowed' });
     }
 
     try {
+        const Access = await RequireFileAccess(req);
         const { awbUrl, targetSku, orderItems = [], orderId, platformOrderId } = req.body || {};
 
-        if (!awbUrl || (orderItems.length === 0 && !targetSku)) {
+        if (!awbUrl || !Array.isArray(orderItems) || orderItems.length > 200 || (orderItems.length === 0 && !targetSku)) {
             return res.status(400).json({ error: 'awbUrl and orderItems parameters are required' });
         }
 
+        const File = await ResolveAWBAccess(Access, awbUrl, orderId);
         const cleanedTargetSku = targetSku ? String(targetSku).trim() : '-';
         if (orderItems.length === 0 && (!cleanedTargetSku || cleanedTargetSku === '-')) {
             return res.status(200).json({
@@ -78,87 +67,8 @@ export default async function handler(req, res) {
             });
         }
 
-        // 1. Clean and determine R2 key
-        let targetUrl = String(awbUrl);
-        if (targetUrl.startsWith('rder Archive/') || targetUrl.indexOf('/rder Archive/') !== -1 || targetUrl.indexOf('?url=rder Archive/') !== -1) {
-            targetUrl = targetUrl.replace('rder Archive/', 'Order Archive/');
-        }
-
-        function extractR2Key(urlStr) {
-            let s = decodeURIComponent(String(urlStr).split('?')[0]);
-            if (s.startsWith('rder Archive/') || s.indexOf('/rder Archive/') !== -1) {
-                s = s.replace('rder Archive/', 'Order Archive/');
-            }
-            const archiveIdx = s.indexOf('Order Archive/');
-            if (archiveIdx !== -1) {
-                return s.substring(archiveIdx);
-            }
-            if (s.startsWith('http://') || s.startsWith('https://')) {
-                try {
-                    const parsed = new URL(s);
-                    let pathname = parsed.pathname;
-                    if (pathname.startsWith('/')) pathname = pathname.substring(1);
-                    return pathname;
-                } catch {
-                    // fallback
-                }
-            }
-            if (s.startsWith('/')) s = s.substring(1);
-            return s;
-        }
-
-        const key = extractR2Key(targetUrl);
-        const S3 = getS3Client();
-        const bucketsToTry = [
-            process.env.R2_PRIVATE_BUCKET_NAME || 'hgh-awb',
-            process.env.R2_BUCKET_NAME || 'hgh-sejahtera'
-        ];
-
-        let buffer = null;
-        let matchedBucket = null;
-        let fetchedViaHttp = false;
-
-        // Try downloading directly from R2 via S3Client using the clean key
-        for (const bucket of bucketsToTry) {
-            if (!bucket) continue;
-            try {
-                const command = new GetObjectCommand({ Bucket: bucket, Key: key });
-                const response = await S3.send(command);
-                if (response.Body) {
-                    if (typeof response.Body.transformToByteArray === 'function') {
-                        const byteArray = await response.Body.transformToByteArray();
-                        buffer = Buffer.from(byteArray);
-                    } else if (typeof response.Body.arrayBuffer === 'function') {
-                        const arrayBuf = await response.Body.arrayBuffer();
-                        buffer = Buffer.from(arrayBuf);
-                    }
-                    matchedBucket = bucket;
-                    break;
-                }
-            } catch {
-                // Try next bucket
-            }
-        }
-
-        // Fallback: If S3 direct fetch didn't find it, try standard HTTP fetch (e.g. public URL)
-        if (!buffer) {
-            try {
-                const fetchUrl = targetUrl + (targetUrl.includes('?') ? '&' : '?') + 't=' + Date.now();
-                const response = await fetch(fetchUrl);
-                if (response.ok) {
-                    const arrayBuf = await response.arrayBuffer();
-                    buffer = Buffer.from(arrayBuf);
-                    matchedBucket = bucketsToTry[0];
-                    fetchedViaHttp = true;
-                }
-            } catch {
-                // Ignore
-            }
-        }
-
-        if (!buffer) {
-            return res.status(404).json({ error: `Failed to download AWB PDF from R2 for key: ${key}` });
-        }
+        const S3 = GetFileStorage();
+        const buffer = await ReadPrivatePDF(S3, File);
 
         // 2. Perform Smart Analysis with pdfjs-dist
         const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
@@ -334,29 +244,11 @@ export default async function handler(req, res) {
         const stampedBytes = await pdfDoc.save();
         const stampedBuffer = Buffer.from(stampedBytes);
 
-        // 4. Overwrite original in R2
-        if (fetchedViaHttp) {
-            for (const bucket of bucketsToTry) {
-                if (!bucket) continue;
-                try {
-                    await S3.send(new PutObjectCommand({
-                        Bucket: bucket,
-                        Key: key,
-                        ContentType: 'application/pdf',
-                        Body: stampedBuffer
-                    }));
-                } catch (e) {
-                    console.error(`PutObjectCommand failed for fallback bucket ${bucket}:`, e.message);
-                }
-            }
-        } else {
-            await S3.send(new PutObjectCommand({
-                Bucket: matchedBucket,
-                Key: key,
-                ContentType: 'application/pdf',
-                Body: stampedBuffer
-            }));
-        }
+        // Write only the private object resolved from the authorized order.
+        await S3.send(new PutObjectCommand({
+            Bucket: File.Bucket, Key: File.Key,
+            ContentType: 'application/pdf', Body: stampedBuffer
+        }));
 
         return res.status(200).json({
             success: true,
@@ -368,10 +260,6 @@ export default async function handler(req, res) {
         });
 
     } catch (err) {
-        console.error('Error stamping AWB PDF:', err);
-        return res.status(500).json({
-            error: 'Internal Server Error stamping AWB',
-            details: err.message || err.toString()
-        });
+        return SendFileError(res, err);
     }
 }

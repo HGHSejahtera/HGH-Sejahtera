@@ -233,7 +233,7 @@ export default async function handler(req, res) {
                     const arrayBuffer = await fileRes.arrayBuffer();
                     const pdfBuffer = Buffer.from(arrayBuffer);
 
-                    const { processAwbPdf } = await import('./_utils/processAwb.js');
+                    const { processAwbPdf } = await import('./_utils/ProcessAWB.js');
                     const resOutput = await processAwbPdf({
                         pdfBuffer,
                         fileName,

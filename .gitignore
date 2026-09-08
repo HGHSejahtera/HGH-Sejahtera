@@ -33,7 +33,6 @@ dev-dist
 
 # Database
 /supabase/
-/supabase_templates/
 
 # Debug & test scripts
 check_*.js
