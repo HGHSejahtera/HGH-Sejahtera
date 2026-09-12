@@ -1,4 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { useProductScanner } from '@/Hooks/UseProductScanner';
+import { AutomaticPriceFields, FormatProductPrice, UpdateProductPrice } from '@/Lib/ProductPricing';
 import { useProducts } from '@/Hooks/UseProducts';
 import { GenerateMasterSKU } from '@/Utils/MasterSKUGenerator';
 import { useBrands } from '@/Hooks/UseBrands';
@@ -50,8 +52,12 @@ export function ProductModal({ isOpen, onClose, product = null, prefilledName = 
     const [isLoading, setIsLoading] = useState(false);
     const [errorMsg, setErrorMsg] = useState('');
     const [fieldErrors, setFieldErrors] = useState({});
+    const [FastScan, SetFastScan] = useState(false);
+    const Saving = useRef(false);
+    const ProductForm = useRef(null);
 
     const [formData, setFormData] = useState({
+        ManualPriceFields: {},
         ImageURL: product?.ImageURL || '',
         MasterSKU: product?.MasterSKU || '',
         ProductName: product?.ProductName || prefilledName || '',
@@ -62,9 +68,9 @@ export function ProductModal({ isOpen, onClose, product = null, prefilledName = 
         Barcode: product?.Barcode || '',
         SellerSKU: product?.SellerSKU || '',
         GTIN: product?.GTIN || '',
-        CostPrice: product?.CostPrice || '',
-        FakeCostPrice: product?.FakeCostPrice || '',
-        StockistPrice: product?.StockistPrice || '',
+        CostPrice: product?.CostPrice ?? '',
+        FakeCostPrice: product?.FakeCostPrice ?? '',
+        StockistPrice: product?.StockistPrice ?? '',
         Stock: product?.Stock || 0,
         WeightG: product?.WeightG || '',
         LengthCM: product?.LengthCM || '',
@@ -78,7 +84,9 @@ export function ProductModal({ isOpen, onClose, product = null, prefilledName = 
 
     useEffect(() => {
         if (isOpen) {
+            SetFastScan(false);
             setFormData({
+                ManualPriceFields: {},
                 ImageURL: product?.ImageURL || '',
                 MasterSKU: product?.MasterSKU || '',
                 ProductName: product?.ProductName || prefilledName || '',
@@ -89,9 +97,9 @@ export function ProductModal({ isOpen, onClose, product = null, prefilledName = 
                 Barcode: product?.Barcode || '',
                 SellerSKU: product?.SellerSKU || '',
                 GTIN: product?.GTIN || '',
-                CostPrice: product?.CostPrice || '',
-                FakeCostPrice: product?.FakeCostPrice || '',
-                StockistPrice: product?.StockistPrice || '',
+                CostPrice: product?.CostPrice ?? '',
+                FakeCostPrice: product?.FakeCostPrice ?? '',
+                StockistPrice: product?.StockistPrice ?? '',
                 Stock: product?.Stock || 0,
                 WeightG: product?.WeightG || '',
                 LengthCM: product?.LengthCM || '',
@@ -127,6 +135,8 @@ export function ProductModal({ isOpen, onClose, product = null, prefilledName = 
                 SellerSKU: value,
                 GTIN: value
             }));
+        } else if (name === 'CostPrice' || AutomaticPriceFields.includes(name)) {
+            setFormData(Previous => UpdateProductPrice(Previous, name, value));
         } else if (name === 'ProductName' || name === 'Variation') {
             setFormData(prev => ({ ...prev, [name]: formatTitleCase(value) }));
         } else if (name === 'Size') {
@@ -138,9 +148,7 @@ export function ProductModal({ isOpen, onClose, product = null, prefilledName = 
 
     const handlePriceBlur = (e) => {
         const { name, value } = e.target;
-        if (value !== '' && !isNaN(parseFloat(value))) {
-            setFormData(prev => ({ ...prev, [name]: parseFloat(value).toFixed(2) }));
-        }
+        setFormData(Previous => ({ ...Previous, [name]: FormatProductPrice(value) }));
     };
 
     const calculateCheckDigit = (barcodeWithoutCheckDigit) => {
@@ -192,30 +200,28 @@ export function ProductModal({ isOpen, onClose, product = null, prefilledName = 
         }
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+    const SaveProduct = async (Values = formData) => {
+        if (Saving.current || (ProductForm.current && !ProductForm.current.reportValidity())) return;
+        Saving.current = true;
         setIsLoading(true);
         setErrorMsg('');
         setFieldErrors({});
 
         try {
-            let finalBarcode = formData.Barcode;
-            if (!finalBarcode || finalBarcode.trim() === '') {
-                finalBarcode = generateInternalBarcode();
-            } else {
+            const finalBarcode = Values.Barcode?.trim() || null;
+            if (finalBarcode) {
                 if (!/^\d{8,50}$/.test(finalBarcode)) {
                     setFieldErrors({ Barcode: 'Barcode must be between 8 to 50 digits (e.g. UPC, EAN, or GTIN).' });
-                    setIsLoading(false);
                     return;
                 }
             }
 
-            const WeightG = formData.WeightG === '' ? null : parseInt(formData.WeightG, 10);
-            const LengthCM = formData.LengthCM === '' ? null : parseFloat(formData.LengthCM);
-            const WidthCM = formData.WidthCM === '' ? null : parseFloat(formData.WidthCM);
-            const HeightCM = formData.HeightCM === '' ? null : parseFloat(formData.HeightCM);
+            const WeightG = Values.WeightG === '' ? null : parseInt(Values.WeightG, 10);
+            const LengthCM = Values.LengthCM === '' ? null : parseFloat(Values.LengthCM);
+            const WidthCM = Values.WidthCM === '' ? null : parseFloat(Values.WidthCM);
+            const HeightCM = Values.HeightCM === '' ? null : parseFloat(Values.HeightCM);
 
-            let finalCategory = formData.Category || null;
+            let finalCategory = Values.Category || null;
             let finalCategoryName = null;
             let finalCategoryID = null;
             
@@ -230,24 +236,24 @@ export function ProductModal({ isOpen, onClose, product = null, prefilledName = 
             }
 
             const productData = {
-                ImageURL: formData.ImageURL || null,
-                MasterSKU: formData.MasterSKU || null,
-                ProductName: formData.ProductName,
-                Brand: formData.Brand || null,
+                ImageURL: Values.ImageURL || null,
+                MasterSKU: Values.MasterSKU || null,
+                ProductName: Values.ProductName,
+                Brand: Values.Brand || null,
                 Category: finalCategory,
                 CategoryName: finalCategoryName,
                 CategoryID: finalCategoryID,
-                Variation: formData.Variation || null,
-                Size: formData.Size || null,
+                Variation: Values.Variation || null,
+                Size: Values.Size || null,
                 Barcode: finalBarcode,
                 SellerSKU: finalBarcode || null,
                 GTIN: finalBarcode || null,
-                CostPrice: parseFloat(formData.CostPrice) || 0,
-                FakeCostPrice: parseFloat(formData.FakeCostPrice) || 0,
-                StockistPrice: parseFloat(formData.StockistPrice) || 0,
-                RetailPrice: parseFloat(formData.RetailPrice) || 0,
-                WholesalePrice: parseFloat(formData.WholesalePrice) || 0,
-                AgentPrice: parseFloat(formData.AgentPrice) || 0,
+                CostPrice: parseFloat(Values.CostPrice) || 0,
+                FakeCostPrice: parseFloat(Values.FakeCostPrice) || 0,
+                StockistPrice: parseFloat(Values.StockistPrice) || 0,
+                RetailPrice: parseFloat(Values.RetailPrice) || 0,
+                WholesalePrice: parseFloat(Values.WholesalePrice) || 0,
+                AgentPrice: parseFloat(Values.AgentPrice) || 0,
                 WeightG: Number.isFinite(WeightG) ? WeightG : null,
                 LengthCM: Number.isFinite(LengthCM) ? LengthCM : null,
                 WidthCM: Number.isFinite(WidthCM) ? WidthCM : null,
@@ -264,7 +270,7 @@ export function ProductModal({ isOpen, onClose, product = null, prefilledName = 
                 const newProd = await addProduct.mutateAsync(productData);
                 savedProductId = newProd.ProductID;
 
-                const initialStock = parseInt(formData.Stock, 10) || 0;
+                const initialStock = parseInt(Values.Stock, 10) || 0;
                 if (initialStock > 0) {
                     await supabase.rpc('stock_in_product', {
                         product_id_input: savedProductId,
@@ -289,20 +295,36 @@ export function ProductModal({ isOpen, onClose, product = null, prefilledName = 
                 setErrorMsg(error.message || 'Failed to save product.');
             }
         } finally {
+            Saving.current = false;
             setIsLoading(false);
         }
     };
 
+    useProductScanner(isOpen && !isLoading, () => ({ ...formData }), async (Code, Snapshot) => {
+        if (Saving.current) return;
+        if (Code.length > 50) {
+            setFormData(Snapshot);
+            setFieldErrors({ Barcode: 'Barcode must be between 8 to 50 digits.' });
+            return;
+        }
+        const Values = { ...Snapshot, Barcode: Code, SellerSKU: Code, GTIN: Code };
+        setFormData(Values);
+        setFieldErrors({});
+        if (product && FastScan) await SaveProduct(Values);
+    });
+
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm overflow-y-auto p-4 sm:p-6 lg:p-10 animate-in fade-in duration-200">
+        <div onKeyDownCapture={Event => {
+            if (Event.key === 'Enter' && Event.target.tagName !== 'TEXTAREA') Event.preventDefault();
+        }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm overflow-y-auto p-4 sm:p-6 lg:p-10 animate-in fade-in duration-200">
             <div className="w-full max-w-[1400px] bg-white rounded-none shadow-2xl relative flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
                 <div className="flex items-center justify-between px-10 py-6 border-b border-gray-100 shrink-0">
                     <h2 className="text-2xl font-bold tracking-tight text-gray-900">
                         {product ? 'Edit Product Profile' : 'Add New Product'}
                     </h2>
-                    <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-900 transition-colors">
+                    <button type="button" disabled={isLoading} onClick={onClose} className="p-2 text-gray-400 hover:text-gray-900 transition-colors">
                         <X className="h-5 w-5" />
                     </button>
                 </div>
@@ -325,7 +347,8 @@ export function ProductModal({ isOpen, onClose, product = null, prefilledName = 
                             </div>
                         </div>
                     )}
-                    <form id="product-form" onSubmit={handleSubmit} className="space-y-10">
+                    <form ref={ProductForm} id="product-form" onSubmit={Event => Event.preventDefault()} className="space-y-10">
+                        <fieldset disabled={isLoading} className="contents">
                         {errorMsg && (
                             <div className="bg-amber-50 text-amber-800 p-4 rounded-lg text-sm border border-amber-200 flex items-start gap-3">
                                 <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
@@ -502,33 +525,33 @@ export function ProductModal({ isOpen, onClose, product = null, prefilledName = 
                                             <Label htmlFor="CostPrice" className="text-gray-700 font-medium flex items-center">
                                                 Cost Price <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500 ml-1.5 mb-0.5 shadow-sm shadow-blue-500/50" title="Actual Cost"></span>
                                             </Label>
-                                            <Input id="CostPrice" name="CostPrice" type="number" step="0.01" required value={formData.CostPrice} onChange={handleChange} onBlur={handlePriceBlur} className="bg-gray-50/50 focus:bg-white" />
+                                            <Input id="CostPrice" name="CostPrice" type="number" min="0" step="0.01" required value={formData.CostPrice} onChange={handleChange} onBlur={handlePriceBlur} className="bg-gray-50/50 focus:bg-white" />
                                         </div>
 
                                         <div className="space-y-2">
                                             <Label htmlFor="FakeCostPrice" className="text-gray-700 font-medium flex items-center">
                                                 Cost Price <span className="inline-block w-1.5 h-1.5 rounded-full bg-gray-300 ml-1.5 mb-0.5 shadow-sm" title="Display Cost"></span>
                                             </Label>
-                                            <Input id="FakeCostPrice" name="FakeCostPrice" type="number" step="0.01" value={formData.FakeCostPrice} onChange={handleChange} onBlur={handlePriceBlur} className="bg-gray-50/50 focus:bg-white" />
+                                            <Input id="FakeCostPrice" name="FakeCostPrice" type="number" min="0" step="0.01" value={formData.FakeCostPrice} onChange={handleChange} onBlur={handlePriceBlur} className="bg-gray-50/50 focus:bg-white" />
                                         </div>
 
                                         <div className="space-y-2">
                                             <Label htmlFor="StockistPrice" className="text-gray-700 font-medium flex items-center">
                                                 Stockist Price
                                             </Label>
-                                            <Input id="StockistPrice" name="StockistPrice" type="number" step="0.01" value={formData.StockistPrice} onChange={handleChange} onBlur={handlePriceBlur} className="bg-gray-50/50 focus:bg-white" />
+                                            <Input id="StockistPrice" name="StockistPrice" type="number" min="0" step="0.01" value={formData.StockistPrice} onChange={handleChange} onBlur={handlePriceBlur} className="bg-gray-50/50 focus:bg-white" />
                                         </div>
 
 
 
                                         <div className="space-y-2">
                                             <Label htmlFor="RetailPrice" className="text-gray-700 font-medium flex items-center">Retail Price</Label>
-                                            <Input id="RetailPrice" name="RetailPrice" type="number" step="0.01" value={formData.RetailPrice} onChange={handleChange} onBlur={handlePriceBlur} className="bg-gray-50/50 focus:bg-white" />
+                                            <Input id="RetailPrice" name="RetailPrice" type="number" min="0" step="0.01" value={formData.RetailPrice} onChange={handleChange} onBlur={handlePriceBlur} className="bg-gray-50/50 focus:bg-white" />
                                         </div>
 
                                         <div className="space-y-2">
                                             <Label htmlFor="WholesalePrice" className="text-gray-700 font-medium flex items-center">Wholesale Price</Label>
-                                            <Input id="WholesalePrice" name="WholesalePrice" type="number" step="0.01" value={formData.WholesalePrice} onChange={handleChange} onBlur={handlePriceBlur} className="bg-gray-50/50 focus:bg-white" />
+                                            <Input id="WholesalePrice" name="WholesalePrice" type="number" min="0" step="0.01" value={formData.WholesalePrice} onChange={handleChange} onBlur={handlePriceBlur} className="bg-gray-50/50 focus:bg-white" />
                                         </div>
 
                                         <div className="space-y-2">
@@ -539,14 +562,22 @@ export function ProductModal({ isOpen, onClose, product = null, prefilledName = 
                                 </section>
                             </div>
                         </div>
+                        </fieldset>
                     </form>
                 </div>
 
-                <div className="flex items-center justify-end gap-3 px-10 py-6 border-t border-gray-100 bg-gray-50/50 shrink-0">
+                <div className="flex flex-wrap items-center justify-end gap-3 px-10 py-6 border-t border-gray-100 bg-gray-50/50 shrink-0">
+                    {product && (
+                        <label className="mr-auto flex items-center gap-2 text-sm text-gray-700" htmlFor="FastScan">
+                            <input id="FastScan" type="checkbox" checked={FastScan} disabled={isLoading}
+                                onChange={Event => SetFastScan(Event.target.checked)} />
+                            Scan, save & close
+                        </label>
+                    )}
                     <Button variant="ghost" type="button" onClick={onClose} disabled={isLoading} className="text-gray-600 hover:bg-gray-200 hover:text-gray-900 font-medium rounded-lg px-6">
                         Cancel
                     </Button>
-                    <Button form="product-form" type="submit" disabled={isLoading} className="bg-blue-600 hover:bg-blue-700 text-white min-w-[150px] transition-colors rounded-lg font-semibold border-0 shadow-sm">
+                    <Button type="button" onClick={() => SaveProduct()} disabled={isLoading} className="bg-blue-600 hover:bg-blue-700 text-white min-w-[150px] transition-colors rounded-lg font-semibold border-0 shadow-sm">
                         {isLoading ? 'Saving...' : 'Save Product'}
                     </Button>
                 </div>
