@@ -1,4 +1,4 @@
-export const AutomaticPriceFields = Object.freeze(['FakeCostPrice', 'StockistPrice', 'WholesalePrice', 'RetailPrice']);
+export const AutomaticPriceFields = Object.freeze(['FakeCostPrice', 'StockistPrice', 'WholesalePrice', 'RetailPrice', 'AgentPrice']);
 
 function ReadSen(Value) {
     const Text = String(Value ?? '').trim();
@@ -37,6 +37,7 @@ export function UpdateProductPrice(Values, Field, Value) {
         StockistPrice: FormatSen(Sen + 200),
         WholesalePrice: FormatSen(Sen + 300),
         RetailPrice: FormatSen(Sen * 2),
+        AgentPrice: FormatSen(Sen + 150),
     };
     for (const Name of AutomaticPriceFields) {
         if (!ManualPriceFields[Name]) Updated[Name] = Suggestions[Name];

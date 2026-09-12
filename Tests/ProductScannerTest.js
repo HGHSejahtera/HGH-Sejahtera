@@ -54,3 +54,20 @@ Test('focus change or pointer reset cannot combine separate inputs into a barcod
     F.Key('Enter');
     Assert.equal(F.Scans.length, 0);
 });
+
+Test('scan from focused Add Product button reaches Barcode without using an input setter', () => {
+    let Time = 0, Result;
+    class Input {}
+    Object.defineProperty(Input.prototype, 'value', { set() { throw new TypeError('Illegal invocation on BUTTON'); } });
+    const Target = { tagName: 'BUTTON', value: '', isConnected: true,
+        ownerDocument: { defaultView: { HTMLInputElement: Input } } };
+    const Scanner = CreateProductScanner(() => ({ ProductName: 'Draft' }),
+        (Code, Snapshot) => { Result = { Code, Snapshot }; }, () => Time);
+    for (const Key of [...'0012345678901', 'Enter']) {
+        Time += 10;
+        Assert.doesNotThrow(() => Scanner.KeyDown({ key: Key, target: Target,
+            preventDefault() {}, stopImmediatePropagation() {} }));
+    }
+    Assert.equal(Result.Code, '0012345678901');
+    Assert.equal(Result.Snapshot.ProductName, 'Draft');
+});

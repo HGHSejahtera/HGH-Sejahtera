@@ -57,15 +57,17 @@ function ChangePrice(UI, Name, Value) {
 }
 function ReadPrice(UI, Name) { return Find(UI.Render(), Node => Node.Props.id === Name).Props.value; }
 
-Test('Cost Price fills the four requested prices and leaves Agent Price alone', async () => {
+Test('Cost Price fills five prices and preserves manual Agent Price changes', async () => {
     let Saved;
     const UI = Fixture(null, async Data => { Saved = Data; return { ProductID: 'Test' }; });
-    ChangePrice(UI, 'AgentPrice', '45.00');
     ChangePrice(UI, 'CostPrice', '10.10');
+    Assert.equal(ReadPrice(UI, 'AgentPrice'), '11.60');
     Assert.equal(ReadPrice(UI, 'FakeCostPrice'), '11.10');
     Assert.equal(ReadPrice(UI, 'StockistPrice'), '12.10');
     Assert.equal(ReadPrice(UI, 'WholesalePrice'), '13.10');
     Assert.equal(ReadPrice(UI, 'RetailPrice'), '20.20');
+    ChangePrice(UI, 'AgentPrice', '45.00');
+    ChangePrice(UI, 'CostPrice', '12.10');
     Assert.equal(ReadPrice(UI, 'AgentPrice'), '45.00');
     ChangePrice(UI, 'RetailPrice', '21.50');
     await UI.ClickSave();
@@ -92,7 +94,7 @@ Test('Edit Auto-Fill replaces saved and manual prices without saving, even in fa
     Assert.equal(ReadPrice(UI, 'StockistPrice'), '12.00');
     Assert.equal(ReadPrice(UI, 'WholesalePrice'), '13.00');
     Assert.equal(ReadPrice(UI, 'RetailPrice'), '20.00');
-    Assert.equal(ReadPrice(UI, 'AgentPrice'), 90);
+    Assert.equal(ReadPrice(UI, 'AgentPrice'), '11.50');
     Assert.equal(Saves, 0);
     Assert.equal(UI.Closed(), 0);
     ChangePrice(UI, 'RetailPrice', '22');

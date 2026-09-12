@@ -14,7 +14,8 @@ export function CreateProductScanner(ReadSnapshot, OnScan, Now = () => performan
                 Event.stopImmediatePropagation();
                 const Code = Buffer, Before = Snapshot;
                 // Restore native/combobox search text before restoring React form state.
-                if (Target && typeof OriginalValue === 'string' && Target.isConnected) {
+                if ((Target?.tagName === 'INPUT' || Target?.tagName === 'TEXTAREA') &&
+                    typeof OriginalValue === 'string' && Target.isConnected) {
                     const View = Target.ownerDocument.defaultView;
                     const Prototype = Target.tagName === 'TEXTAREA' ? View.HTMLTextAreaElement.prototype : View.HTMLInputElement.prototype;
                     const Setter = Object.getOwnPropertyDescriptor(Prototype, 'value')?.set;

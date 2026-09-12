@@ -10,6 +10,8 @@ Test('price suggestions use exact cents, including zero and leading decimals', (
         Assert.equal(Result.RetailPrice, Retail);
     }
     Assert.equal(FormatProductPrice('0010.1'), '10.10');
+    Assert.equal(UpdateProductPrice({}, 'CostPrice', '10.10').AgentPrice, '11.60');
+    Assert.equal(UpdateProductPrice({}, 'CostPrice', '0.29').AgentPrice, '1.79');
 });
 Test('manual prices including zero and empty stay manual through later cost changes', () => {
     let Draft = UpdateProductPrice({}, 'CostPrice', '10');

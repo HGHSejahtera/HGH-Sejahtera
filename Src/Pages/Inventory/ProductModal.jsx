@@ -577,7 +577,7 @@ export function ProductModal({ isOpen, onClose, product = null, prefilledName = 
 
                                         <div className="space-y-2">
                                             <Label htmlFor="AgentPrice" className="text-gray-700 font-medium flex items-center">Agent Price</Label>
-                                            <Input id="AgentPrice" name="AgentPrice" type="number" step="0.01" value={formData.AgentPrice} onChange={handleChange} onBlur={handlePriceBlur} className="bg-gray-50/50 focus:bg-white" />
+                                            <Input id="AgentPrice" name="AgentPrice" type="number" min="0" step="0.01" value={formData.AgentPrice} onChange={handleChange} onBlur={handlePriceBlur} className="bg-gray-50/50 focus:bg-white" />
                                         </div>
                                     </div>
                                 </section>
