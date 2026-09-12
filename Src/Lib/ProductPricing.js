@@ -17,6 +17,11 @@ export function FormatProductPrice(Value) {
     return Sen === null ? Value : FormatSen(Sen);
 }
 
+export function AutoFillProductPrices(Values) {
+    if (ReadSen(Values.CostPrice) === null) return null;
+    return UpdateProductPrice({ ...Values, ManualPriceFields: {} }, 'CostPrice', Values.CostPrice);
+}
+
 export function UpdateProductPrice(Values, Field, Value) {
     const ManualPriceFields = Values.ManualPriceFields || {};
     if (AutomaticPriceFields.includes(Field)) {

@@ -89,6 +89,7 @@ export function InventoryDashboard() {
     const [bulkActionConfirm, setBulkActionConfirm] = useState(null);
     const [deleteVerification, setDeleteVerification] = useState('');
     const [modalOpen, setModalOpen] = useState(false);
+    const [ScanAutoSave, SetScanAutoSave] = useState(false);
     const { isHGHMode } = useSecretMode();
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [confirmAction, setConfirmAction] = useState(null);
@@ -1123,6 +1124,18 @@ export function InventoryDashboard() {
                             rightActionElement={
                                 <>
                                     <Button
+                                        type="button"
+                                        variant={ScanAutoSave ? 'default' : 'outline'}
+                                        size="sm"
+                                        aria-pressed={ScanAutoSave}
+                                        aria-label={ScanAutoSave ? 'Auto Scan' : 'Manual Scan'}
+                                        onClick={() => SetScanAutoSave(Current => !Current)}
+                                        className="h-8 whitespace-nowrap rounded-md text-xs"
+                                        title="Auto-save and close Edit Product after a barcode scan"
+                                    >
+                                        {ScanAutoSave ? 'Auto Scan' : 'Manual Scan'}
+                                    </Button>
+                                    <Button
                                         variant="outline"
                                         size="sm"
                                         onClick={() => refetch()}
@@ -1212,6 +1225,7 @@ export function InventoryDashboard() {
                     isOpen={modalOpen}
                     onClose={() => setModalOpen(false)}
                     product={selectedProduct}
+                    ScanAutoSave={ScanAutoSave}
                 />
             )}
 
@@ -1408,5 +1422,3 @@ export function InventoryDashboard() {
         </div>
     );
 }
-
-

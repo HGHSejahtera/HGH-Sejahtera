@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useProductScanner } from '@/Hooks/UseProductScanner';
-import { AutomaticPriceFields, FormatProductPrice, UpdateProductPrice } from '@/Lib/ProductPricing';
+import { AutomaticPriceFields, AutoFillProductPrices, FormatProductPrice, UpdateProductPrice } from '@/Lib/ProductPricing';
 import { useProducts } from '@/Hooks/UseProducts';
 import { GenerateMasterSKU } from '@/Utils/MasterSKUGenerator';
 import { useBrands } from '@/Hooks/UseBrands';
@@ -43,7 +43,7 @@ const formatSizeStr = (str) => {
     return str.toUpperCase().replace(/(\d+)\s*([A-Z]+)/g, '$1 $2').trim();
 };
 
-export function ProductModal({ isOpen, onClose, product = null, prefilledName = '', onSuccess = null }) {
+export function ProductModal({ isOpen, onClose, product = null, prefilledName = '', onSuccess = null, ScanAutoSave = false }) {
     const { t } = useTranslation();
     const { data: allProducts = [], addProduct, updateProduct } = useProducts();
     const { data: brands = [] } = useBrands();
@@ -52,7 +52,6 @@ export function ProductModal({ isOpen, onClose, product = null, prefilledName = 
     const [isLoading, setIsLoading] = useState(false);
     const [errorMsg, setErrorMsg] = useState('');
     const [fieldErrors, setFieldErrors] = useState({});
-    const [FastScan, SetFastScan] = useState(false);
     const Saving = useRef(false);
     const ProductForm = useRef(null);
 
@@ -84,7 +83,6 @@ export function ProductModal({ isOpen, onClose, product = null, prefilledName = 
 
     useEffect(() => {
         if (isOpen) {
-            SetFastScan(false);
             setFormData({
                 ManualPriceFields: {},
                 ImageURL: product?.ImageURL || '',
@@ -136,6 +134,7 @@ export function ProductModal({ isOpen, onClose, product = null, prefilledName = 
                 GTIN: value
             }));
         } else if (name === 'CostPrice' || AutomaticPriceFields.includes(name)) {
+            if (name === 'CostPrice') setFieldErrors(Previous => ({ ...Previous, CostPrice: undefined }));
             setFormData(Previous => UpdateProductPrice(Previous, name, value));
         } else if (name === 'ProductName' || name === 'Variation') {
             setFormData(prev => ({ ...prev, [name]: formatTitleCase(value) }));
@@ -300,6 +299,17 @@ export function ProductModal({ isOpen, onClose, product = null, prefilledName = 
         }
     };
 
+    const HandleAutoFill = () => {
+        if (!product || Saving.current) return;
+        const Updated = AutoFillProductPrices(formData);
+        if (!Updated) {
+            setFieldErrors(Previous => ({ ...Previous, CostPrice: 'Enter a valid Cost Price with up to 2 decimal places.' }));
+            return;
+        }
+        setFormData(Updated);
+        setFieldErrors(Previous => ({ ...Previous, CostPrice: undefined }));
+    };
+
     useProductScanner(isOpen && !isLoading, () => ({ ...formData }), async (Code, Snapshot) => {
         if (Saving.current) return;
         if (Code.length > 50) {
@@ -310,7 +320,7 @@ export function ProductModal({ isOpen, onClose, product = null, prefilledName = 
         const Values = { ...Snapshot, Barcode: Code, SellerSKU: Code, GTIN: Code };
         setFormData(Values);
         setFieldErrors({});
-        if (product && FastScan) await SaveProduct(Values);
+        if (product && ScanAutoSave) await SaveProduct(Values);
     });
 
     if (!isOpen) return null;
@@ -519,13 +529,24 @@ export function ProductModal({ isOpen, onClose, product = null, prefilledName = 
 
                             <div className="space-y-8">
                                 <section>
-                                    <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-5 border-b border-gray-100 pb-2">Price</h3>
+                                    <div className="flex flex-wrap items-center justify-between gap-2 mb-5 border-b border-gray-100 pb-2">
+                                        <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider">Price</h3>
+                                        {product && (
+                                            <Button type="button" variant="outline" size="sm" disabled={isLoading}
+                                                onClick={HandleAutoFill} title="Replace suggested prices using Cost Price">
+                                                Auto-Fill
+                                            </Button>
+                                        )}
+                                    </div>
                                     <div className="space-y-5">
                                         <div className="space-y-2">
                                             <Label htmlFor="CostPrice" className="text-gray-700 font-medium flex items-center">
                                                 Cost Price <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500 ml-1.5 mb-0.5 shadow-sm shadow-blue-500/50" title="Actual Cost"></span>
                                             </Label>
-                                            <Input id="CostPrice" name="CostPrice" type="number" min="0" step="0.01" required value={formData.CostPrice} onChange={handleChange} onBlur={handlePriceBlur} className="bg-gray-50/50 focus:bg-white" />
+                                            <Input id="CostPrice" name="CostPrice" type="number" min="0" step="0.01" required value={formData.CostPrice} onChange={handleChange} onBlur={handlePriceBlur}
+                                                aria-invalid={!!fieldErrors.CostPrice} aria-describedby={fieldErrors.CostPrice ? 'CostPriceError' : undefined}
+                                                className="bg-gray-50/50 focus:bg-white" />
+                                            {fieldErrors.CostPrice && <p id="CostPriceError" role="alert" className="text-xs text-red-600">{fieldErrors.CostPrice}</p>}
                                         </div>
 
                                         <div className="space-y-2">
@@ -567,13 +588,6 @@ export function ProductModal({ isOpen, onClose, product = null, prefilledName = 
                 </div>
 
                 <div className="flex flex-wrap items-center justify-end gap-3 px-10 py-6 border-t border-gray-100 bg-gray-50/50 shrink-0">
-                    {product && (
-                        <label className="mr-auto flex items-center gap-2 text-sm text-gray-700" htmlFor="FastScan">
-                            <input id="FastScan" type="checkbox" checked={FastScan} disabled={isLoading}
-                                onChange={Event => SetFastScan(Event.target.checked)} />
-                            Scan, save & close
-                        </label>
-                    )}
                     <Button variant="ghost" type="button" onClick={onClose} disabled={isLoading} className="text-gray-600 hover:bg-gray-200 hover:text-gray-900 font-medium rounded-lg px-6">
                         Cancel
                     </Button>

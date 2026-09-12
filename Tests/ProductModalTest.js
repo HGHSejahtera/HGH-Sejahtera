@@ -3,7 +3,7 @@ import Assert from 'node:assert/strict';
 import { readFile as ReadFile } from 'node:fs/promises';
 import { runInNewContext as RunInNewContext } from 'node:vm';
 import { transformWithOxc as TransformWithOxc } from 'vite';
-import { AutomaticPriceFields, FormatProductPrice, UpdateProductPrice } from '../Src/Lib/ProductPricing.js';
+import { AutomaticPriceFields, AutoFillProductPrices, FormatProductPrice, UpdateProductPrice } from '../Src/Lib/ProductPricing.js';
 
 const Source = (await ReadFile(new URL('../Src/Pages/Inventory/ProductModal.jsx', import.meta.url), 'utf8'))
     .replace(/^import .*;\r?$/gm, '').replace('export function ProductModal', 'function ProductModal');
@@ -17,9 +17,9 @@ function Find(Node, Predicate) {
 }
 function Fixture(Product = null, Save = async () => ({ ProductID: 'Test' })) {
     const States = [], Refs = [];
-    let Index = 0, RefIndex = 0, Scanner, Closed = 0;
+    let Index = 0, RefIndex = 0, Scanner, Closed = 0, ScanAutoSave = false;
     const Context = {
-        AutomaticPriceFields, FormatProductPrice, UpdateProductPrice,
+        AutomaticPriceFields, AutoFillProductPrices, FormatProductPrice, UpdateProductPrice,
         useState: Initial => { const Position = Index++; if (!(Position in States)) States[Position] = Initial;
             return [States[Position], Value => { States[Position] = typeof Value === 'function' ? Value(States[Position]) : Value; }]; },
         useRef: Initial => { const Position = RefIndex++; return Refs[Position] ||= { current: Initial }; },
@@ -35,13 +35,13 @@ function Fixture(Product = null, Save = async () => ({ ProductID: 'Test' })) {
     };
     RunInNewContext(Code, Context);
     const Render = () => { Index = 0; RefIndex = 0;
-        return Context.ProductModal({ isOpen: true, product: Product, onClose: () => Closed++ }); };
+        return Context.ProductModal({ isOpen: true, product: Product, ScanAutoSave, onClose: () => Closed++ }); };
     const ClickSave = () => {
         const Button = Find(Render(), Node => Node.Type === 'Button' && Node.Children.includes('Save Product'));
         if (Button.Props.onClick) return Button.Props.onClick();
         return Find(Render(), Node => Node.Type === 'form').Props.onSubmit({ preventDefault() {} });
     };
-    return { Render, ClickSave, GetScanner: () => Scanner, Closed: () => Closed };
+    return { Render, ClickSave, SetScanAutoSave: Value => { ScanAutoSave = Value; }, GetScanner: () => Scanner, Closed: () => Closed };
 }
 
 Test('saving a product without a barcode leaves it unassigned', async () => {
@@ -79,6 +79,40 @@ Test('opening Edit preserves stored prices without applying new formulas', () =>
     Assert.equal(ReadPrice(UI, 'RetailPrice'), 50);
 });
 
+Test('Edit Auto-Fill replaces saved and manual prices without saving, even in fast scan mode', async () => {
+    let Saves = 0;
+    const UI = Fixture({ ProductID: 'Test', CostPrice: 10, FakeCostPrice: 50,
+        StockistPrice: 60, WholesalePrice: 70, RetailPrice: 80, AgentPrice: 90 }, async () => { Saves++; });
+    ChangePrice(UI, 'RetailPrice', '100');
+    UI.SetScanAutoSave(true);
+    const Button = Find(UI.Render(), Node => Node.Type === 'Button' && Node.Children.includes('Auto-Fill'));
+    Assert.equal(Button.Props.type, 'button');
+    await Button.Props.onClick();
+    Assert.equal(ReadPrice(UI, 'FakeCostPrice'), '11.00');
+    Assert.equal(ReadPrice(UI, 'StockistPrice'), '12.00');
+    Assert.equal(ReadPrice(UI, 'WholesalePrice'), '13.00');
+    Assert.equal(ReadPrice(UI, 'RetailPrice'), '20.00');
+    Assert.equal(ReadPrice(UI, 'AgentPrice'), 90);
+    Assert.equal(Saves, 0);
+    Assert.equal(UI.Closed(), 0);
+    ChangePrice(UI, 'RetailPrice', '22');
+    await UI.ClickSave();
+    Assert.equal(Saves, 1);
+});
+
+Test('Auto-Fill is Edit-only and invalid cost cannot replace prices', () => {
+    const Add = Fixture();
+    Assert.equal(Find(Add.Render(), Node => Node.Children.includes('Auto-Fill')), undefined);
+    const UI = Fixture({ ProductID: 'Test', CostPrice: '', RetailPrice: 80 });
+    Find(UI.Render(), Node => Node.Children.includes('Auto-Fill')).Props.onClick();
+    Assert.equal(ReadPrice(UI, 'RetailPrice'), 80);
+    Assert.ok(Find(UI.Render(), Node => Node.Props.id === 'CostPriceError'));
+    ChangePrice(UI, 'CostPrice', '0');
+    Find(UI.Render(), Node => Node.Children.includes('Auto-Fill')).Props.onClick();
+    Assert.equal(ReadPrice(UI, 'RetailPrice'), '0.00');
+    Assert.equal(ReadPrice(UI, 'FakeCostPrice'), '1.00');
+});
+
 Test('manual price survives changing cost; scanner restores automatic price state', async () => {
     const UI = Fixture();
     ChangePrice(UI, 'CostPrice', '10');
@@ -108,6 +142,7 @@ Test('Enter submit alone never saves a product', async () => {
 Test('Add scan restores other fields, replaces barcode and waits for Save', async () => {
     let Count = 0;
     const UI = Fixture(null, async () => { Count++; return { ProductID: 'Test' }; });
+    UI.SetScanAutoSave(true);
     UI.Render();
     const Snapshot = UI.GetScanner().ReadSnapshot();
     Find(UI.Render(), Node => Node.Props.id === 'ProductName').Props.onChange({ target: { name: 'ProductName', value: '12345678' } });
@@ -120,12 +155,11 @@ Test('Add scan restores other fields, replaces barcode and waits for Save', asyn
 Test('Edit scan defaults to manual save; fast mode saves new barcode once', async () => {
     const Saved = [];
     const UI = Fixture({ ProductID: 'Test', Barcode: '11111111', ProductName: 'Original' }, async Data => Saved.push(Data));
-    let Tree = UI.Render();
-    Assert.equal(Find(Tree, Node => Node.Props.id === 'FastScan').Props.checked, false);
+    const Tree = UI.Render();
+    Assert.equal(Find(Tree, Node => Node.Props.id === 'FastScan'), undefined);
     await UI.GetScanner().OnScan('22222222', UI.GetScanner().ReadSnapshot());
     Assert.equal(Saved.length, 0);
-    Tree = UI.Render();
-    Find(Tree, Node => Node.Props.id === 'FastScan').Props.onChange({ target: { checked: true } });
+    UI.SetScanAutoSave(true);
     UI.Render();
     await UI.GetScanner().OnScan('33333333', UI.GetScanner().ReadSnapshot());
     Assert.equal(Saved.length, 1);
@@ -136,7 +170,7 @@ Test('Edit scan defaults to manual save; fast mode saves new barcode once', asyn
 Test('fast save failure keeps the form open; concurrent scan cannot save twice', async () => {
     let Reject, Count = 0;
     const UI = Fixture({ ProductID: 'Test', Barcode: '11111111' }, () => { Count++; return new Promise((Resolve, Fail) => { Reject = Fail; }); });
-    Find(UI.Render(), Node => Node.Props.id === 'FastScan').Props.onChange({ target: { checked: true } });
+    UI.SetScanAutoSave(true);
     UI.Render();
     const Pending = UI.GetScanner().OnScan('22222222', UI.GetScanner().ReadSnapshot());
     await UI.GetScanner().OnScan('33333333', UI.GetScanner().ReadSnapshot());
