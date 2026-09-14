@@ -105,7 +105,7 @@ function AccountPanel({ Auth }) {
             else if (Editor === 'Username') { SetProfile(Previous => ({ ...Previous, Username: Next })); SetNotice('Updated'); }
             else { useAuthStore.setState(State => State.user?.id === UserID ? { user: { ...State.user, hasPin: Editor === 'SetPIN' } } : {}); SetNotice('Updated'); }
         } catch (Failure) {
-            const Known = ['WrongPassword','UsernameTaken','UsernameInvalid','EmailInvalid','PasswordInvalid','PINInvalid','TooManyAttempts','SignIn','Unavailable','SetupRequired','Invalid','UpdateFailed'];
+            const Known = ['WrongPassword','UsernameTaken','EmailTaken','UsernameInvalid','EmailInvalid','PasswordInvalid','PINInvalid','TooManyAttempts','SignIn','Unavailable','SetupRequired','Invalid','UpdateFailed'];
             SetError(Known.includes(Failure.message) ? Failure.message : 'UpdateFailed'); SetCurrentPassword('');
         } finally { Running.current = false; SetBusy(false); }
     }
@@ -122,7 +122,7 @@ function AccountPanel({ Auth }) {
                     {NicknameError && <p role="alert" className="px-5 py-3 text-sm text-red-700">{Text(NicknameError)}</p>}{NicknameNotice && <p role="status" className="px-5 py-3 text-sm text-primary">{Text(NicknameNotice)}</p>}
                 </AccountSection>
                 <AccountSection Title={Text('SignInDetails')} Icon={Lock}>
-                    {!AccountChangesReady && <p role="status" className="px-5 py-3 text-sm text-amber-900 bg-amber-50">{Text('SetupRequired')}</p>}
+                    {!AccountChangesReady && <p role="status" className="px-5 py-3 text-sm text-amber-900 bg-amber-50">{Text('SignInUnavailable')}</p>}
                     {['Username','Email'].map(Field=><AccountRow key={Field} Label={Text(Field)} Value={Profile[Field] || Text('NoEmail')}><Button variant="ghost" className="min-h-11 text-primary" aria-label={Text(Field === 'Username' ? 'ChangeUsername' : 'ChangeEmail')} disabled={!AccountChangesReady || Busy || PasswordChanged} onClick={()=>Open(Field)}>{Text('Change')}</Button></AccountRow>)}
                     {Profile.PendingEmail && <p className="px-5 py-3 text-sm text-gray-500 break-all">{Text('PendingEmail')}: {Profile.PendingEmail}</p>}
                     <AccountRow Label={Text('Password')}><Button variant="ghost" className="min-h-11 text-primary" disabled={!AccountChangesReady || Busy || PasswordChanged} onClick={()=>Open('Password')}>{Text('ChangePassword')}</Button></AccountRow>

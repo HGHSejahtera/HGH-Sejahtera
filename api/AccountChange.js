@@ -44,18 +44,22 @@ export function CreateAccountChangeHandler({ Env, Client = CreateClient } = {}) 
             if (LimitError || typeof Limit?.Allowed !== 'boolean') return Reply(503, 'Unavailable');
             if (!Limit.Allowed) return Reply(429, 'TooManyAttempts');
             const { data: Profile, error: ProfileError } = await Database.from('Users').select('UserID, IsActive, Role').eq('UserID', UserID).single();
-            if (ProfileError || !Profile?.IsActive || Profile.Role === 'Pending') return Reply(403, 'SignIn');
+            if (ProfileError || !Profile?.IsActive || !Profile.Role || ['Pending', 'Rejected'].includes(Profile.Role)) return Reply(403, 'SignIn');
             // A separate short-lived Auth client verifies the CURRENT account, never an identifier supplied by the caller.
             const { data: Proof, error: ProofError } = await Auth.auth.signInWithPassword({ email: Identity.user.email, password: Body.CurrentPassword });
             Verified = !!Proof?.session;
-            if (ProofError || Proof?.user?.id !== UserID) return Reply(401, 'WrongPassword');
+            if (ProofError || !Proof?.session?.access_token || Proof?.user?.id !== UserID) return Reply(401, 'WrongPassword');
             let Result;
             if (Body.Action === 'Username') Result = await Database.rpc('ChangeOwnUsername', { TargetUserID: UserID, NewUsername: Value });
             else if (Body.Action === 'Email') Result = await Auth.auth.updateUser({ email: Value });
             else if (Body.Action === 'Password') Result = await Auth.auth.updateUser({ password: Value, current_password: Body.CurrentPassword });
             else Result = await Database.rpc('ChangeOwnPIN', { TargetUserID: UserID, NewPIN: Body.Action === 'DisablePIN' ? null : Value });
-            if (Result?.error) return Reply(400, Result.error.code === '23505' ? 'UsernameTaken' : 'UpdateFailed');
+            if (Result?.error) {
+                if (Result.error.status === 429) return Reply(429, 'TooManyAttempts');
+                return Reply(400, Result.error.code === '23505' ? 'UsernameTaken' : Result.error.code === 'email_exists' ? 'EmailTaken' : 'UpdateFailed');
+            }
             if (!Result || (['Username', 'SetPIN', 'DisablePIN'].includes(Body.Action) && Result.data !== true)) return Reply(503, 'Unavailable');
+            if (['Email', 'Password'].includes(Body.Action) && Result.data?.user?.id !== UserID) return Reply(503, 'Unavailable');
             if (Body.Action === 'Password') {
                 const { error: SignOutError } = await Auth.auth.signOut({ scope: 'global' });
                 Verified = !!SignOutError;

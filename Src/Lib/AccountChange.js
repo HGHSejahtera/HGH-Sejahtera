@@ -2,7 +2,7 @@ import { supabase as Supabase } from './Supabase.js';
 import { useAuthStore } from '../Hooks/UseAuth.js';
 
 // Enable only after the endpoint, database restrictions and provider settings pass rollout verification.
-export const AccountChangesReady = false;
+export const AccountChangesReady = true;
 export const PINChangesReady = true;
 export function IsAccountChangeReady(Action) {
     return ['SetPIN', 'DisablePIN'].includes(Action) ? PINChangesReady : AccountChangesReady;
