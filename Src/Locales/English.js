@@ -1,4 +1,7 @@
+import { AccountEnglish } from './Account';
 export const en = {
+    SettingsNavigation: { Account:'My Account', General:'General', Users:'User Management', APIConnection:'API Connection' },
+    Account: AccountEnglish,
     sidebar: {
         dashboard: "Dashboard",
         pos: "POS",

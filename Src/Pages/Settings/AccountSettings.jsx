@@ -1,690 +1,143 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '@/Lib/Supabase';
+import { useEffect, useRef, useState } from 'react';
+import { UserRound, Shield, Lock, Loader2 } from 'lucide-react';
+import { supabase as Supabase } from '@/Lib/Supabase';
+import { ChangeAccount, AccountChangesReady, PINChangesReady, IsAccountChangeReady } from '@/Lib/AccountChange';
 import { useAuthStore } from '@/Hooks/UseAuth';
+import { useTranslation } from '@/Hooks/UseTranslation';
 import { usePreferences } from '@/Hooks/UsePreferences';
 import { Button } from '@/Components/UI/Button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/UI/Select';
 import { Input } from '@/Components/UI/Input';
 import { Label } from '@/Components/UI/Label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/UI/Select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/Components/UI/Dialog';
-import { SettingsTabs } from './Settings';
-import { 
-    User, 
-    Loader2, 
-    CheckCircle2, 
-    AlertCircle, 
-    AlertTriangle,
-    Lock, 
-    Clock, 
-    Shield
-} from 'lucide-react';
+import { SettingsPage } from './SettingsPage';
 
+function AccountSection({ Title, Icon, children }) {
+    return <section className="border-t border-gray-100"><h2 className="flex items-center gap-2 px-5 py-3 bg-gray-50/70 text-sm font-semibold text-gray-700"><Icon aria-hidden="true" className="size-4 text-primary"/>{Title}</h2><div className="divide-y divide-gray-100">{children}</div></section>;
+}
+function AccountRow({ Label, Value, children }) {
+    return <div className="px-5 py-4 flex flex-wrap items-center justify-between gap-3"><div className="min-w-0 flex-1"><h3 className="text-sm font-medium text-gray-900">{Label}</h3>{Value && <p className="mt-1 text-sm text-gray-500 break-all">{Value}</p>}</div>{children}</div>;
+}
 export function AccountSettings() {
-    const { user } = useAuthStore();
-    const { pinTimeout, setPinTimeout } = usePreferences();
-    const [profile, setProfile] = useState({ staffId: '', username: '', email: '', nickname: '' });
-    const [hasPin, setHasPin] = useState(false);
-    const [isLoading, setIsLoading] = useState(true);
-    
-    // Status states
-    const [usernameStatus, setUsernameStatus] = useState('');
-    const [nicknameStatus, setNicknameStatus] = useState('');
-    const [emailStatus, setEmailStatus] = useState('');
-    const [passwordStatus, setPasswordStatus] = useState('');
-    const [pinStatus, setPinStatus] = useState('');
-
-    const [isEditingPin, setIsEditingPin] = useState(false);
-    const [isEditingPassword, setIsEditingPassword] = useState(false);
-    const [isDisableModalOpen, setIsDisableModalOpen] = useState(false);
-
-    // PIN state
-    const [oldPin, setOldPin] = useState('');
-    const [newPinStr, setNewPinStr] = useState('');
-    const [confirmPinStr, setConfirmPinStr] = useState('');
-
-    // Password state
-    const [newPassword, setNewPassword] = useState('');
-    const [confirmPassword, setConfirmPassword] = useState('');
-
+    const Auth = useAuthStore();
+    if (!Auth.isAuthenticated || Auth.isLocked || !Auth.user?.id) return null;
+    return <AccountPanel key={Auth.user.id} Auth={Auth}/>;
+}
+function AccountPanel({ Auth }) {
+    const { t: Translate } = useTranslation();
+    const Text = Key => Translate('Account.' + Key);
+    const { pinTimeout: PINTimeout, setPinTimeout: SetPINTimeout } = usePreferences();
+    const [Profile, SetProfile] = useState(null);
+    const [Nickname, SetNickname] = useState('');
+    const [EditingNickname, SetEditingNickname] = useState(false);
+    const [Loading, SetLoading] = useState(true);
+    const [LoadError, SetLoadError] = useState(false);
+    const [Revision, SetRevision] = useState(0);
+    const [Editor, SetEditor] = useState(null);
+    const [Value, SetValue] = useState('');
+    const [Confirmation, SetConfirmation] = useState('');
+    const [CurrentPassword, SetCurrentPassword] = useState('');
+    const [Busy, SetBusy] = useState(false);
+    const [ErrorKey, SetError] = useState('');
+    const [Notice, SetNotice] = useState('');
+    const [NicknameError, SetNicknameError] = useState('');
+    const [NicknameNotice, SetNicknameNotice] = useState('');
+    const [PasswordChanged, SetPasswordChanged] = useState(false);
+    const Request = useRef(null);
+    const Running = useRef(false);
+    const UserID = Auth.user?.id;
     useEffect(() => {
-        async function fetchProfile() {
-            if (!user?.id) return;
-            setIsLoading(true);
-
-            const { data, error } = await supabase
-                .from('Users')
-                .select('StaffID, Username, Email, Nickname, PINHash')
-                .eq('UserID', user.id)
-                .single();
-
-            if (!error && data) {
-                setProfile({
-                    staffId: data.StaffID || '',
-                    username: data.Username || '',
-                    email: data.Email || '',
-                    nickname: data.Nickname || ''
-                });
-                setHasPin(!!data.PINHash);
-                if (useAuthStore.getState().user) {
-                    useAuthStore.getState().user.hasPin = !!data.PINHash;
-                }
-            }
-            setIsLoading(false);
+        let Active = true;
+        async function Load() {
+            try {
+                const [{ data: Data, error: Failure }, { data: Identity, error: AuthFailure }] = await Promise.all([
+                    Supabase.from('Users').select('StaffID, Username, Nickname').eq('UserID', UserID).single(), Supabase.auth.getUser()
+                ]);
+                if (!Active) return;
+                if (Failure || AuthFailure || !Data || Identity?.user?.id !== UserID) throw new Error();
+                SetProfile({ ...Data, Email: Identity.user.email || '', PendingEmail: Identity.user.new_email || '' });
+                SetNickname(Data.Nickname || '');
+            } catch { if (Active) SetLoadError(true); }
+            finally { if (Active) SetLoading(false); }
         }
-
-        fetchProfile();
-    }, [user?.id]);
-
-    const handleUpdateField = async (field, value, setStatus) => {
-        setStatus('loading');
-        const { data, error } = await supabase
-            .from('Users')
-            .update({ [field]: value })
-            .eq('UserID', user.id)
-            .select();
-
-        if (error || !data || data.length === 0) {
-            setStatus('error');
-            console.error(`Failed to update ${field}:`, error || '0 rows updated (RLS block)');
-        } else {
-            setStatus('success');
-            setTimeout(() => setStatus(''), 3000);
-        }
-    };
-
-    const handleUpdateUsername = async () => {
-        setUsernameStatus('loading');
-        const { data, error } = await supabase
-            .from('Users')
-            .update({ Username: profile.username })
-            .eq('UserID', user.id)
-            .select();
-            
-        if (error || !data || data.length === 0) {
-            console.error(error || '0 rows updated (RLS block)');
-            setUsernameStatus(error?.code === '23505' ? 'taken' : 'error');
-        } else {
-            setUsernameStatus('success');
-            setTimeout(() => setUsernameStatus(''), 3000);
-        }
-    };
-
-    const handleUpdateNickname = async () => {
-        setNicknameStatus('loading');
-        const formattedNickname = profile.nickname 
-            ? profile.nickname.trim().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
-            : '';
-        const { data, error } = await supabase
-            .from('Users')
-            .update({ Nickname: formattedNickname })
-            .eq('UserID', user.id)
-            .select();
-            
-        if (error || !data || data.length === 0) {
-            console.error(error || '0 rows updated (RLS block)');
-            setNicknameStatus('error');
-        } else {
-            setProfile({ ...profile, nickname: formattedNickname });
-            setNicknameStatus('success');
-            setTimeout(() => setNicknameStatus(''), 3000);
-        }
-    };
-
-    const handleUpdateEmail = async () => {
-        setEmailStatus('loading');
-        const { error } = await supabase.auth.updateUser({ email: profile.email });
-        if (error) {
-            console.error(error);
-            setEmailStatus('error');
-        } else {
-            setEmailStatus('success');
-            setTimeout(() => setEmailStatus(''), 4000);
-        }
-    };
-
-    const handleUpdatePassword = async () => {
-        if (!newPassword || newPassword !== confirmPassword) {
-            setPasswordStatus('error');
-            return;
-        }
-        setPasswordStatus('loading');
-        const { error } = await supabase.auth.updateUser({ password: newPassword });
-        if (error) {
-            console.error(error);
-            setPasswordStatus('error');
-        } else {
-            setPasswordStatus('success');
-            setNewPassword('');
-            setConfirmPassword('');
-            setIsEditingPassword(false);
-            setTimeout(() => setPasswordStatus(''), 3000);
-        }
-    };
-
-    const handleDisablePin = () => {
-        setIsDisableModalOpen(true);
-    };
-
-    const executeDisablePin = async () => {
-        setPinStatus('loading');
-        try {
-            let success = false;
-            // 1. First attempt standardized clear_my_pin RPC (bypasses RLS reliably)
-            const { data: rpcSuccess, error: rpcError } = await supabase.rpc('clear_my_pin');
-            if (!rpcError && rpcSuccess !== false) {
-                success = true;
-            } else {
-                // 2. Fallback to direct update with .select() check to ensure row was modified
-                const { data: updatedData, error: updateError } = await supabase
-                    .from('Users')
-                    .update({ PINHash: null })
-                    .eq('UserID', user.id)
-                    .select();
-
-                if (!updateError && updatedData && updatedData.length > 0) {
-                    success = true;
-                }
-            }
-
-            if (!success) {
-                setPinStatus('error');
-            } else {
-                setHasPin(false);
-                if (useAuthStore.getState().user) {
-                    useAuthStore.getState().user.hasPin = false;
-                }
-                setPinStatus('disabled_success');
-                setIsEditingPin(false);
-                setIsDisableModalOpen(false);
-                setTimeout(() => setPinStatus(''), 3000);
-            }
-        } catch (err) {
-            console.error(err);
-            setPinStatus('error');
-        }
-    };
-
-    const submitWindowsPin = async () => {
-        if (!newPinStr || newPinStr.length !== 4 || newPinStr !== confirmPinStr) {
-            setPinStatus('mismatch');
-            return;
-        }
-
-        setPinStatus('loading');
-
-        try {
-            if (hasPin) {
-                // Check current PIN via verify_my_pin RPC or direct comparison
-                const { data: verifySuccess, error: verifyErr } = await supabase.rpc('verify_my_pin', { entered_pin: oldPin });
-                if (verifyErr || !verifySuccess) {
-                    setPinStatus('wrong_old');
-                    return;
-                }
-            }
-
-            // Save using standardized set_my_pin RPC so backend and frontend stay 100% synchronized
-            const { data: setSuccess, error: setError } = await supabase.rpc('set_my_pin', { new_pin: newPinStr });
-
-            if (setError || !setSuccess) {
-                setPinStatus('error');
-            } else {
-                setHasPin(true);
-                if (useAuthStore.getState().user) {
-                    useAuthStore.getState().user.hasPin = true;
-                }
-                setPinStatus('success');
-                setOldPin('');
-                setNewPinStr('');
-                setConfirmPinStr('');
-                setIsEditingPin(false);
-                setTimeout(() => setPinStatus(''), 3000);
-            }
-        } catch (err) {
-            console.error(err);
-            setPinStatus('error');
-        }
-    };
-
-    if (isLoading) {
-        return (
-            <div className="flex items-center justify-center min-h-[60vh]">
-                <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
-            </div>
-        );
+        Load();
+        const Requests = Request;
+        return () => { Active = false; Requests.current?.abort(); };
+    }, [UserID, Revision]);
+    const CurrentIdentity = () => { const State = useAuthStore.getState(); return State.user?.id === UserID && State.isAuthenticated && !State.isLocked; };
+    function Open(Action) {
+        if (Running.current || !IsAccountChangeReady(Action)) return;
+        SetEditor(Action); SetValue(Action === 'Username' ? Profile.Username : Action === 'Email' ? Profile.Email : '');
+        SetCurrentPassword(''); SetConfirmation(''); SetError(''); SetNotice('');
     }
-
-    return (
-        <div className="max-w-7xl mx-auto space-y-8 pb-16">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200 pb-6">
-                <div>
-                    <h1 className="text-3xl font-black tracking-tight text-gray-900">Account Settings</h1>
-                    <p className="text-sm text-gray-500 mt-1">Manage your personal details, credentials, and POS screen lock security.</p>
-                </div>
-                <SettingsTabs />
+    function Close() { if (!Running.current) { SetEditor(null); SetCurrentPassword(''); SetValue(''); SetConfirmation(''); SetError(''); } }
+    async function SaveNickname(Event) {
+        Event.preventDefault();
+        if (Running.current || !CurrentIdentity()) return;
+        const Name = Nickname.trim();
+        if (!Name || Name.length > 50) { SetNicknameError('NicknameInvalid'); return; }
+        Running.current = true; SetBusy(true); SetNicknameError(''); SetNicknameNotice('');
+        try {
+            const { data: Data, error: Failure } = await Supabase.from('Users').update({ Nickname: Name }).eq('UserID', UserID).select('Nickname').single();
+            if (!CurrentIdentity()) return;
+            if (Failure || !Data) throw new Error();
+            SetProfile(Previous => ({ ...Previous, Nickname: Data.Nickname })); SetNickname(Data.Nickname);
+            useAuthStore.setState(State => State.user?.id === UserID ? { user: { ...State.user, nickname: Data.Nickname, name: Data.Nickname } } : {});
+            SetNicknameNotice('Updated'); SetEditingNickname(false);
+        } catch { if (CurrentIdentity()) SetNicknameError('UpdateFailed'); }
+        finally { Running.current = false; SetBusy(false); }
+    }
+    async function Submit(Event) {
+        Event.preventDefault();
+        if (Running.current || !CurrentIdentity()) return;
+        const Next = ['Username', 'Email'].includes(Editor) ? Value.trim() : Value;
+        if (!CurrentPassword || (Editor !== 'DisablePIN' && !Next)) { SetError('Required'); return; }
+        if (['Password', 'SetPIN'].includes(Editor) && Next !== Confirmation) { SetError('Mismatch'); return; }
+        if (['Username', 'Email'].includes(Editor) && Next === Profile[Editor]) { SetError('NoChange'); return; }
+        if (Editor === 'Password' && (Array.from(Next).length < 15 || new TextEncoder().encode(Next).length > 72 || Next === CurrentPassword)) { SetError('PasswordInvalid'); return; }
+        Running.current = true; SetBusy(true); SetError('');
+        Request.current = new AbortController();
+        try {
+            const Result = await ChangeAccount(Editor, Next, CurrentPassword, Request.current.signal);
+            SetCurrentPassword(''); SetValue(''); SetConfirmation(''); SetEditor(null);
+            if (Editor === 'Password') { SetPasswordChanged(true); SetNotice(Result.SignOutComplete ? 'PasswordChanged' : 'PasswordSignOutWarning'); }
+            else if (Editor === 'Email') { SetProfile(Previous => ({ ...Previous, PendingEmail: Next })); SetNotice('EmailPending'); }
+            else if (Editor === 'Username') { SetProfile(Previous => ({ ...Previous, Username: Next })); SetNotice('Updated'); }
+            else { useAuthStore.setState(State => State.user?.id === UserID ? { user: { ...State.user, hasPin: Editor === 'SetPIN' } } : {}); SetNotice('Updated'); }
+        } catch (Failure) {
+            const Known = ['WrongPassword','UsernameTaken','UsernameInvalid','EmailInvalid','PasswordInvalid','PINInvalid','TooManyAttempts','SignIn','Unavailable','SetupRequired','Invalid','UpdateFailed'];
+            SetError(Known.includes(Failure.message) ? Failure.message : 'UpdateFailed'); SetCurrentPassword('');
+        } finally { Running.current = false; SetBusy(false); }
+    }
+    const Titles = { Username:'ChangeUsername', Email:'ChangeEmail', Password:'ChangePassword', SetPIN: Auth.user?.hasPin ? 'ChangePIN' : 'SetPIN', DisablePIN:'DisablePIN' };
+    const Hints = { Username:'UsernameHint', Email:'EmailHint', Password:'PasswordHint', SetPIN:'PINHint', DisablePIN:'DisablePINHint' };
+    return <SettingsPage Title={Text('Title')}>
+        {Loading ? <p role="status" className="p-6 rounded-2xl bg-white border">{Text('Loading')}</p> : LoadError || !Profile ? <div className="p-6 rounded-2xl bg-white border space-y-3"><p role="alert">{Text('LoadFailed')}</p><Button onClick={() => { SetLoading(true); SetLoadError(false); SetRevision(Previous => Previous + 1); }}>{Text('Retry')}</Button></div> : <>
+            {Notice && <div role="status" className="rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm space-y-3"><p>{Text(Notice)}</p>{PasswordChanged && <Button onClick={() => Auth.logout()}>{Text('SignInAgain')}</Button>}</div>}
+            <div className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+                <div className="flex items-center gap-3 px-5 py-5"><div aria-hidden="true" className="size-11 shrink-0 rounded-full bg-primary/10 text-primary flex items-center justify-center font-semibold">{(Profile.Nickname || Profile.Username || 'H').slice(0,1).toUpperCase()}</div><div className="min-w-0"><h2 className="text-base font-semibold break-words">{Profile.Nickname || Profile.Username}</h2><p className="text-xs text-gray-500 mt-0.5">{Text('StaffID')}: {Profile.StaffID || '—'}</p></div></div>
+                <AccountSection Title={Text('Profile')} Icon={UserRound}>
+                    <AccountRow Label={Text('Nickname')} Value={!EditingNickname ? Profile.Nickname : undefined}>{!EditingNickname && <Button variant="ghost" className="min-h-11 text-primary" disabled={Busy || PasswordChanged} onClick={()=>SetEditingNickname(true)}>{Text('Change')}</Button>}</AccountRow>
+                    {EditingNickname && <form onSubmit={SaveNickname} className="px-5 py-4 space-y-3"><Label htmlFor="AccountNickname">{Text('Nickname')}</Label><Input id="AccountNickname" value={Nickname} onChange={Event=>SetNickname(Event.target.value)} maxLength={50} required disabled={Busy || PasswordChanged} className="min-h-11"/><div className="flex gap-2"><Button type="submit" disabled={Busy || PasswordChanged || Nickname.trim() === Profile.Nickname} className="min-h-11">{Text(Busy && !Editor ? 'Saving' : 'Save')}</Button><Button type="button" variant="ghost" disabled={Busy} onClick={()=>{SetNickname(Profile.Nickname || '');SetEditingNickname(false);SetNicknameError('');}}>{Text('Cancel')}</Button></div></form>}
+                    {NicknameError && <p role="alert" className="px-5 py-3 text-sm text-red-700">{Text(NicknameError)}</p>}{NicknameNotice && <p role="status" className="px-5 py-3 text-sm text-primary">{Text(NicknameNotice)}</p>}
+                </AccountSection>
+                <AccountSection Title={Text('SignInDetails')} Icon={Lock}>
+                    {!AccountChangesReady && <p role="status" className="px-5 py-3 text-sm text-amber-900 bg-amber-50">{Text('SetupRequired')}</p>}
+                    {['Username','Email'].map(Field=><AccountRow key={Field} Label={Text(Field)} Value={Profile[Field] || Text('NoEmail')}><Button variant="ghost" className="min-h-11 text-primary" aria-label={Text(Field === 'Username' ? 'ChangeUsername' : 'ChangeEmail')} disabled={!AccountChangesReady || Busy || PasswordChanged} onClick={()=>Open(Field)}>{Text('Change')}</Button></AccountRow>)}
+                    {Profile.PendingEmail && <p className="px-5 py-3 text-sm text-gray-500 break-all">{Text('PendingEmail')}: {Profile.PendingEmail}</p>}
+                    <AccountRow Label={Text('Password')}><Button variant="ghost" className="min-h-11 text-primary" disabled={!AccountChangesReady || Busy || PasswordChanged} onClick={()=>Open('Password')}>{Text('ChangePassword')}</Button></AccountRow>
+                </AccountSection>
+                <AccountSection Title={Text('ScreenLock')} Icon={Shield}>
+                    <AccountRow Label={Text('PIN')} Value={Text(Auth.user?.hasPin ? 'PINActive' : 'PINOff')}><div className="flex flex-wrap gap-2"><Button variant="ghost" className="min-h-11 text-primary" disabled={!PINChangesReady || Busy || PasswordChanged} onClick={()=>Open('SetPIN')}>{Text(Auth.user?.hasPin ? 'ChangePIN' : 'SetPIN')}</Button>{Auth.user?.hasPin && <Button variant="ghost" className="min-h-11 text-red-700" disabled={!PINChangesReady || Busy || PasswordChanged} onClick={()=>Open('DisablePIN')}>{Text('DisablePIN')}</Button>}</div></AccountRow>
+                    <div className="px-5 py-4 flex flex-wrap justify-between items-center gap-3"><Label htmlFor="AccountAutoLock">{Text('AutoLock')}</Label><Select value={String(PINTimeout)} onValueChange={Next=>SetPINTimeout(Number(Next))} disabled={!Auth.user?.hasPin || PasswordChanged}><SelectTrigger id="AccountAutoLock" className="min-h-11 w-40"><SelectValue/></SelectTrigger><SelectContent>{[3,5,10,30,60].map(Minutes=><SelectItem key={Minutes} value={String(Minutes*60000)}>{Minutes} {Text('Minutes')}</SelectItem>)}<SelectItem value="0">{Text('Never')}</SelectItem></SelectContent></Select></div>
+                </AccountSection>
             </div>
-
-            <div className="bg-gradient-to-r from-gray-900 via-gray-800 to-indigo-950 rounded-2xl p-6 sm:p-8 text-white shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-6 border border-gray-800">
-                <div className="flex items-center gap-5">
-                    <div className="w-16 h-16 rounded-2xl bg-indigo-600/30 border border-indigo-400/30 flex items-center justify-center text-2xl font-black text-indigo-300 shadow-inner">
-                        {(profile.nickname || profile.username || 'U').charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                        <div className="flex items-center gap-3 flex-wrap">
-                            <h2 className="text-2xl font-bold tracking-tight text-white">
-                                {profile.nickname || profile.username || 'User Profile'}
-                            </h2>
-                            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-mono">
-                                {profile.staffId || 'STAFF'}
-                            </span>
-                        </div>
-                        <p className="text-gray-400 text-sm mt-1">
-                            @{profile.username} • {profile.email || 'No email configured'}
-                        </p>
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                    <div className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 flex items-center gap-2.5">
-                        <span className={`w-2 h-2 rounded-full ${hasPin ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
-                        <span className="text-xs font-semibold text-gray-200">
-                            {hasPin ? 'POS PIN Security Active' : 'PIN Not Configured'}
-                        </span>
-                    </div>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                <div className="lg:col-span-7 space-y-8">
-                    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                        <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
-                            <div>
-                                <h3 className="text-lg font-bold text-gray-900">Personal Information</h3>
-                                <p className="text-xs text-gray-500 mt-0.5">Update your display name and login identifiers.</p>
-                            </div>
-                            <User className="w-5 h-5 text-gray-400" />
-                        </div>
-
-                        <div className="p-6 sm:p-8 space-y-8 divide-y divide-gray-100">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                <div>
-                                    <Label className="text-sm font-semibold text-gray-900">Staff ID</Label>
-                                    <p className="text-xs text-gray-500 mt-0.5">Unique system employee code</p>
-                                </div>
-                                <div className="w-full sm:w-64">
-                                    <Input 
-                                        value={profile.staffId || '—'}
-                                        readOnly
-                                        className="w-full bg-gray-100/80 text-gray-600 font-mono text-center font-bold cursor-not-allowed border-gray-200 shadow-none"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="pt-6 space-y-3">
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                    <div>
-                                        <Label className="text-sm font-semibold text-gray-900">Nickname / Nama Panggilan</Label>
-                                        <p className="text-xs text-gray-500 mt-0.5">Used across dashboards and receipts</p>
-                                    </div>
-                                    <div className="flex items-center gap-2 w-full sm:w-80">
-                                        <Input 
-                                            className="w-full bg-white"
-                                            value={profile.nickname}
-                                            placeholder="Contoh: Riz"
-                                            onChange={(e) => setProfile({...profile, nickname: e.target.value})}
-                                        />
-                                        <Button 
-                                            onClick={handleUpdateNickname} 
-                                            disabled={nicknameStatus === 'loading'}
-                                            className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 shrink-0"
-                                        >
-                                            {nicknameStatus === 'loading' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
-                                        </Button>
-                                    </div>
-                                </div>
-                                {nicknameStatus === 'success' && (
-                                    <p className="text-xs text-emerald-600 font-medium flex items-center justify-end">
-                                        <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Nickname updated successfully
-                                    </p>
-                                )}
-                                {nicknameStatus === 'error' && (
-                                    <p className="text-xs text-red-600 font-medium flex items-center justify-end">
-                                        <AlertCircle className="w-3.5 h-3.5 mr-1" /> Failed to update nickname
-                                    </p>
-                                )}
-                            </div>
-
-                            <div className="pt-6 space-y-3">
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                    <div>
-                                        <Label className="text-sm font-semibold text-gray-900">Username</Label>
-                                        <p className="text-xs text-gray-500 mt-0.5">Your primary login handle</p>
-                                    </div>
-                                    <div className="flex items-center gap-2 w-full sm:w-80">
-                                        <div className="relative flex-1">
-                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-medium">@</span>
-                                            <Input 
-                                                className="w-full bg-white pl-8"
-                                                value={profile.username}
-                                                onChange={(e) => setProfile({...profile, username: e.target.value})}
-                                            />
-                                        </div>
-                                        <Button 
-                                            onClick={handleUpdateUsername} 
-                                            disabled={usernameStatus === 'loading'}
-                                            className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 shrink-0"
-                                        >
-                                            {usernameStatus === 'loading' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
-                                        </Button>
-                                    </div>
-                                </div>
-                                {usernameStatus === 'success' && (
-                                    <p className="text-xs text-emerald-600 font-medium flex items-center justify-end">
-                                        <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Username updated successfully
-                                    </p>
-                                )}
-                                {usernameStatus === 'taken' && (
-                                    <p className="text-xs text-red-600 font-medium flex items-center justify-end">
-                                        <AlertCircle className="w-3.5 h-3.5 mr-1" /> This username is already taken
-                                    </p>
-                                )}
-                                {usernameStatus === 'error' && (
-                                    <p className="text-xs text-red-600 font-medium flex items-center justify-end">
-                                        <AlertCircle className="w-3.5 h-3.5 mr-1" /> Failed to update username
-                                    </p>
-                                )}
-                            </div>
-
-                            <div className="pt-6 space-y-3">
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                    <div>
-                                        <Label className="text-sm font-semibold text-gray-900">Email Address</Label>
-                                        <p className="text-xs text-gray-500 mt-0.5">For account recovery and notices</p>
-                                    </div>
-                                    <div className="flex items-center gap-2 w-full sm:w-80">
-                                        <Input 
-                                            type="email"
-                                            className="w-full bg-white"
-                                            value={profile.email}
-                                            onChange={(e) => setProfile({...profile, email: e.target.value})}
-                                        />
-                                        <Button 
-                                            onClick={handleUpdateEmail} 
-                                            disabled={emailStatus === 'loading'}
-                                            className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 shrink-0"
-                                        >
-                                            {emailStatus === 'loading' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
-                                        </Button>
-                                    </div>
-                                </div>
-                                {emailStatus === 'success' && (
-                                    <p className="text-xs text-emerald-600 font-medium flex items-center justify-end">
-                                        <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Check your email box for confirmation
-                                    </p>
-                                )}
-                                {emailStatus === 'error' && (
-                                    <p className="text-xs text-red-600 font-medium flex items-center justify-end">
-                                        <AlertCircle className="w-3.5 h-3.5 mr-1" /> Failed to update email
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="lg:col-span-5 space-y-8">
-                    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                        <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
-                            <div>
-                                <h3 className="text-lg font-bold text-gray-900">POS Screen Lock & PIN</h3>
-                                <p className="text-xs text-gray-500 mt-0.5">Control automatic terminal locking</p>
-                            </div>
-                            <Shield className="w-5 h-5 text-gray-400" />
-                        </div>
-
-                        <div className="p-6 space-y-6">
-                            <div className="flex items-center justify-between pb-6 border-b border-gray-100">
-                                <div className="space-y-0.5">
-                                    <Label className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
-                                        <Clock className="w-4 h-4 text-gray-500" /> Auto-Lock Timeout
-                                    </Label>
-                                    <p className="text-xs text-gray-500">Lock terminal screen when idle</p>
-                                </div>
-                                <Select value={pinTimeout.toString()} onValueChange={(val) => setPinTimeout(parseInt(val, 10))}>
-                                    <SelectTrigger className="w-[140px] bg-white h-9 text-xs font-semibold">
-                                        <SelectValue placeholder="Select timeout" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value={(3 * 60 * 1000).toString()}>3 Minutes</SelectItem>
-                                        <SelectItem value={(5 * 60 * 1000).toString()}>5 Minutes</SelectItem>
-                                        <SelectItem value={(10 * 60 * 1000).toString()}>10 Minutes</SelectItem>
-                                        <SelectItem value={(30 * 60 * 1000).toString()}>30 Minutes</SelectItem>
-                                        <SelectItem value={(60 * 60 * 1000).toString()}>60 Minutes</SelectItem>
-                                        <SelectItem value="0">Never</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            <div className="space-y-4">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <Label className="text-sm font-semibold text-gray-900">Terminal PIN Code</Label>
-                                        <p className="text-xs text-gray-500 mt-0.5">
-                                            {hasPin ? 'PIN is currently set up and active' : 'Set a 4-digit PIN for quick unlock'}
-                                        </p>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        {hasPin && (
-                                            <Button 
-                                                variant="destructive" 
-                                                size="sm"
-                                                onClick={handleDisablePin}
-                                                disabled={pinStatus === 'loading'}
-                                                className="font-semibold text-xs bg-red-600 hover:bg-red-700 text-white"
-                                            >
-                                                Disable PIN
-                                            </Button>
-                                        )}
-                                        <Button 
-                                            variant="outline" 
-                                            size="sm"
-                                            onClick={() => setIsEditingPin(!isEditingPin)}
-                                            className="font-semibold text-xs"
-                                        >
-                                            {isEditingPin ? 'Close' : (hasPin ? 'Change PIN' : 'Set PIN')}
-                                        </Button>
-                                    </div>
-                                </div>
-
-                                {pinStatus === 'disabled_success' && <p className="text-xs text-emerald-600 font-medium mt-2">PIN has been disabled successfully</p>}
-
-                                {isEditingPin && (
-                                    <div className="p-4 rounded-xl bg-gray-50 border border-gray-200/80 space-y-4 pt-4 mt-2">
-                                        {hasPin && (
-                                            <div className="flex items-center justify-between gap-3">
-                                                <Label className="text-xs font-semibold text-gray-700">Current PIN</Label>
-                                                <Input 
-                                                    type="password" 
-                                                    maxLength={4}
-                                                    placeholder="••••"
-                                                    className="w-28 text-center tracking-[0.4em] font-mono text-base bg-white h-9"
-                                                    value={oldPin}
-                                                    onChange={(e) => setOldPin(e.target.value)}
-                                                />
-                                            </div>
-                                        )}
-                                        <div className="flex items-center justify-between gap-3">
-                                            <Label className="text-xs font-semibold text-gray-700">
-                                                {hasPin ? 'New PIN' : 'Enter 4-digit PIN'}
-                                            </Label>
-                                            <Input 
-                                                type="password" 
-                                                maxLength={4}
-                                                placeholder="••••"
-                                                className="w-28 text-center tracking-[0.4em] font-mono text-base bg-white h-9"
-                                                value={newPinStr}
-                                                onChange={(e) => setNewPinStr(e.target.value)}
-                                            />
-                                        </div>
-                                        <div className="flex items-center justify-between gap-3">
-                                            <Label className="text-xs font-semibold text-gray-700">Confirm PIN</Label>
-                                            <Input 
-                                                type="password" 
-                                                maxLength={4}
-                                                placeholder="••••"
-                                                className="w-28 text-center tracking-[0.4em] font-mono text-base bg-white h-9"
-                                                value={confirmPinStr}
-                                                onChange={(e) => setConfirmPinStr(e.target.value)}
-                                            />
-                                        </div>
-
-                                        <div className="flex items-center justify-end gap-2 pt-2">
-                                            <Button 
-                                                size="sm"
-                                                variant="ghost"
-                                                onClick={() => {
-                                                    setOldPin(''); setNewPinStr(''); setConfirmPinStr(''); setIsEditingPin(false); setPinStatus('');
-                                                }}
-                                                className="text-xs"
-                                            >
-                                                Cancel
-                                            </Button>
-                                            <Button 
-                                                size="sm"
-                                                onClick={submitWindowsPin} 
-                                                disabled={pinStatus === 'loading'} 
-                                                className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4"
-                                            >
-                                                {pinStatus === 'loading' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Save PIN'}
-                                            </Button>
-                                        </div>
-
-                                        {pinStatus === 'success' && <p className="text-xs text-emerald-600 font-medium">PIN updated successfully</p>}
-                                        {pinStatus === 'mismatch' && <p className="text-xs text-red-600 font-medium">PINs must match and be 4 digits</p>}
-                                        {pinStatus === 'wrong_old' && <p className="text-xs text-red-600 font-medium">Current PIN is incorrect</p>}
-                                        {pinStatus === 'error' && <p className="text-xs text-red-600 font-medium">Failed to update PIN</p>}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                        <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
-                            <div>
-                                <h3 className="text-lg font-bold text-gray-900">Password</h3>
-                                <p className="text-xs text-gray-500 mt-0.5">Change your account login password</p>
-                            </div>
-                            <Lock className="w-5 h-5 text-gray-400" />
-                        </div>
-
-                        <div className="p-6 space-y-4">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <Label className="text-sm font-semibold text-gray-900">Account Password</Label>
-                                    <p className="text-xs text-gray-500 mt-0.5">Keep your account secure with a strong password</p>
-                                </div>
-                                <Button 
-                                    variant="outline" 
-                                    size="sm"
-                                    onClick={() => setIsEditingPassword(!isEditingPassword)}
-                                    className="font-semibold text-xs"
-                                >
-                                    {isEditingPassword ? 'Close' : 'Change Password'}
-                                </Button>
-                            </div>
-
-                            {isEditingPassword && (
-                                <div className="p-4 rounded-xl bg-gray-50 border border-gray-200/80 space-y-4 pt-4 mt-2">
-                                    <div className="space-y-1.5">
-                                        <Label className="text-xs font-semibold text-gray-700">New Password</Label>
-                                        <Input 
-                                            type="password"
-                                            className="w-full bg-white h-9"
-                                            value={newPassword}
-                                            onChange={(e) => setNewPassword(e.target.value)}
-                                        />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <Label className="text-xs font-semibold text-gray-700">Confirm New Password</Label>
-                                        <Input 
-                                            type="password"
-                                            className="w-full bg-white h-9"
-                                            value={confirmPassword}
-                                            onChange={(e) => setConfirmPassword(e.target.value)}
-                                        />
-                                    </div>
-
-                                    <div className="flex items-center justify-end gap-2 pt-2">
-                                        <Button 
-                                            size="sm"
-                                            variant="ghost"
-                                            onClick={() => {
-                                                setNewPassword(''); setConfirmPassword(''); setIsEditingPassword(false); setPasswordStatus('');
-                                            }}
-                                            className="text-xs"
-                                        >
-                                            Cancel
-                                        </Button>
-                                        <Button 
-                                            size="sm"
-                                            onClick={handleUpdatePassword} 
-                                            disabled={passwordStatus === 'loading'} 
-                                            className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4"
-                                        >
-                                            {passwordStatus === 'loading' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Update Password'}
-                                        </Button>
-                                    </div>
-
-                                    {passwordStatus === 'success' && <p className="text-xs text-emerald-600 font-medium">Password updated successfully</p>}
-                                    {passwordStatus === 'error' && <p className="text-xs text-red-600 font-medium">Failed to update or passwords mismatch</p>}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Disable PIN Confirmation Modal */}
-            <Dialog open={isDisableModalOpen} onOpenChange={setIsDisableModalOpen}>
-                <DialogContent className="max-w-md rounded-2xl p-6 border border-gray-200/80 shadow-2xl bg-white overflow-hidden">
-                    <DialogHeader>
-                        <DialogTitle className="text-lg font-bold text-gray-900">
-                            Disable POS Terminal PIN
-                        </DialogTitle>
-                    </DialogHeader>
-
-                    <p className="text-sm text-gray-600 py-2">
-                        Are you sure you want to disable and remove your terminal PIN?
-                    </p>
-
-                    <DialogFooter className="pt-2 flex items-center justify-end gap-2.5">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setIsDisableModalOpen(false)}
-                            disabled={pinStatus === 'loading'}
-                            className="text-xs font-semibold px-4 h-9"
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            type="button"
-                            onClick={executeDisablePin}
-                            disabled={pinStatus === 'loading'}
-                            className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-5 h-9 shadow-sm"
-                        >
-                            {pinStatus === 'loading' ? (
-                                <>
-                                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                                    Deleting...
-                                </>
-                            ) : (
-                                'Confirm Delete'
-                            )}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-        </div>
-    );
+        </>}
+        <Dialog open={!!Editor} onOpenChange={Open=>{if(!Open)Close();}}><DialogContent CloseLabel={Text('Cancel')} className="sm:max-w-md max-h-[90dvh] overflow-y-auto"><DialogHeader><DialogTitle>{Editor && Text(Titles[Editor])}</DialogTitle><DialogDescription>{Editor && Text(Hints[Editor])}</DialogDescription></DialogHeader><form onSubmit={Submit} className="space-y-4">
+            {Editor !== 'DisablePIN' && <div className="space-y-2"><Label htmlFor="AccountNewValue">{Editor && Text(Editor==='Password'?'NewPassword':Editor==='SetPIN'?'NewPIN':Editor)}</Label><Input id="AccountNewValue" autoFocus type={['Password','SetPIN'].includes(Editor)?'password':Editor==='Email'?'email':'text'} autoComplete={Editor==='Password'?'new-password':Editor==='Email'?'email':'off'} inputMode={Editor==='SetPIN'?'numeric':undefined} maxLength={Editor==='SetPIN'?4:Editor==='Username'?30:undefined} value={Value} onChange={Event=>SetValue(Editor==='SetPIN'?Event.target.value.replace(/\D/g,''):Event.target.value)} disabled={Busy} required className="min-h-11"/></div>}
+            {['Password','SetPIN'].includes(Editor) && <div className="space-y-2"><Label htmlFor="AccountConfirmation">{Text(Editor==='Password'?'ConfirmPassword':'ConfirmPIN')}</Label><Input id="AccountConfirmation" type="password" autoComplete={Editor==='Password'?'new-password':'off'} inputMode={Editor==='SetPIN'?'numeric':undefined} maxLength={Editor==='SetPIN'?4:undefined} value={Confirmation} onChange={Event=>SetConfirmation(Event.target.value)} required disabled={Busy} className="min-h-11"/></div>}
+            <div className="space-y-2 border-t pt-4"><Label htmlFor="AccountCurrentPassword">{Text('CurrentPassword')}</Label><Input id="AccountCurrentPassword" type="password" autoComplete="current-password" value={CurrentPassword} onChange={Event=>SetCurrentPassword(Event.target.value)} required disabled={Busy} className="min-h-11"/></div>
+            {ErrorKey && <p role="alert" className="text-sm text-red-700">{Text(ErrorKey)}</p>}<DialogFooter><Button type="button" variant="outline" onClick={Close} disabled={Busy} className="min-h-11">{Text('Cancel')}</Button><Button type="submit" variant={Editor==='DisablePIN'?'destructive':'default'} disabled={Busy} className="min-h-11">{Busy && <Loader2 aria-hidden="true" className="size-4 animate-spin"/>}{Text(Busy?'Saving':Editor==='DisablePIN'?'DisablePIN':'Confirmation')}</Button></DialogFooter>
+        </form></DialogContent></Dialog>
+    </SettingsPage>;
 }

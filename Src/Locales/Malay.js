@@ -1,4 +1,7 @@
+import { AccountMalay } from './Account';
 export const my = {
+    SettingsNavigation: { Account:'Akaun Saya', General:'Umum', Users:'Pengurusan Pengguna', APIConnection:'Sambungan API' },
+    Account: AccountMalay,
     sidebar: {
         dashboard: "Papan Pemuka",
         pos: "POS",

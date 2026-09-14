@@ -29,6 +29,7 @@ import { AgentRecords } from './Pages/Agents/AgentRecords';
 import { Settings } from './Pages/Settings/Settings';
 import { UserManagement } from './Pages/Settings/UserManagement';
 import { AccountSettings } from './Pages/Settings/AccountSettings';
+import { APIConnection } from './Pages/Settings/APIConnection';
 import { InventoryDashboard } from './Pages/Inventory/InventoryDashboard';
 import { StockIn } from './Pages/Inventory/StockIn';
 
@@ -98,6 +99,7 @@ export default function App() {
                                     <Route path="/Agent-Management/:id/Statement" element={<AgentStatement />} />
                                     <Route path="/Agent-Management/:id/Records" element={<AgentRecords />} />
                                     <Route path="/Settings/General" element={<Settings />} />
+                                    <Route path="/Settings/APIConnection" element={<APIConnection />} />
                                     <Route path="/Settings/Users" element={<UserManagement />} />
                                     <Route path="/Settings/Account" element={<AccountSettings />} />
                                     <Route path="/Settings" element={<Navigate to="/Settings/Account" replace />} />

@@ -5,7 +5,7 @@ import { Button } from '@/Components/UI/Button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/Components/UI/Dialog';
 import { useAuthStore } from '@/Hooks/UseAuth';
 import { useTikTokConnection } from '@/Hooks/UseTikTokConnection';
-import { SettingsTabs } from './SettingsTabs';
+import { SettingsPage } from './SettingsPage';
 
 const StatusLabels = { PendingConfirmation: 'Confirm shop', Connected: 'Connected', Disconnected: 'Disconnected', ReconnectRequired: 'Reconnect required' };
 const DateText = Value => Value ? new Date(Value * 1000).toLocaleString('en-MY') : 'Not checked';
@@ -22,10 +22,7 @@ function ConnectionPanel({ Standalone }) {
     const [DisconnectID, SetDisconnectID] = useState(null);
     const [Search] = useSearchParams();
     const Result = Search.get('Result');
-    return <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-6 pb-12">
-        <div className="space-y-1"><h1 className="text-2xl font-bold tracking-tight text-gray-900">API Connection</h1>
-            <p className="text-sm text-gray-500">Manage your TikTok Shop connection.</p></div>
-        <SettingsTabs ReloadDocument={Standalone} />
+    return <SettingsPage Title="API Connection" Description="Manage your TikTok Shop connection." ReloadDocument={Standalone}>
         <section className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6 shadow-sm space-y-5" aria-label="TikTok Shop connection" aria-busy={Loading || Busy}>
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
@@ -78,5 +75,5 @@ function ConnectionPanel({ Standalone }) {
                 <DialogFooter><Button variant="outline" onClick={() => SetDisconnectID(null)}>Cancel</Button><Button disabled={Busy} onClick={() => { const ID = DisconnectID; SetDisconnectID(null); void Run('Disconnect', ID); }}>Disconnect</Button></DialogFooter>
             </DialogContent>
         </Dialog>
-    </div>;
+    </SettingsPage>;
 }

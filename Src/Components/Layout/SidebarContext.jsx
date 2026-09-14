@@ -6,52 +6,41 @@ const SidebarContext = createContext(null);
 export function SidebarProvider({ children }) {
     const location = useLocation();
 
-    // Set initial state based on screen size and current route
-    const [isCollapsed, setIsCollapsed] = useState(() => {
-        if (window.innerWidth < 1024) return true;
-        const path = location.pathname.toLowerCase();
-        const lowerPath = path.toLowerCase();
-        if (lowerPath.startsWith('/inventory') || lowerPath.startsWith('/price') || lowerPath.includes('/product-matcher')) return true;
-        return false;
-    });
+    const [ExpandedPage, SetExpandedPage] = useState(null);
+    const [Page, SetPage] = useState(location.key);
+    if (Page !== location.key) {
+        SetPage(location.key);
+        SetExpandedPage(null);
+    }
+    const isCollapsed = ExpandedPage !== location.key;
     
     const [isMobileOpen, setIsMobileOpen] = useState(false);
 
-    // Auto-collapse on smaller screens or specific routes
+    // Expansion is temporary for the current page. Resizing never auto-expands.
     useEffect(() => {
         const handleResize = () => {
             if (window.innerWidth < 1024) {
-                setIsCollapsed(true);
+                SetExpandedPage(null);
                 setIsMobileOpen(false);
-            } else {
-                // If screen is large, auto-expand UNLESS on inventory, pricing, product-matcher, or statement page
-                const path = location.pathname.toLowerCase();
-                const lowerPath = path.toLowerCase();
-                if (lowerPath.startsWith('/inventory') || lowerPath.startsWith('/price') || lowerPath.includes('/product-matcher') || lowerPath.includes('/statement')) {
-                    setIsCollapsed(true);
-                } else {
-                    setIsCollapsed(false);
-                }
             }
         };
 
-        handleResize();
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
-    }, [location.pathname]);
+    }, []);
 
     const toggleSidebar = () => {
         if (window.innerWidth < 768) {
             setIsMobileOpen(prev => !prev);
         } else {
-            setIsCollapsed(prev => !prev);
+            SetExpandedPage(Previous => Previous === location.key ? null : location.key);
         }
     };
 
     const closeMobile = () => setIsMobileOpen(false);
 
     return (
-        <SidebarContext.Provider value={{ isCollapsed, isMobileOpen, toggleSidebar, closeMobile, setIsCollapsed }}>
+        <SidebarContext.Provider value={{ isCollapsed, isMobileOpen, toggleSidebar, closeMobile }}>
             {children}
         </SidebarContext.Provider>
     );

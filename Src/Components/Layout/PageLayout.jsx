@@ -2,10 +2,14 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { SidebarProvider } from './SidebarContext';
+import { SettingsLayout } from '../../Pages/Settings/SettingsLayout';
 
 export function PageLayout() {
     const location = useLocation();
     const isPOS = location.pathname.toLowerCase().includes('/pos');
+    const IsSettings = /^\/Settings(?:\/|$)/.test(location.pathname);
+
+    if (IsSettings) return <SettingsLayout><Outlet /></SettingsLayout>;
 
     return (
         <SidebarProvider>

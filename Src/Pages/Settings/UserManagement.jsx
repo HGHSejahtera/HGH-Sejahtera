@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 
-import { UserPlus, Shield, Check, X, Users, KeyRound, Loader2, Trash2, Edit2, AlertTriangle, AlertCircle } from 'lucide-react';
+import { UserPlus, Shield, Check, X, Users, KeyRound, Loader2, Trash2, Edit2 } from 'lucide-react';
 import { DataTable } from '@/Components/Common/DataTable';
 import { Button } from '@/Components/UI/Button';
 import { Input } from '@/Components/UI/Input';
@@ -11,31 +11,31 @@ import { useTranslation } from '@/Hooks/UseTranslation';
 import { useAuthStore } from '@/Hooks/UseAuth';
 import { toast } from 'sonner';
 
-import { SettingsTabs } from './Settings';
+import { SettingsPage } from './SettingsPage';
 
 function DeveloperPinDirectory({ pins, isLoading, onResetPin, onClearPin }) {
     if (isLoading) {
         return (
-            <div className="bg-slate-900 text-white rounded-xl p-6 border border-slate-800 flex items-center justify-center min-h-[120px]">
+            <div className="bg-white text-gray-900 rounded-2xl p-6 border border-gray-200 flex items-center justify-center min-h-[120px]">
                 <Loader2 className="w-6 h-6 animate-spin text-indigo-400 mr-3" />
-                <span className="text-sm font-medium text-slate-300">Loading Developer PIN Directory...</span>
+                <span className="text-sm font-medium text-gray-600">Loading Developer PIN Directory...</span>
             </div>
         );
     }
 
     return (
-        <div className="bg-slate-900 text-white rounded-xl shadow-lg border border-slate-800 overflow-hidden">
-            <div className="p-6 border-b border-slate-800 bg-slate-950/60 flex items-center justify-between">
+        <div className="bg-white text-gray-900 rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className="p-4 sm:p-6 border-b border-gray-100 bg-gray-50/50 flex flex-wrap gap-3 items-center justify-between">
                 <div>
-                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                        <KeyRound className="w-5 h-5 text-amber-400" />
+                    <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                        <KeyRound className="w-5 h-5 text-primary" />
                         Developer PIN Directory
                     </h3>
-                    <p className="text-xs text-slate-400 mt-1">
+                    <p className="text-xs text-gray-500 mt-1">
                         Exclusively accessible to Developer role. View exact 4-digit terminal PIN codes or clear forgotten PINs instantly.
                     </p>
                 </div>
-                <span className="text-xs font-semibold px-2.5 py-1 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                <span className="text-xs font-semibold px-2.5 py-1 rounded bg-primary/10 text-primary border border-primary/10">
                     Developer Vault
                 </span>
             </div>
@@ -50,16 +50,16 @@ function DeveloperPinDirectory({ pins, isLoading, onResetPin, onClearPin }) {
                             return (
                                 <div 
                                     key={user.UserID}
-                                    className="bg-slate-800/80 rounded-lg p-4 border border-slate-700/80 flex flex-col justify-between gap-3"
+                                    className="bg-gray-50 rounded-lg p-4 border border-gray-200 flex flex-col justify-between gap-3"
                                 >
                                     <div className="flex items-start justify-between gap-2">
                                         <div>
                                             <div className="flex items-center gap-2">
-                                                <span className="font-bold text-slate-100 text-sm">{user.DisplayName}</span>
+                                                <span className="font-bold text-gray-900 text-sm">{user.DisplayName}</span>
                                             </div>
                                             <div className="flex items-center gap-2 mt-1">
-                                                <span className="text-xs font-mono text-slate-400">{user.StaffID || 'No Staff ID'}</span>
-                                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-700 text-slate-300 uppercase">
+                                                <span className="text-xs font-mono text-gray-500">{user.StaffID || 'No Staff ID'}</span>
+                                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-gray-100 text-gray-600 uppercase">
                                                     {user.Role}
                                                 </span>
                                             </div>
@@ -68,8 +68,8 @@ function DeveloperPinDirectory({ pins, isLoading, onResetPin, onClearPin }) {
 
                                     <div className="flex items-center justify-between pt-2 border-t border-slate-700/60 mt-1">
                                         <div className="flex items-center gap-2">
-                                            <span className="text-xs text-slate-400">PIN:</span>
-                                            <span className={`font-mono font-bold text-sm px-2 py-0.5 rounded ${isSet ? 'bg-amber-400/10 text-amber-300 border border-amber-400/30 tracking-widest' : 'bg-slate-700/50 text-slate-500 italic'}`}>
+                                            <span className="text-xs text-gray-500">PIN:</span>
+                                            <span className={`font-mono font-bold text-sm px-2 py-0.5 rounded ${isSet ? 'bg-amber-400/10 text-amber-300 border border-amber-400/30 tracking-widest' : 'bg-gray-100/50 text-slate-500 italic'}`}>
                                                 {user.DecodedPIN}
                                             </span>
                                         </div>
@@ -79,7 +79,7 @@ function DeveloperPinDirectory({ pins, isLoading, onResetPin, onClearPin }) {
                                                 size="sm"
                                                 variant="ghost"
                                                 onClick={() => onResetPin(user)}
-                                                className="h-7 px-2.5 text-xs bg-slate-700 hover:bg-slate-600 text-slate-200"
+                                                className="h-7 px-2.5 text-xs bg-gray-100 hover:bg-slate-600 text-slate-200"
                                                 title="Set new PIN"
                                             >
                                                 <Edit2 className="w-3 h-3 mr-1" /> Set
@@ -148,6 +148,8 @@ export function UserManagement() {
     const currentUserRole = user?.role || 'Staff';
     const [ActiveUsers, setActiveUsers] = useState([]);
     const [PendingUsers, setPendingUsers] = useState([]);
+    const [UsersLoading, SetUsersLoading] = useState(true);
+    const [UsersError, SetUsersError] = useState(false);
     const [DeveloperPins, setDeveloperPins] = useState([]);
     const [IsLoadingPins, setIsLoadingPins] = useState(false);
 
@@ -170,6 +172,8 @@ export function UserManagement() {
     }, [currentUserRole]);
 
     const fetchUsers = useCallback(async () => {
+        SetUsersLoading(true);
+        SetUsersError(false);
         const { data, error } = await supabase
             .from('Users')
             .select('*')
@@ -177,6 +181,7 @@ export function UserManagement() {
             
         if (error) {
             console.error('Error fetching users:', error);
+            SetUsersError(true);
         } else {
             let active = data.filter(u => u.Role !== 'Pending' && u.Role !== 'Rejected');
             
@@ -189,6 +194,7 @@ export function UserManagement() {
             setPendingUsers(data.filter(u => u.Role === 'Pending'));
         }
 
+        SetUsersLoading(false);
         if (currentUserRole === 'Developer') {
             fetchDeveloperPins();
         }
@@ -375,15 +381,7 @@ export function UserManagement() {
     ];
 
     return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-end">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight mb-2">User Management</h1>
-                </div>
-            </div>
-
-            <SettingsTabs />
-
+        <SettingsPage Title="User Management" Description="Manage users, roles and access.">
             {currentUserRole === 'Developer' && (
                 <DeveloperPinDirectory
                     pins={DeveloperPins}
@@ -412,16 +410,16 @@ export function UserManagement() {
                 </div>
             )}
 
-            <div className="bg-white rounded-xl shadow-sm border p-4">
-                {ActiveUsers.length === 0 && PendingUsers.length === 0 ? (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6">
+                {UsersLoading ? <p role="status" className="py-6 text-sm text-gray-500">Loading users…</p> : UsersError ? <div className="space-y-3"><p role="alert" className="text-sm text-red-700">Unable to load users. Try again.</p><Button variant="outline" onClick={fetchUsers}>Retry</Button></div> : ActiveUsers.length === 0 && PendingUsers.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-16 text-gray-400">
                         <Users className="w-12 h-12 mb-4" />
                         <p className="text-lg font-medium">{t('settingsUsers.emptyTitle')}</p>
                         <p className="text-sm mt-1">{t('settingsUsers.emptyDescription')}</p>
                     </div>
                 ) : (
-                    <div className="overflow-x-auto">
-                        <div className="min-w-[760px]">
+                    <div className="relative min-w-0">
+                        <div className="min-w-0">
                             <DataTable 
                                 columns={columns} 
                                 data={ActiveUsers} 
@@ -457,24 +455,24 @@ export function UserManagement() {
 
             {/* Set PIN Modal */}
             <Dialog open={!!resetPinTarget} onOpenChange={(open) => !open && setResetPinTarget(null)}>
-                <DialogContent className="max-w-xl rounded-2xl p-6 border border-slate-800 shadow-2xl bg-slate-900 text-white overflow-hidden">
+                <DialogContent className="max-w-xl rounded-2xl p-6 border border-gray-200 shadow-2xl bg-slate-900 text-white overflow-hidden">
                     <DialogHeader className="space-y-3 pb-2">
                         <div className="flex items-center gap-3">
-                            <div className="w-11 h-11 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0 shadow-sm">
+                            <div className="w-11 h-11 rounded-xl bg-primary/10 border border-primary/10 flex items-center justify-center text-primary shrink-0 shadow-sm">
                                 <KeyRound className="w-6 h-6" />
                             </div>
                             <div>
                                 <DialogTitle className="text-xl font-bold text-white tracking-tight">
                                     Set POS Terminal PIN
                                 </DialogTitle>
-                                <DialogDescription className="text-xs text-slate-400 font-medium mt-0.5">
+                                <DialogDescription className="text-xs text-gray-500 font-medium mt-0.5">
                                     Set a 4-digit numeric PIN for quick unlock
                                 </DialogDescription>
                             </div>
                         </div>
                     </DialogHeader>
                     <div className="py-4 space-y-4">
-                        <div className="p-3.5 rounded-xl bg-slate-800/80 border border-slate-700/80 text-xs text-slate-300 flex items-center justify-between">
+                        <div className="p-3.5 rounded-xl bg-gray-50 border border-gray-200 text-xs text-gray-600 flex items-center justify-between">
                             <span>Target Account</span>
                             <span className="font-mono font-bold text-amber-300 bg-slate-950 px-2.5 py-1 rounded border border-slate-700">
                                 {resetPinTarget?.DisplayName} (@{resetPinTarget?.Username})
@@ -495,7 +493,7 @@ export function UserManagement() {
                         </div>
                     </div>
                     <DialogFooter className="pt-4 border-t border-slate-800 flex justify-end gap-2.5">
-                        <Button variant="ghost" onClick={() => setResetPinTarget(null)} disabled={isActionLoading} className="text-xs font-semibold px-4 h-9 text-slate-300 hover:bg-slate-800">
+                        <Button variant="ghost" onClick={() => setResetPinTarget(null)} disabled={isActionLoading} className="text-xs font-semibold px-4 h-9 text-gray-600 hover:bg-slate-800">
                             Cancel
                         </Button>
                         <Button onClick={executeResetPin} disabled={isActionLoading || newPinInput.length !== 4} className="bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold px-5 h-9">
@@ -508,17 +506,17 @@ export function UserManagement() {
 
             {/* Clear PIN Modal */}
             <Dialog open={!!clearPinTarget} onOpenChange={(open) => !open && setClearPinTarget(null)}>
-                <DialogContent className="max-w-md rounded-2xl p-6 border border-slate-800 shadow-2xl bg-slate-900 text-white overflow-hidden">
+                <DialogContent className="max-w-md rounded-2xl p-6 border border-gray-200 shadow-2xl bg-slate-900 text-white overflow-hidden">
                     <DialogHeader>
-                        <DialogTitle className="text-lg font-bold text-white">
+                        <DialogTitle className="text-lg font-semibold text-gray-900">
                             Clear POS Terminal PIN
                         </DialogTitle>
                     </DialogHeader>
-                    <p className="text-sm text-slate-300 py-2">
+                    <p className="text-sm text-gray-600 py-2">
                         Are you sure you want to clear and remove the PIN for <strong className="text-white">{clearPinTarget?.DisplayName}</strong>?
                     </p>
                     <DialogFooter className="pt-2 flex justify-end gap-2.5">
-                        <Button variant="ghost" onClick={() => setClearPinTarget(null)} disabled={isActionLoading} className="text-xs font-semibold px-4 h-9 text-slate-300 hover:bg-slate-800">
+                        <Button variant="ghost" onClick={() => setClearPinTarget(null)} disabled={isActionLoading} className="text-xs font-semibold px-4 h-9 text-gray-600 hover:bg-slate-800">
                             Cancel
                         </Button>
                         <Button variant="destructive" onClick={executeClearPin} disabled={isActionLoading} className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-5 h-9">
@@ -528,7 +526,7 @@ export function UserManagement() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-        </div>
+        </SettingsPage>
     );
 }
 
