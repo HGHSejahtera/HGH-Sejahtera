@@ -1,0 +1,9 @@
+@import "../Index.css";
+
+/* The isolated build root is outside Src; declare its UI sources explicitly. */
+@source "./";
+@source "../Pages/Settings/APIConnection.jsx";
+@source "../Pages/Settings/SettingsTabs.jsx";
+@source "../Components/UI/Button.jsx";
+@source "../Components/UI/Dialog.jsx";
+@source "../Components/UI/Input.jsx";

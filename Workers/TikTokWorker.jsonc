@@ -1,0 +1,55 @@
+{
+  "name": "hgh-tiktok",
+  "account_id": "ef74c750bb9bf8fc53e3ca1a6bb07bf4",
+  "main": "TikTokPageWorker.js",
+  "compatibility_date": "2026-09-13",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [
+    {
+      "pattern": "https://www.hghsejahtera.my/api/TikTokConnect*",
+      "zone_id": "35299064de4a8bca4c0ad76ca3727424"
+    },
+    {
+      "pattern": "https://www.hghsejahtera.my/api/TikTokConnection*",
+      "zone_id": "35299064de4a8bca4c0ad76ca3727424"
+    },
+    {
+      "pattern": "https://www.hghsejahtera.my/api/TikTokAuthorization*",
+      "zone_id": "35299064de4a8bca4c0ad76ca3727424"
+    },
+    {
+      "pattern": "https://www.hghsejahtera.my/Settings/APIConnection*",
+      "zone_id": "35299064de4a8bca4c0ad76ca3727424"
+    },
+    {
+      "pattern": "https://www.hghsejahtera.my/TikTokAssets/*",
+      "zone_id": "35299064de4a8bca4c0ad76ca3727424"
+    }
+  ],
+  "vars": {
+    "TikTokConnectionEnabled": "true"
+  },
+  "observability": {
+    "enabled": true,
+    "redact_query_string": true,
+    "logs": {
+      "enabled": true,
+      "invocation_logs": false
+    },
+    "traces": {
+      "enabled": false
+    }
+  },
+  "keep_vars": true,
+  "assets": {
+    "directory": "../../ReleaseValidation/TikTokPageDesignCandidate/Assets",
+    "binding": "Assets",
+    "run_worker_first": true,
+    "html_handling": "none",
+    "not_found_handling": "none"
+  }
+}
